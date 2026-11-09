@@ -40,16 +40,20 @@ class _TakeoutImportScreenState extends ConsumerState<TakeoutImportScreen> {
   String? _error;
   StreamSubscription<TakeoutCounts>? _sub;
 
+  // Kept from initState: ref can't be used once the widget is disposing.
+  late final NativeChannel _native = ref.read(nativeChannelProvider);
+
   @override
   void initState() {
     super.initState();
+    _native;
     _inspect();
   }
 
   @override
   void dispose() {
     _sub?.cancel();
-    ref.read(nativeChannelProvider).keepScreenOn(false);
+    _native.keepScreenOn(false);
     super.dispose();
   }
 
@@ -115,9 +119,11 @@ class _TakeoutImportScreenState extends ConsumerState<TakeoutImportScreen> {
     } finally {
       await _sub?.cancel();
       await native.keepScreenOn(false);
-      ref.invalidate(libraryProvider);
-      ref.invalidate(albumsProvider);
-      ref.invalidate(reviewsProvider);
+      if (mounted) {
+        ref.invalidate(libraryProvider);
+        ref.invalidate(albumsProvider);
+        ref.invalidate(reviewsProvider);
+      }
     }
   }
 
