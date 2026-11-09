@@ -54,11 +54,76 @@ class CameraInfo {
       v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
 }
 
+/// A photo or video in Android's trash.
+class TrashedItem {
+  const TrashedItem({
+    required this.id,
+    required this.name,
+    required this.video,
+    required this.expires,
+    required this.size,
+    required this.width,
+    required this.height,
+    required this.duration,
+  });
+
+  factory TrashedItem.fromMap(Map<Object?, Object?> m) => TrashedItem(
+    id: m['id']! as String,
+    name: (m['name'] as String?) ?? '',
+    video: m['video']! as bool,
+    expires: DateTime.fromMillisecondsSinceEpoch(
+      ((m['expires'] as num?) ?? 0).toInt() * 1000,
+    ),
+    size: ((m['size'] as num?) ?? 0).toInt(),
+    width: ((m['width'] as num?) ?? 0).toInt(),
+    height: ((m['height'] as num?) ?? 0).toInt(),
+    duration: Duration(milliseconds: ((m['duration'] as num?) ?? 0).toInt()),
+  );
+
+  final String id;
+  final String name;
+  final bool video;
+
+  /// When Android deletes it for good.
+  final DateTime expires;
+  final int size;
+  final int width;
+  final int height;
+  final Duration duration;
+
+  @override
+  bool operator ==(Object other) => other is TrashedItem && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
 /// Dart side of the app's own Android channel (MainActivity / NativeChannel).
 class NativeChannel {
   const NativeChannel();
 
   static const MethodChannel _channel = MethodChannel('my.minned.fotos/native');
+
+  Future<List<TrashedItem>> trash() async {
+    final List<Object?>? rows = await _channel.invokeMethod<List<Object?>>(
+      'trashList',
+    );
+    return <TrashedItem>[
+      for (final Object? r in rows ?? <Object?>[])
+        TrashedItem.fromMap(r! as Map<Object?, Object?>),
+    ];
+  }
+
+  Future<Uint8List?> trashThumbnail(TrashedItem item, int px) async {
+    try {
+      return await _channel.invokeMethod<Uint8List>(
+        'trashThumbnail',
+        <String, Object>{'id': item.id, 'video': item.video, 'px': px},
+      );
+    } on PlatformException {
+      return null;
+    }
+  }
 
   Future<CameraInfo?> exif(String path) async {
     try {

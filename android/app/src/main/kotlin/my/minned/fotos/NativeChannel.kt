@@ -17,6 +17,15 @@ class NativeChannel(private val activity: Activity) : MethodChannel.MethodCallHa
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "exif" -> background(result) { exif(call.argument<String>("path")!!) }
+            "trashList" -> background(result) { TrashStore.list(activity) }
+            "trashThumbnail" -> background(result) {
+                TrashStore.thumbnail(
+                    activity,
+                    call.argument<String>("id")!!.toLong(),
+                    call.argument<Boolean>("video")!!,
+                    call.argument<Int>("px")!!,
+                )
+            }
             else -> result.notImplemented()
         }
     }
