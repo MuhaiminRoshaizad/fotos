@@ -7,12 +7,15 @@ import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
 
 /** Android work Flutter has no API for. Slow calls run off the main thread. */
-class NativeChannel(private val activity: Activity) : MethodChannel.MethodCallHandler {
+class NativeChannel(
+    private val activity: Activity,
+    private val channel: MethodChannel,
+) : MethodChannel.MethodCallHandler {
     companion object {
         const val NAME = "my.minned.fotos/native"
     }
 
-    private val io = Executors.newSingleThreadExecutor()
+    private val io = Executors.newCachedThreadPool()
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -25,6 +28,56 @@ class NativeChannel(private val activity: Activity) : MethodChannel.MethodCallHa
                     call.argument<Boolean>("video")!!,
                     call.argument<Int>("px")!!,
                 )
+            }
+            "root" -> result.success(FilesNative.root())
+            "hasAllFilesAccess" -> result.success(FilesNative.hasAllFilesAccess())
+            "openAllFilesAccessSettings" -> {
+                FilesNative.openAllFilesAccessSettings(activity)
+                result.success(null)
+            }
+            "storage" -> result.success(FilesNative.storage())
+            "scan" -> background(result) {
+                FilesNative.scan(activity, call.argument<List<String>>("paths")!!)
+            }
+            "openWith" -> {
+                try {
+                    FilesNative.openWith(activity, call.argument<String>("path")!!)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
+            "zipInfo" -> background(result) { FilesNative.zipInfo(call.argument<String>("path")!!) }
+            "extract" -> background(result) {
+                val written = FilesNative.extract(
+                    call.argument<String>("zip")!!,
+                    call.argument<String>("target")!!,
+                ) { done, total ->
+                    activity.runOnUiThread {
+                        channel.invokeMethod(
+                            "extractProgress",
+                            mapOf("done" to done, "total" to total),
+                        )
+                    }
+                }
+                FilesNative.scan(activity, written)
+                written.size
+            }
+            "pdfPageCount" -> background(result) {
+                FilesNative.pdfPageCount(call.argument<String>("path")!!)
+            }
+            "pdfPage" -> background(result) {
+                FilesNative.pdfPage(
+                    call.argument<String>("path")!!,
+                    call.argument<Int>("index")!!,
+                    call.argument<Int>("width")!!,
+                )
+            }
+            "keepScreenOn" -> {
+                val on = call.argument<Boolean>("on")!!
+                val flag = android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                if (on) activity.window.addFlags(flag) else activity.window.clearFlags(flag)
+                result.success(null)
             }
             else -> result.notImplemented()
         }

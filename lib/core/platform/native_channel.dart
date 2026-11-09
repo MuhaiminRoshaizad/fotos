@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 /// Camera details read from a photo's EXIF.
@@ -136,4 +138,126 @@ class NativeChannel {
       return null;
     }
   }
+
+  // ---- Files tab ----------------------------------------------------------
+
+  Future<String> storageRoot() async =>
+      (await _channel.invokeMethod<String>('root'))!;
+
+  Future<bool> hasAllFilesAccess() async =>
+      (await _channel.invokeMethod<bool>('hasAllFilesAccess')) ?? false;
+
+  Future<void> openAllFilesAccessSettings() =>
+      _channel.invokeMethod<void>('openAllFilesAccessSettings');
+
+  Future<StorageStats> storage() async {
+    final Map<Object?, Object?> m = (await _channel
+        .invokeMethod<Map<Object?, Object?>>('storage'))!;
+    return StorageStats(
+      total: (m['total']! as num).toInt(),
+      free: (m['free']! as num).toInt(),
+    );
+  }
+
+  /// Updates MediaStore for files fotos changed, so the gallery tabs match.
+  Future<void> scan(List<String> paths) =>
+      _channel.invokeMethod<void>('scan', <String, Object>{'paths': paths});
+
+  /// Returns false when no app can open the file.
+  Future<bool> openWith(String path) async =>
+      (await _channel.invokeMethod<bool>('openWith', <String, Object>{
+        'path': path,
+      })) ??
+      false;
+
+  Future<ZipInfo> zipInfo(String path) async {
+    final Map<Object?, Object?> m = (await _channel
+        .invokeMethod<Map<Object?, Object?>>('zipInfo', <String, Object>{
+          'path': path,
+        }))!;
+    return ZipInfo(
+      files: (m['files']! as num).toInt(),
+      bytes: (m['bytes']! as num).toInt(),
+      takeout: m['takeout']! as bool,
+    );
+  }
+
+  static final StreamController<(int, int)> _extractProgress =
+      StreamController<(int, int)>.broadcast();
+  static bool _listening = false;
+
+  /// (done, total) while an extraction runs.
+  Stream<(int, int)> get extractProgress {
+    if (!_listening) {
+      _listening = true;
+      _channel.setMethodCallHandler((MethodCall call) async {
+        if (call.method == 'extractProgress') {
+          final Map<Object?, Object?> m = call.arguments as Map<Object?, Object?>;
+          _extractProgress.add((m['done']! as int, m['total']! as int));
+        }
+      });
+    }
+    return _extractProgress.stream;
+  }
+
+  /// Extracts [zip] into [target] and returns how many files were written.
+  /// Throws [NotEnoughSpaceException] before writing anything when the phone
+  /// lacks room.
+  Future<int> extract(String zip, String target) async {
+    try {
+      return (await _channel.invokeMethod<int>('extract', <String, Object>{
+        'zip': zip,
+        'target': target,
+      }))!;
+    } on PlatformException catch (e) {
+      final String msg = e.message ?? '';
+      if (msg.startsWith('not_enough_space:')) {
+        throw NotEnoughSpaceException(int.parse(msg.split(':').last));
+      }
+      rethrow;
+    }
+  }
+
+  Future<int> pdfPageCount(String path) async =>
+      (await _channel.invokeMethod<int>('pdfPageCount', <String, Object>{
+        'path': path,
+      }))!;
+
+  Future<Uint8List> pdfPage(String path, int index, int width) async =>
+      (await _channel.invokeMethod<Uint8List>('pdfPage', <String, Object>{
+        'path': path,
+        'index': index,
+        'width': width,
+      }))!;
+
+  Future<void> keepScreenOn(bool on) =>
+      _channel.invokeMethod<void>('keepScreenOn', <String, Object>{'on': on});
+}
+
+class StorageStats {
+  const StorageStats({required this.total, required this.free});
+  final int total;
+  final int free;
+  int get used => total - free;
+}
+
+class ZipInfo {
+  const ZipInfo({
+    required this.files,
+    required this.bytes,
+    required this.takeout,
+  });
+
+  final int files;
+
+  /// Total size once extracted.
+  final int bytes;
+
+  /// Looks like a Google Takeout archive.
+  final bool takeout;
+}
+
+class NotEnoughSpaceException implements Exception {
+  const NotEnoughSpaceException(this.needed);
+  final int needed;
 }

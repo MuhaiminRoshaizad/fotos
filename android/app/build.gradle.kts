@@ -64,3 +64,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // FileProvider for "Open with"; the same version the plugins already resolve.
+    implementation("androidx.core:core:1.16.0")
+}

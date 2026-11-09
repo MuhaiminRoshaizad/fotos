@@ -7,7 +7,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NativeChannel.NAME)
-            .setMethodCallHandler(NativeChannel(this))
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NativeChannel.NAME)
+        channel.setMethodCallHandler(NativeChannel(this, channel))
     }
 }
