@@ -56,6 +56,7 @@ abstract interface class MediaRepository {
   /// system confirmation, in which case nothing changes.
   Future<bool> setFavourite(List<AssetEntity> items, bool favourite);
   Future<List<String>> moveToTrash(List<AssetEntity> items);
+  Future<List<String>> restoreFromTrash(List<AssetEntity> items);
   Future<bool> moveTo(List<AssetEntity> items, String relativePath);
   Future<int> copyTo(List<AssetEntity> items, String relativePath);
 }

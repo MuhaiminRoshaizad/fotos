@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../../../core/media/grid_skeleton.dart';
@@ -10,6 +11,7 @@ import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../viewer/presentation/viewer_screen.dart';
 
 enum LibraryKind {
   photos(MediaKind.photos, 'Photos'),
@@ -130,7 +132,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           level: _level,
           heroPrefix: widget.kind.name,
           onLevelChanged: (GridLevel l) => setState(() => _level = l),
-          onOpen: (int index) {},
+          onOpen: (int index) => context.push(
+            '/viewer',
+            extra: ViewerArgs(
+              items: list,
+              index: index,
+              heroPrefix: widget.kind.name,
+            ),
+          ),
         );
       },
     );

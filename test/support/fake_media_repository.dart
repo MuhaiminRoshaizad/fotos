@@ -76,6 +76,10 @@ class FakeMediaRepository implements MediaRepository {
       items.map((AssetEntity e) => e.id).toList();
 
   @override
+  Future<List<String>> restoreFromTrash(List<AssetEntity> items) async =>
+      items.map((AssetEntity e) => e.id).toList();
+
+  @override
   Future<bool> moveTo(List<AssetEntity> items, String relativePath) async =>
       true;
 
