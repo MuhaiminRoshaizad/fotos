@@ -17,6 +17,8 @@ class NativeChannel(
 
     private val io = Executors.newCachedThreadPool()
 
+    @Volatile private var takeout: TakeoutImporter? = null
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "exif" -> background(result) { exif(call.argument<String>("path")!!) }
@@ -72,6 +74,36 @@ class NativeChannel(
                     call.argument<Int>("index")!!,
                     call.argument<Int>("width")!!,
                 )
+            }
+            "takeoutStart" -> background(result) {
+                val importer = TakeoutImporter(activity) { p ->
+                    activity.runOnUiThread { channel.invokeMethod("takeoutProgress", p) }
+                }
+                takeout = importer
+                try {
+                    importer.run(call.argument<String>("path")!!)
+                } finally {
+                    takeout = null
+                }
+            }
+            "takeoutCancel" -> {
+                takeout?.cancelled = true
+                result.success(null)
+            }
+            "takeoutReviews" -> background(result) {
+                val all = TakeoutImporter.readReviews(activity)
+                (0 until all.length()).map { i ->
+                    val o = all.getJSONObject(i)
+                    o.keys().asSequence().associateWith { k -> o.get(k).takeIf { it != org.json.JSONObject.NULL } }
+                }
+            }
+            "takeoutResolve" -> background(result) {
+                val id = call.argument<String>("id")!!
+                val keepTakeout = call.argument<Boolean>("keepTakeout")!!
+                val item = TakeoutImporter.findReview(activity, id)
+                if (item != null && keepTakeout) TakeoutImporter.publishStaged(activity, item)
+                TakeoutImporter.dropReview(activity, id)
+                null
             }
             "keepScreenOn" -> {
                 val on = call.argument<Boolean>("on")!!

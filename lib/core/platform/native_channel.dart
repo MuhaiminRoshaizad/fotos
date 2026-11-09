@@ -182,24 +182,33 @@ class NativeChannel {
     );
   }
 
-  static final StreamController<(int, int)> _extractProgress =
-      StreamController<(int, int)>.broadcast();
+  static final StreamController<MethodCall> _events =
+      StreamController<MethodCall>.broadcast();
   static bool _listening = false;
 
-  /// (done, total) while an extraction runs.
-  Stream<(int, int)> get extractProgress {
+  /// Calls Android makes into Dart (progress reports), by method name.
+  Stream<Object?> events(String method) {
     if (!_listening) {
       _listening = true;
       _channel.setMethodCallHandler((MethodCall call) async {
-        if (call.method == 'extractProgress') {
-          final Map<Object?, Object?> m =
-              call.arguments as Map<Object?, Object?>;
-          _extractProgress.add((m['done']! as int, m['total']! as int));
-        }
+        _events.add(call);
       });
     }
-    return _extractProgress.stream;
+    return _events.stream
+        .where((MethodCall c) => c.method == method)
+        .map((MethodCall c) => c.arguments);
   }
+
+  /// For features that own their calls on this channel (the Takeout import).
+  Future<T?> invoke<T>(String method, [Map<String, Object?>? args]) =>
+      _channel.invokeMethod<T>(method, args);
+
+  /// (done, total) while an extraction runs.
+  Stream<(int, int)> get extractProgress =>
+      events('extractProgress').map((Object? a) {
+        final Map<Object?, Object?> m = a! as Map<Object?, Object?>;
+        return (m['done']! as int, m['total']! as int);
+      });
 
   /// Extracts [zip] into [target] and returns how many files were written.
   /// Throws [NotEnoughSpaceException] before writing anything when the phone
