@@ -7,7 +7,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// The upload key lives outside the repo: android/key.properties locally, GitHub secrets in CI.
+// An optional upload key, kept outside the repo in android/key.properties.
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) load(FileInputStream(keystorePropertiesFile))
@@ -44,9 +44,8 @@ android {
 
     buildTypes {
         release {
-            // Without key.properties, local release builds fall back to the debug key so
-            // `flutter run --release` still works. The release workflow refuses to run
-            // without the real key, so a debug-signed APK is never published.
+            // Without key.properties, release builds use this machine's debug key. That
+            // key is stable per machine, so APKs built here update each other in place.
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
