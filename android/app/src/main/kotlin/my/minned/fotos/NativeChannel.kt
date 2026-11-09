@@ -135,7 +135,9 @@ class NativeChannel(
     private fun background(result: MethodChannel.Result, work: () -> Any?) {
         io.execute {
             try {
-                val value = work()
+                // A Unit result can't cross the channel; replying with it
+                // throws on the main thread and takes the whole app down.
+                val value = work().takeUnless { it == Unit }
                 activity.runOnUiThread { result.success(value) }
             } catch (e: Exception) {
                 activity.runOnUiThread { result.error("native_failed", e.message, null) }
