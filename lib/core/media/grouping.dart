@@ -17,6 +17,12 @@ enum GridLevel {
     GridLevel.days => 'Days',
   };
 
+  /// Columns for a grid [width] logical pixels wide. Phones get [columns];
+  /// wider screens add columns so thumbnails keep a phone-like size instead
+  /// of stretching across a tablet.
+  int columnsFor(double width) =>
+      (columns * width / 412).round().clamp(columns, columns * 3);
+
   /// One step closer (pinch out) or further (pinch in), clamped at the ends.
   GridLevel step(int delta) {
     final int i = (index + delta).clamp(0, GridLevel.values.length - 1);

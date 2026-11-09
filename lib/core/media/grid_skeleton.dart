@@ -19,8 +19,8 @@ class GridSkeleton extends StatelessWidget {
       enabled: true,
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints c) {
-          final double tile =
-              (c.maxWidth - 2 * (level.columns - 1)) / level.columns;
+          final int columns = level.columnsFor(c.maxWidth);
+          final double tile = (c.maxWidth - 2 * (columns - 1)) / columns;
           final int rows = (c.maxHeight / (tile + 2)).ceil();
           return ListView(
             physics: const NeverScrollableScrollPhysics(),
@@ -39,13 +39,13 @@ class GridSkeleton extends StatelessWidget {
                 ),
               ),
               GridView.count(
-                crossAxisCount: level.columns,
+                crossAxisCount: columns,
                 mainAxisSpacing: 2,
                 crossAxisSpacing: 2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 children: List<Widget>.generate(
-                  rows * level.columns,
+                  rows * columns,
                   (_) => ColoredBox(color: cs.surfaceContainerHigh),
                 ),
               ),

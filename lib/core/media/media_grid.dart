@@ -249,9 +249,10 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
 
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints c) {
+        final int columns = widget.level.columnsFor(c.maxWidth);
         final GridGeometry geo = GridGeometry(
           width: c.maxWidth,
-          columns: widget.level.columns,
+          columns: columns,
           groupSizes: <int>[
             for (final MediaGroup<AssetEntity> g in groups) g.items.length,
           ],
@@ -301,7 +302,7 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
           slivers.add(
             SliverGrid.builder(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: widget.level.columns,
+                crossAxisCount: columns,
                 mainAxisSpacing: 2,
                 crossAxisSpacing: 2,
               ),

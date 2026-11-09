@@ -40,4 +40,12 @@ void main() {
     expect(GridLevel.all.step(1), GridLevel.days);
     expect(GridLevel.all.step(-1), GridLevel.months);
   });
+
+  test('wide screens add columns, phones keep the base count', () {
+    expect(GridLevel.all.columnsFor(390), 4);
+    expect(GridLevel.all.columnsFor(412), 4);
+    expect(GridLevel.all.columnsFor(800), 8);
+    expect(GridLevel.days.columnsFor(1280), 9);
+    expect(GridLevel.years.columnsFor(5000), 21);
+  });
 }
