@@ -12,6 +12,9 @@ import '../features/files/presentation/folder_screen.dart';
 import '../features/files/presentation/pdf_screen.dart';
 import '../features/files/presentation/text_screen.dart';
 import '../features/library/presentation/library_screen.dart';
+import '../features/takeout_import/presentation/review_screen.dart';
+import '../features/takeout_import/presentation/takeout_home_screen.dart';
+import '../features/takeout_import/presentation/takeout_import_screen.dart';
 import '../features/viewer/presentation/viewer_screen.dart';
 import 'shell.dart';
 
@@ -38,6 +41,17 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                   FadeTransition(opacity: a, child: child),
               child: ViewerScreen(args: state.extra! as ViewerArgs),
             ),
+      ),
+      GoRoute(
+        path: '/takeout/import',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, GoRouterState s) =>
+            TakeoutImportScreen(path: s.uri.queryParameters['path']!),
+      ),
+      GoRoute(
+        path: '/takeout/review',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, _) => const ReviewScreen(),
       ),
       GoRoute(
         path: '/files/media',
@@ -101,6 +115,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                   GoRoute(
                     path: 'trash',
                     builder: (_, _) => const TrashScreen(),
+                  ),
+                  GoRoute(
+                    path: 'takeout',
+                    builder: (_, _) => const TakeoutHomeScreen(),
                   ),
                 ],
               ),

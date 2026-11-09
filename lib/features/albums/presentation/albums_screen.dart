@@ -125,6 +125,11 @@ class _AlbumsBody extends ConsumerWidget {
                   count: ref.watch(trashProvider).value?.length,
                   onTap: () => context.push('/albums/trash'),
                 ),
+                _MoreRow(
+                  icon: Icons.download_for_offline_outlined,
+                  label: 'Import from Google Takeout',
+                  onTap: () => context.push('/albums/takeout'),
+                ),
               ],
             ),
             SliverToBoxAdapter(child: SizedBox(height: bottom)),

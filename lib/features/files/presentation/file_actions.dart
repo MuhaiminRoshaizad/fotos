@@ -113,7 +113,13 @@ Future<void> showEntryActions(
           ),
         ),
         const Divider(height: 1),
-        if (zip != null) ...<Widget>[
+        if (zip != null && zip.takeout)
+          SheetAction(
+            icon: Icons.download_for_offline_outlined,
+            label: 'Import from Google Takeout',
+            onTap: () => Navigator.of(ctx).pop('takeout'),
+          ),
+        if (zip != null && !zip.takeout) ...<Widget>[
           SheetAction(
             icon: Icons.unarchive_outlined,
             label: 'Extract here',
@@ -163,6 +169,13 @@ Future<void> showEntryActions(
   );
   if (choice == null || !context.mounted) return;
   switch (choice) {
+    case 'takeout':
+      context.push(
+        Uri(
+          path: '/takeout/import',
+          queryParameters: <String, String>{'path': entry.path},
+        ).toString(),
+      );
     case 'extractHere':
       await _extract(context, ref, entry, p.dirname(entry.path));
     case 'extractTo':
