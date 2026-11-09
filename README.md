@@ -16,6 +16,7 @@ permission in release builds.
 - **Viewer** — swipe between items, down to close, up for details (date, file,
   camera, location). Pinch or double-tap to zoom. Videos: double-tap a side to
   skip 10 s, hold for 2× speed, scrub on a filmstrip, loop and mute.
+  It also opens photos sent from the camera's thumbnail or another app's View.
 - **Albums** — the phone's folders, with pins, chosen covers and per-album sort
   (date, name, length). New album, Favourites, and Recently deleted with restore.
 - **Files** — every folder on the phone (needs All files access). PDFs open in a

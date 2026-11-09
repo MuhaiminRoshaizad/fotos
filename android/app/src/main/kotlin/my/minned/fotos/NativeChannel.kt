@@ -31,6 +31,12 @@ class NativeChannel(
                     call.argument<Int>("px")!!,
                 )
             }
+            "launchUri" -> {
+                // Handed out once, so a later resume doesn't reopen it.
+                val uri = MainActivity.viewUri(activity.intent)
+                activity.intent = android.content.Intent(activity.intent).setAction(null)
+                result.success(uri)
+            }
             "root" -> result.success(FilesNative.root())
             "hasAllFilesAccess" -> result.success(FilesNative.hasAllFilesAccess())
             "openAllFilesAccessSettings" -> {

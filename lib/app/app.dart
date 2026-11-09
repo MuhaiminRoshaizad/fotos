@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
+import '../features/viewer/presentation/view_intent_handler.dart';
 import 'router.dart';
 
 class FotosApp extends ConsumerWidget {
@@ -15,6 +16,8 @@ class FotosApp extends ConsumerWidget {
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
       routerConfig: ref.watch(routerProvider),
+      builder: (BuildContext context, Widget? child) =>
+          ViewIntentHandler(child: child ?? const SizedBox.shrink()),
     );
   }
 }
