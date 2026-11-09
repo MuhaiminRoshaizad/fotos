@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 
 import '../core/selection/selection.dart';
 import '../core/theme/app_tokens.dart';
@@ -21,12 +22,51 @@ const double _itemWidth = 72;
 const double _indicatorWidth = 56;
 
 /// The pill that floats above the content. Icon over label so four
-/// destinations fit a phone width; the indicator slides between them.
-class FloatingNav extends StatelessWidget {
+/// destinations fit a phone width. The indicator springs to a newly opened
+/// tab, passing it a little before it settles, and the tab's icon bounces.
+class FloatingNav extends StatefulWidget {
   const FloatingNav({super.key, required this.index, required this.onSelect});
 
   final int index;
   final ValueChanged<int> onSelect;
+
+  @override
+  State<FloatingNav> createState() => _FloatingNavState();
+}
+
+class _FloatingNavState extends State<FloatingNav>
+    with SingleTickerProviderStateMixin {
+  /// Where the indicator is, in tabs from the left.
+  late final AnimationController _at = AnimationController.unbounded(
+    vsync: this,
+    value: widget.index.toDouble(),
+  );
+
+  @override
+  void didUpdateWidget(FloatingNav old) {
+    super.didUpdateWidget(old);
+    if (old.index == widget.index) return;
+    final double to = widget.index.toDouble();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _at.value = to;
+    } else {
+      _at.animateWith(
+        SpringSimulation(
+          AppMotion.spring,
+          _at.value,
+          to,
+          _at.velocity,
+          snapToEnd: true,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _at.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,13 +77,21 @@ class FloatingNav extends StatelessWidget {
         height: AppNavMetrics.height - 12,
         child: Stack(
           children: <Widget>[
-            AnimatedPositioned(
-              duration: AppMotion.long,
-              curve: AppMotion.emphasized,
-              left: index * _itemWidth + (_itemWidth - _indicatorWidth) / 2,
-              top: 4,
-              width: _indicatorWidth,
-              height: 30,
+            AnimatedBuilder(
+              animation: _at,
+              builder: (BuildContext context, Widget? child) {
+                final (double left, double width) = indicatorSpan(
+                  _at.value,
+                  navDestinations.length,
+                );
+                return Positioned(
+                  left: left,
+                  top: 4,
+                  width: width,
+                  height: 30,
+                  child: child!,
+                );
+              },
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: cs.primaryContainer,
@@ -56,8 +104,8 @@ class FloatingNav extends StatelessWidget {
                 for (int i = 0; i < navDestinations.length; i++)
                   _NavItem(
                     destination: navDestinations[i],
-                    selected: i == index,
-                    onTap: () => onSelect(i),
+                    selected: i == widget.index,
+                    onTap: () => widget.onSelect(i),
                   ),
               ],
             ),
@@ -68,7 +116,27 @@ class FloatingNav extends StatelessWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
+/// Left edge and width of the indicator [at] tabs from the left. Past the
+/// first or last tab the spring's overshoot squashes it against that end,
+/// by up to a third of its width, instead of carrying it out of the pill.
+(double, double) indicatorSpan(double at, int tabs) {
+  final double last = tabs - 1.0;
+  final double over = at < 0 ? -at : (at > last ? at - last : 0.0);
+  final double width =
+      _indicatorWidth -
+      (over * _itemWidth).clamp(0, _indicatorWidth / 3).toDouble();
+  final double inset = (_itemWidth - _indicatorWidth) / 2;
+  final double left = at < 0
+      ? inset
+      : at > last
+      ? last * _itemWidth + inset + _indicatorWidth - width
+      : at * _itemWidth + inset;
+  return (left, width);
+}
+
+/// One tab. No ripple: the indicator and a small bounce of the icon answer
+/// the tap.
+class _NavItem extends StatefulWidget {
   const _NavItem({
     required this.destination,
     required this.selected,
@@ -80,17 +148,61 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _bounce = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+    value: 1,
+  );
+  late final Animation<double> _scale =
+      TweenSequence<double>(<TweenSequenceItem<double>>[
+        TweenSequenceItem<double>(
+          tween: Tween<double>(begin: 1, end: 1.28),
+          weight: 1,
+        ),
+        TweenSequenceItem<double>(
+          tween: Tween<double>(begin: 1.28, end: 0.94),
+          weight: 1,
+        ),
+        TweenSequenceItem<double>(
+          tween: Tween<double>(begin: 0.94, end: 1),
+          weight: 1,
+        ),
+      ]).animate(CurvedAnimation(parent: _bounce, curve: Curves.easeOut));
+
+  @override
+  void didUpdateWidget(_NavItem old) {
+    super.didUpdateWidget(old);
+    if (widget.selected &&
+        !old.selected &&
+        !MediaQuery.disableAnimationsOf(context)) {
+      _bounce.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _bounce.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
+    final bool selected = widget.selected;
     final Color color = selected ? cs.primary : cs.onSurfaceVariant;
     return Semantics(
       selected: selected,
       button: true,
-      label: destination.label,
+      label: widget.destination.label,
       excludeSemantics: true,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 36,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
         child: SizedBox(
           width: _itemWidth,
           child: Column(
@@ -98,15 +210,20 @@ class _NavItem extends StatelessWidget {
             children: <Widget>[
               SizedBox(
                 height: 30,
-                child: Icon(
-                  selected ? destination.selectedIcon : destination.icon,
-                  size: AppIconSize.standard,
-                  color: color,
+                child: ScaleTransition(
+                  scale: _scale,
+                  child: Icon(
+                    selected
+                        ? widget.destination.selectedIcon
+                        : widget.destination.icon,
+                    size: AppIconSize.standard,
+                    color: color,
+                  ),
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                destination.label,
+                widget.destination.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textScaler: MediaQuery.textScalerOf(
@@ -154,9 +271,9 @@ class SelectionBar extends StatelessWidget {
                 enabled: enabled,
                 label: a.label,
                 excludeSemantics: true,
-                child: InkResponse(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: enabled ? () => onAction(a) : null,
-                  radius: 36,
                   child: SizedBox(
                     width: _itemWidth + 4,
                     child: Opacity(

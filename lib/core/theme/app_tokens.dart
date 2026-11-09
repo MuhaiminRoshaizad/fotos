@@ -34,6 +34,14 @@ abstract final class AppMotion {
   static const Curve emphasized = Curves.easeInOutCubicEmphasized;
   static const Curve decelerate = Cubic(0.05, 0.7, 0.1, 1);
   static const Curve accelerate = Cubic(0.3, 0, 0.8, 0.15);
+
+  /// Springy movement for things the user moves directly (the nav indicator):
+  /// slightly under-damped, so it passes its target a little and settles.
+  static final SpringDescription spring = SpringDescription.withDampingRatio(
+    mass: 1,
+    stiffness: 180,
+    ratio: 0.6,
+  );
 }
 
 /// Geometry of the floating navigation bar, shared by everything that must
