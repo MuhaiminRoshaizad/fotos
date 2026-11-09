@@ -221,34 +221,38 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         child: Stack(
           children: <Widget>[
             Positioned.fill(
-              child: ExtendedImageGesturePageView.builder(
-                controller: _pages,
-                itemCount: _items.length,
-                onPageChanged: (int i) {
-                  setState(() => _index = i);
-                  _centreStrip(true);
-                },
-                itemBuilder: (BuildContext context, int i) {
-                  final AssetEntity item = _items[i];
-                  if (item.type == AssetType.video) {
-                    return ExtendedImageSlidePageHandler(
-                      extendedImageSlidePageState: _slideKey.currentState,
-                      heroBuilderForSlidingPage: (Widget child) =>
-                          Hero(tag: _hero(item), child: child),
-                      child: VideoPage(
-                        key: ValueKey<String>(item.id),
-                        asset: item,
-                        active: i == _index,
-                        chrome: _chrome,
-                        onTap: () => _setChrome(!_chrome),
-                      ),
+              // Same reason as in VideoPage: give page text a real style.
+              child: Material(
+                type: MaterialType.transparency,
+                child: ExtendedImageGesturePageView.builder(
+                  controller: _pages,
+                  itemCount: _items.length,
+                  onPageChanged: (int i) {
+                    setState(() => _index = i);
+                    _centreStrip(true);
+                  },
+                  itemBuilder: (BuildContext context, int i) {
+                    final AssetEntity item = _items[i];
+                    if (item.type == AssetType.video) {
+                      return ExtendedImageSlidePageHandler(
+                        extendedImageSlidePageState: _slideKey.currentState,
+                        heroBuilderForSlidingPage: (Widget child) =>
+                            Hero(tag: _hero(item), child: child),
+                        child: VideoPage(
+                          key: ValueKey<String>(item.id),
+                          asset: item,
+                          active: i == _index,
+                          chrome: _chrome,
+                          onTap: () => _setChrome(!_chrome),
+                        ),
+                      );
+                    }
+                    return GestureDetector(
+                      onTap: () => _setChrome(!_chrome),
+                      child: _photo(item, i),
                     );
-                  }
-                  return GestureDetector(
-                    onTap: () => _setChrome(!_chrome),
-                    child: _photo(item, i),
-                  );
-                },
+                  },
+                ),
               ),
             ),
             _TopBar(

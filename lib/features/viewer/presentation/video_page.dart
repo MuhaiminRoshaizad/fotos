@@ -165,6 +165,19 @@ class _VideoPageState extends ConsumerState<VideoPage> {
           )
         : AspectRatio(aspectRatio: c.value.aspectRatio, child: VideoPlayer(c));
 
+    // The slide-out page doesn't put the video under the viewer's Material,
+    // so give it its own; without one, text falls back to Flutter's
+    // unstyled debug look.
+    return Material(
+      type: MaterialType.transparency,
+      child: DefaultTextStyle(
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        child: _page(c, picture),
+      ),
+    );
+  }
+
+  Widget _page(VideoPlayerController? c, Widget picture) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints box) {
         return GestureDetector(
@@ -392,8 +405,10 @@ class _Controls extends ConsumerWidget {
               Expanded(
                 child: Text(
                   '${Fmt.duration(v.position)} / ${Fmt.duration(v.duration)}',
+                  maxLines: 1,
                   style: const TextStyle(
                     color: fg,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
                   ),
@@ -509,8 +524,18 @@ class _Filmstrip extends StatelessWidget {
                                 ),
                                 fit: BoxFit.cover,
                                 gaplessPlayback: true,
-                                errorBuilder: (_, _, _) =>
-                                    const ColoredBox(color: Color(0xFF222222)),
+                                // Some videos can't give a frame at every
+                                // time; show the cover frame there instead.
+                                errorBuilder: (_, _, _) => Image(
+                                  image: AssetEntityImageProvider(
+                                    asset,
+                                    isOriginal: false,
+                                    thumbnailSize: const ThumbnailSize.square(
+                                      128,
+                                    ),
+                                  ),
+                                  fit: BoxFit.cover,
+                                ),
                               ),
                             ),
                           ),
