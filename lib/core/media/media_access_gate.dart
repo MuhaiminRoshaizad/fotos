@@ -110,8 +110,8 @@ class _LimitedBanner extends ConsumerWidget {
             'fotos can see only the photos you picked.',
             style: TextStyle(color: cs.onPrimaryContainer),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
             children: <Widget>[
               TextButton(
                 onPressed: () => ref

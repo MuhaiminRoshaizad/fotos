@@ -165,11 +165,13 @@ class _Section extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.xs),
             ],
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            Flexible(
+              child: Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         ),
