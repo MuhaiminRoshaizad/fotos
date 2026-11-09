@@ -192,7 +192,8 @@ class NativeChannel {
       _listening = true;
       _channel.setMethodCallHandler((MethodCall call) async {
         if (call.method == 'extractProgress') {
-          final Map<Object?, Object?> m = call.arguments as Map<Object?, Object?>;
+          final Map<Object?, Object?> m =
+              call.arguments as Map<Object?, Object?>;
           _extractProgress.add((m['done']! as int, m['total']! as int));
         }
       });
@@ -218,10 +219,8 @@ class NativeChannel {
     }
   }
 
-  Future<int> pdfPageCount(String path) async =>
-      (await _channel.invokeMethod<int>('pdfPageCount', <String, Object>{
-        'path': path,
-      }))!;
+  Future<int> pdfPageCount(String path) async => (await _channel
+      .invokeMethod<int>('pdfPageCount', <String, Object>{'path': path}))!;
 
   Future<Uint8List> pdfPage(String path, int index, int width) async =>
       (await _channel.invokeMethod<Uint8List>('pdfPage', <String, Object>{
