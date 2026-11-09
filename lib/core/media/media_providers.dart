@@ -32,7 +32,9 @@ mediaAccessProvider = AsyncNotifierProvider<MediaAccessNotifier, MediaAccess>(
 );
 
 /// Ticks whenever the device library changes; lists watch it to refresh.
-/// Bursts (a 300-item move) arrive as one tick.
+/// A burst (a 300-item move, a running Takeout import) arrives as one tick
+/// once the library has been quiet for a moment, so the whole library isn't
+/// re-read after every single file.
 final StreamProvider<int> mediaChangesProvider = StreamProvider<int>((Ref ref) {
   final StreamController<int> out = StreamController<int>();
   int ticks = 0;
@@ -42,7 +44,7 @@ final StreamProvider<int> mediaChangesProvider = StreamProvider<int>((Ref ref) {
       .changes()
       .listen((_) {
         debounce?.cancel();
-        debounce = Timer(const Duration(milliseconds: 400), () {
+        debounce = Timer(const Duration(milliseconds: 1500), () {
           out.add(++ticks);
         });
       });
