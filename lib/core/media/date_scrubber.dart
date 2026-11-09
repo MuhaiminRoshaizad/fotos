@@ -67,11 +67,18 @@ class _DateScrubberState extends State<DateScrubber> {
     setState(() => _visible = true);
   }
 
-  void _dragTo(double dy, double trackHeight) {
+  // Where the handle and the finger were when the drag began. The handle
+  // then follows the finger 1:1: offsets measured from the handle itself
+  // would count its own movement twice and run ahead of the finger.
+  double _startTop = 0;
+  double _startY = 0;
+
+  void _dragTo(double globalY, double trackHeight) {
     final ScrollPosition p = widget.controller.position;
-    final double f = ((dy - _thumbHeight / 2) / (trackHeight - _thumbHeight))
-        .clamp(0, 1);
-    final double offset = f * p.maxScrollExtent;
+    final double travel = trackHeight - _thumbHeight;
+    if (travel <= 0) return;
+    final double thumbTop = (_startTop + globalY - _startY).clamp(0, travel);
+    final double offset = thumbTop / travel * p.maxScrollExtent;
     widget.controller.jumpTo(offset);
     final String label = widget.labelAt(offset);
     if (label != _label) {
@@ -138,6 +145,8 @@ class _DateScrubberState extends State<DateScrubber> {
                             behavior: HitTestBehavior.opaque,
                             onVerticalDragStart: (DragStartDetails d) {
                               _hide?.cancel();
+                              _startTop = top;
+                              _startY = d.globalPosition.dy;
                               setState(() {
                                 _dragging = true;
                                 _label = widget.labelAt(
@@ -146,7 +155,7 @@ class _DateScrubberState extends State<DateScrubber> {
                               });
                             },
                             onVerticalDragUpdate: (DragUpdateDetails d) =>
-                                _dragTo(top + d.localPosition.dy, track),
+                                _dragTo(d.globalPosition.dy, track),
                             onVerticalDragEnd: (_) {
                               setState(() => _dragging = false);
                               _onScroll();
