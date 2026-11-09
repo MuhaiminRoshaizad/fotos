@@ -7,6 +7,8 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
+import '../../../core/media/add_to_album.dart';
+import '../../../core/media/empty_albums.dart';
 import '../../../core/media/media_access_gate.dart';
 import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
@@ -73,6 +75,8 @@ class _AlbumsBody extends ConsumerWidget {
     final AsyncValue<List<Album>> albums = ref.watch(albumsProvider);
     final AlbumPrefs prefs =
         ref.watch(albumPrefsProvider).value ?? const AlbumPrefs();
+    final List<String> empty =
+        ref.watch(emptyAlbumsProvider).value ?? const <String>[];
     final double bottom = AppNavMetrics.clearance(
       MediaQuery.paddingOf(context).bottom,
     );
@@ -94,6 +98,18 @@ class _AlbumsBody extends ConsumerWidget {
         final List<Album> rest = list
             .where((Album a) => !prefs.pinned.contains(a.id))
             .toList();
+        final List<String> pending = pendingEmptyAlbums(empty, list);
+        if (pending.length != empty.length) {
+          // An empty album that now holds something is a real folder; forget
+          // the placeholder so deleting that folder later doesn't revive it.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            for (final String n in empty.where(
+              (String n) => !pending.contains(n),
+            )) {
+              ref.read(emptyAlbumsProvider.notifier).remove(n);
+            }
+          });
+        }
         return CustomScrollView(
           slivers: <Widget>[
             if (pinned.isNotEmpty) ...<Widget>[
@@ -101,7 +117,7 @@ class _AlbumsBody extends ConsumerWidget {
               _AlbumGrid(albums: pinned, prefs: prefs),
             ],
             const _Section(title: 'On this phone'),
-            if (list.isEmpty)
+            if (list.isEmpty && pending.isEmpty)
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -109,7 +125,7 @@ class _AlbumsBody extends ConsumerWidget {
                 ),
               )
             else
-              _AlbumGrid(albums: rest, prefs: prefs),
+              _AlbumGrid(albums: rest, prefs: prefs, empty: pending),
             const _Section(title: 'More'),
             SliverList.list(
               children: <Widget>[
@@ -181,9 +197,16 @@ class _Section extends StatelessWidget {
 }
 
 class _AlbumGrid extends StatelessWidget {
-  const _AlbumGrid({required this.albums, required this.prefs});
+  const _AlbumGrid({
+    required this.albums,
+    required this.prefs,
+    this.empty = const <String>[],
+  });
   final List<Album> albums;
   final AlbumPrefs prefs;
+
+  /// Empty albums, shown first.
+  final List<String> empty;
 
   @override
   Widget build(BuildContext context) {
@@ -199,12 +222,16 @@ class _AlbumGrid extends StatelessWidget {
           mainAxisSpacing: AppSpacing.lg,
           childAspectRatio: 0.74,
         ),
-        itemCount: albums.length,
-        itemBuilder: (BuildContext context, int i) => _AlbumTile(
-          album: albums[i],
-          pinned: prefs.pinned.contains(albums[i].id),
-          coverId: prefs.covers[albums[i].id],
-        ),
+        itemCount: empty.length + albums.length,
+        itemBuilder: (BuildContext context, int i) {
+          if (i < empty.length) return _EmptyAlbumTile(name: empty[i]);
+          final Album a = albums[i - empty.length];
+          return _AlbumTile(
+            album: a,
+            pinned: prefs.pinned.contains(a.id),
+            coverId: prefs.covers[a.id],
+          );
+        },
       ),
     );
   }
@@ -295,6 +322,64 @@ class _AlbumTile extends ConsumerWidget {
             ),
             Text(
               '${album.count}',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyAlbumTile extends ConsumerWidget {
+  const _EmptyAlbumTile({required this.name});
+  final String name;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    void open() => context.push(
+      Uri(
+        path: '/albums/empty',
+        queryParameters: <String, String>{'name': name},
+      ).toString(),
+    );
+    return Semantics(
+      button: true,
+      label: '$name, empty album',
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        onTap: open,
+        onLongPress: () {
+          AppHaptics.longPress();
+          open();
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: Icon(
+                  Icons.photo_album_outlined,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            Text(
+              'Empty',
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             ),
           ],

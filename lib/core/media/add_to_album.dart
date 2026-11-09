@@ -10,6 +10,7 @@ import '../validation/validators.dart';
 import '../widgets/app_sheet.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/toast.dart';
+import 'empty_albums.dart';
 import 'media_providers.dart';
 import 'media_repository.dart';
 
@@ -23,33 +24,39 @@ Future<void> addToAlbum(
   void Function(String albumName)? onView,
 }) async {
   final List<Album> albums = await ref.read(albumsProvider.future);
+  final List<String> empty = pendingEmptyAlbums(
+    await ref.read(emptyAlbumsProvider.future),
+    albums,
+  );
   if (!context.mounted) return;
   final _Choice? choice = await showAppSheet<_Choice>(
     context,
     scrollControlled: true,
     builder: (BuildContext ctx) =>
-        _AddToAlbumSheet(count: items.length, albums: albums),
+        _AddToAlbumSheet(count: items.length, albums: albums, empty: empty),
   );
   if (choice == null || !context.mounted) return;
 
   String? relativePath = choice.album == null
-      ? null
+      ? (choice.emptyName == null ? null : albumFolder(choice.emptyName!))
       : await choice.album!.path.relativePathAsync;
   if (!context.mounted) return;
-  String name = choice.album?.name ?? '';
-  if (choice.album == null) {
+  String name = choice.album?.name ?? choice.emptyName ?? '';
+  if (choice.album == null && choice.emptyName == null) {
     final String? n = await promptName(
       context,
       title: 'New album',
       label: 'Album name',
       hint: 'e.g. Holiday 2026',
       confirmLabel: 'Create',
-      validate: (String v) =>
-          validateFolderName(v, albums.map((Album a) => a.name)),
+      validate: (String v) => validateFolderName(v, <String>[
+        ...albums.map((Album a) => a.name),
+        ...empty,
+      ]),
     );
     if (n == null || !context.mounted) return;
     name = n;
-    relativePath = 'Pictures/$n/';
+    relativePath = albumFolder(n);
   }
   if (relativePath == null) return;
 
@@ -63,6 +70,8 @@ Future<void> addToAlbum(
   }
   ref.invalidate(libraryProvider);
   ref.invalidate(albumsProvider);
+  // Once something has moved in, Android lists the folder itself.
+  if (done > 0) await ref.read(emptyAlbumsProvider.notifier).remove(name);
   onDone?.call();
   if (!context.mounted) return;
   if (done == 0) {
@@ -79,15 +88,29 @@ Future<void> addToAlbum(
 }
 
 class _Choice {
-  const _Choice(this.album, this.move);
+  const _Choice(this.album, this.move, {this.emptyName});
   final Album? album;
   final bool move;
+  final String? emptyName;
+}
+
+/// Empty albums not yet backed by a folder that holds media.
+List<String> pendingEmptyAlbums(List<String> empty, List<Album> albums) {
+  final Set<String> real = albums
+      .map((Album a) => a.name.toLowerCase())
+      .toSet();
+  return empty.where((String n) => !real.contains(n.toLowerCase())).toList();
 }
 
 class _AddToAlbumSheet extends StatefulWidget {
-  const _AddToAlbumSheet({required this.count, required this.albums});
+  const _AddToAlbumSheet({
+    required this.count,
+    required this.albums,
+    required this.empty,
+  });
   final int count;
   final List<Album> albums;
+  final List<String> empty;
 
   @override
   State<_AddToAlbumSheet> createState() => _AddToAlbumSheetState();
@@ -150,6 +173,14 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
             title: const Text('New album'),
             onTap: () => Navigator.of(context).pop(_Choice(null, _move)),
           ),
+          for (final String n in widget.empty)
+            ListTile(
+              leading: const _Thumb(child: Icon(Icons.photo_album_outlined)),
+              title: Text(n),
+              subtitle: const Text('Empty'),
+              onTap: () =>
+                  Navigator.of(context).pop(_Choice(null, _move, emptyName: n)),
+            ),
           for (final Album a in widget.albums)
             ListTile(
               leading: _Thumb(

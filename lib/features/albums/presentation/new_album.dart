@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
+import '../../../core/media/empty_albums.dart';
 import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/media/media_tile.dart';
@@ -13,46 +15,66 @@ import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/toast.dart';
 
-/// Android shows a folder as an album only once it holds something, so a new
-/// album is named first and then filled straight away from a picker.
+/// Names a new album and creates it empty; photos can be added straight
+/// away from the album, or later with Add to album.
 Future<void> createAlbum(BuildContext context, WidgetRef ref) async {
   final List<Album> albums = await ref.read(albumsProvider.future);
+  final List<String> empty = await ref.read(emptyAlbumsProvider.future);
   if (!context.mounted) return;
   final String? name = await promptName(
     context,
     title: 'New album',
     label: 'Album name',
     hint: 'e.g. Holiday 2026',
-    confirmLabel: 'Next',
-    validate: (String v) =>
-        validateFolderName(v, albums.map((Album a) => a.name)),
+    confirmLabel: 'Create',
+    validate: (String v) => validateFolderName(v, <String>[
+      ...albums.map((Album a) => a.name),
+      ...empty,
+    ]),
   );
   if (name == null || !context.mounted) return;
+  await ref.read(emptyAlbumsProvider.notifier).add(name);
+  if (!context.mounted) return;
+  showToast(context, 'Created $name');
+  context.push(
+    Uri(
+      path: '/albums/empty',
+      queryParameters: <String, String>{'name': name},
+    ).toString(),
+  );
+}
+
+/// Picks photos and videos from the library and moves them into [name].
+/// Returns whether anything moved.
+Future<bool> addPhotosTo(
+  BuildContext context,
+  WidgetRef ref,
+  String name,
+) async {
   final List<AssetEntity> library = await ref.read(
     libraryProvider(MediaKind.all).future,
   );
-  if (!context.mounted) return;
+  if (!context.mounted) return false;
   final List<AssetEntity>? picked = await showAppSheet<List<AssetEntity>>(
     context,
     scrollControlled: true,
     builder: (_) => _Picker(album: name, items: library),
   );
-  if (picked == null || picked.isEmpty || !context.mounted) return;
+  if (picked == null || picked.isEmpty || !context.mounted) return false;
   final bool ok = await ref
       .read(mediaRepositoryProvider)
-      .moveTo(picked, 'Pictures/$name/');
+      .moveTo(picked, albumFolder(name));
   ref.invalidate(albumsProvider);
   ref.invalidate(libraryProvider);
-  if (!context.mounted) return;
+  if (ok) await ref.read(emptyAlbumsProvider.notifier).remove(name);
+  if (!context.mounted) return ok;
   if (ok) {
     AppHaptics.success();
-    showToast(
-      context,
-      'Created $name with ${Fmt.count(picked.length, 'item')}',
-    );
+    showToast(context, 'Moved ${Fmt.count(picked.length, 'item')} to $name');
   } else {
-    showToast(context, 'The album wasn\'t created. Nothing was moved.');
+    showToast(context, 'Nothing was moved.');
   }
+  return ok;
 }
 
 class _Picker extends StatefulWidget {
