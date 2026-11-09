@@ -31,6 +31,17 @@ class NativeChannel(
                     call.argument<Int>("px")!!,
                 )
             }
+            "favourite" -> MediaRequests.favourite(
+                activity,
+                call.argument<List<String>>("ids")!!,
+                call.argument<List<Boolean>>("videos")!!,
+                call.argument<Boolean>("value")!!,
+            ) { ok -> result.success(ok) }
+            "deleteForever" -> MediaRequests.delete(
+                activity,
+                call.argument<List<String>>("ids")!!,
+                call.argument<List<Boolean>>("videos")!!,
+            ) { ok -> result.success(ok) }
             "launchUri" -> {
                 // Handed out once, so a later resume doesn't reopen it.
                 val uri = MainActivity.viewUri(activity.intent)

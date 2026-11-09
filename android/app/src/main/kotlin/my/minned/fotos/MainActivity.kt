@@ -15,6 +15,15 @@ class MainActivity : FlutterActivity() {
         this.channel = channel
     }
 
+    @Deprecated("FlutterActivity still routes plugin results through this callback.")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == MediaRequests.REQUEST_CODE) {
+            MediaRequests.onResult(resultCode)
+            return
+        }
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
     /** A View or camera Review request while fotos is already running. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

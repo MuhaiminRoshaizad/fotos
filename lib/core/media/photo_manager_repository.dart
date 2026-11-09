@@ -4,10 +4,15 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import '../platform/native_channel.dart';
 import 'media_repository.dart';
 
 /// [MediaRepository] over Android's MediaStore, through photo_manager.
 class PhotoManagerRepository implements MediaRepository {
+  PhotoManagerRepository([this._native = const NativeChannel()]);
+
+  final NativeChannel _native;
+
   static const PermissionRequestOption _permission = PermissionRequestOption(
     androidPermission: AndroidPermission(
       type: RequestType.common,
@@ -140,19 +145,13 @@ class PhotoManagerRepository implements MediaRepository {
   }
 
   @override
-  Future<bool> setFavourite(List<AssetEntity> items, bool favourite) async {
-    try {
-      for (final AssetEntity e in items) {
-        await PhotoManager.editor.android.favoriteAsset(
-          entity: e,
-          favorite: favourite,
-        );
-      }
-      return true;
-    } on StateError {
-      return false;
-    }
-  }
+  Future<bool> setFavourite(List<AssetEntity> items, bool favourite) =>
+      // photo_manager asks once per item; this asks once for the batch.
+      _native.favourite(
+        items.map((AssetEntity e) => e.id).toList(),
+        items.map((AssetEntity e) => e.type == AssetType.video).toList(),
+        value: favourite,
+      );
 
   @override
   Future<List<String>> moveToTrash(List<AssetEntity> items) =>

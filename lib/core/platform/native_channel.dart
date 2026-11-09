@@ -139,6 +139,29 @@ class NativeChannel {
     }
   }
 
+  // ---- MediaStore requests the user confirms once per batch -------------
+
+  /// One system confirmation for the whole batch. True if the user agreed.
+  Future<bool> favourite(
+    List<String> ids,
+    List<bool> videos, {
+    required bool value,
+  }) async =>
+      (await _channel.invokeMethod<bool>('favourite', <String, Object>{
+        'ids': ids,
+        'videos': videos,
+        'value': value,
+      })) ??
+      false;
+
+  /// Deletes for good, trashed items included. True if the user agreed.
+  Future<bool> deleteForever(List<String> ids, List<bool> videos) async =>
+      (await _channel.invokeMethod<bool>('deleteForever', <String, Object>{
+        'ids': ids,
+        'videos': videos,
+      })) ??
+      false;
+
   // ---- Files tab ----------------------------------------------------------
 
   Future<String> storageRoot() async =>

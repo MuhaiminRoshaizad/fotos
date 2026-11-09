@@ -156,11 +156,11 @@ class TrashScreen extends ConsumerWidget {
       return;
     }
     // Android shows its own "can't be undone" confirmation for this.
-    final List<String> gone = await PhotoManager.editor.deleteWithIds(<String>[
-      item.id,
-    ]);
+    final bool gone = await ref
+        .read(nativeChannelProvider)
+        .deleteForever(<String>[item.id], <bool>[item.video]);
     ref.invalidate(trashProvider);
-    if (context.mounted && gone.isNotEmpty) {
+    if (context.mounted && gone) {
       showToast(context, 'Deleted for good');
     }
   }
