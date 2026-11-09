@@ -157,7 +157,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           selectionActions: () => mediaSelectionActions(
             ref,
             () => _items,
-            onViewAlbum: (_) => context.go('/albums'),
+            onViewAlbum: (String name) async {
+              final List<Album> albums = await ref.read(albumsProvider.future);
+              final Album? a = albums
+                  .where((Album x) => x.name == name)
+                  .firstOrNull;
+              if (!mounted) return;
+              context.go(a == null ? '/albums' : '/albums/folder/${a.id}');
+            },
           ),
           onLevelChanged: (GridLevel l) => setState(() => _level = l),
           onOpen: (int index) => context.push(

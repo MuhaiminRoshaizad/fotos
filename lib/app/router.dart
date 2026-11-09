@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/albums/presentation/album_screen.dart';
 import '../features/albums/presentation/albums_screen.dart';
+import '../features/albums/presentation/trash_screen.dart';
 import '../features/files/presentation/files_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/viewer/presentation/viewer_screen.dart';
@@ -69,7 +71,25 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           ),
           StatefulShellBranch(
             routes: <RouteBase>[
-              GoRoute(path: '/albums', builder: (_, _) => const AlbumsScreen()),
+              GoRoute(
+                path: '/albums',
+                builder: (_, _) => const AlbumsScreen(),
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'folder/:id',
+                    builder: (_, GoRouterState s) =>
+                        AlbumScreen(albumId: s.pathParameters['id']!),
+                  ),
+                  GoRoute(
+                    path: 'favourites',
+                    builder: (_, _) => const FavouritesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'trash',
+                    builder: (_, _) => const TrashScreen(),
+                  ),
+                ],
+              ),
             ],
           ),
           StatefulShellBranch(
