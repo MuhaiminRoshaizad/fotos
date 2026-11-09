@@ -1,4 +1,4 @@
-package com.example.fotos
+package my.minned.fotos
 
 import io.flutter.embedding.android.FlutterActivity
 
