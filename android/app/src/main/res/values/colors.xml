@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The theme's cyanotype blue, as in lib/core/theme/app_theme.dart. -->
+    <color name="ic_launcher_background">#1D5BBF</color>
+    <!-- The app's surface colour, so the launch window matches the first frame. -->
+    <color name="launch_background">#FAFBFD</color>
+</resources>
