@@ -44,3 +44,9 @@ final trashThumbnailProvider = FutureProvider.autoDispose
       (Ref ref, TrashedItem item) =>
           ref.read(nativeChannelProvider).trashThumbnail(item, 256),
     );
+
+/// An asset by id, for album covers the user picked.
+final assetByIdProvider = FutureProvider.autoDispose
+    .family<AssetEntity?, String>(
+      (Ref ref, String id) => AssetEntity.fromId(id),
+    );

@@ -224,91 +224,82 @@ class _AlbumTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    return FutureBuilder<AssetEntity?>(
-      future: coverId == null
-          ? Future<AssetEntity?>.value(album.cover)
-          : AssetEntity.fromId(
-              coverId!,
-            ).then((AssetEntity? e) => e ?? album.cover),
-      initialData: coverId == null ? album.cover : null,
-      builder: (BuildContext context, AsyncSnapshot<AssetEntity?> snap) {
-        final AssetEntity? cover = snap.data;
-        return Semantics(
-          button: true,
-          label:
-              '${album.name}, ${Fmt.count(album.count, 'item')}'
-              '${pinned ? ', pinned' : ''}',
-          hint: 'Long-press for options',
-          excludeSemantics: true,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.md),
-            onTap: () => context.push('/albums/folder/${album.id}'),
-            onLongPress: () {
-              AppHaptics.longPress();
-              showAlbumOptions(context, ref, album);
-            },
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadii.md),
-                    child: ColoredBox(
-                      color: cs.surfaceContainerHigh,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: <Widget>[
-                          if (cover != null)
-                            AnimatedSwitcher(
-                              duration: AppMotion.medium,
-                              child: Image(
-                                key: ValueKey<String>(cover.id),
-                                image: AssetEntityImageProvider(
-                                  cover,
-                                  isOriginal: false,
-                                  thumbnailSize: const ThumbnailSize.square(
-                                    384,
-                                  ),
-                                ),
-                                fit: BoxFit.cover,
-                              ),
+    // A picked cover that has since been deleted falls back to the newest item.
+    final AssetEntity? cover = coverId == null
+        ? album.cover
+        : (ref.watch(assetByIdProvider(coverId!)).value ?? album.cover);
+    return Semantics(
+      button: true,
+      label:
+          '${album.name}, ${Fmt.count(album.count, 'item')}'
+          '${pinned ? ', pinned' : ''}',
+      hint: 'Long-press for options',
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        onTap: () => context.push('/albums/folder/${album.id}'),
+        onLongPress: () {
+          AppHaptics.longPress();
+          showAlbumOptions(context, ref, album);
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.md),
+                child: ColoredBox(
+                  color: cs.surfaceContainerHigh,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: <Widget>[
+                      if (cover != null)
+                        AnimatedSwitcher(
+                          duration: AppMotion.medium,
+                          child: Image(
+                            key: ValueKey<String>(cover.id),
+                            image: AssetEntityImageProvider(
+                              cover,
+                              isOriginal: false,
+                              thumbnailSize: const ThumbnailSize.square(384),
                             ),
-                          if (pinned)
-                            Positioned(
-                              right: 6,
-                              top: 6,
-                              child: CircleAvatar(
-                                radius: 12,
-                                backgroundColor: cs.surfaceContainerLowest,
-                                child: Icon(
-                                  Icons.push_pin,
-                                  size: 14,
-                                  color: cs.primary,
-                                ),
-                              ),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      if (pinned)
+                        Positioned(
+                          right: 6,
+                          top: 6,
+                          child: CircleAvatar(
+                            radius: 12,
+                            backgroundColor: cs.surfaceContainerLowest,
+                            child: Icon(
+                              Icons.push_pin,
+                              size: 14,
+                              color: cs.primary,
                             ),
-                        ],
-                      ),
-                    ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  album.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  '${album.count}',
-                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
-                ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 6),
+            Text(
+              album.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            Text(
+              '${album.count}',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
