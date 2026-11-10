@@ -80,16 +80,80 @@ ThemeData buildAppTheme(Brightness brightness) {
       },
     ),
     scaffoldBackgroundColor: scheme.surface,
+    // Pages that keep a plain bar (readers, Takeout) get iOS's inline bar:
+    // centred 17 pt title over a hairline.
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
-      centerTitle: false,
+      centerTitle: true,
+      toolbarHeight: 48,
+      shape: Border(
+        bottom: BorderSide(color: scheme.outlineVariant, width: 0.5),
+      ),
+      iconTheme: IconThemeData(color: scheme.primary),
+      actionsIconTheme: IconThemeData(color: scheme.primary),
       titleTextStyle: TextStyle(
-        fontSize: 20,
+        fontFamily: 'Inter',
+        fontSize: 17,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
+    ),
+    // Buttons follow iOS: a filled capsule for the main action, a grey
+    // capsule for the second, plain accent text for the rest.
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        shape: const StadiumBorder(),
+        minimumSize: const Size(64, 50),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        textStyle: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        shape: const StadiumBorder(),
+        side: BorderSide.none,
+        backgroundColor: scheme.onSurface.withValues(alpha: 0.08),
+        foregroundColor: scheme.primary,
+        minimumSize: const Size(64, 50),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        textStyle: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: scheme.primary,
+        textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 17),
+      ),
+    ),
+    // Cards read as inset groups: flat, rounded 12, no shadow.
+    cardTheme: CardThemeData(
+      color: light ? scheme.surfaceContainerLowest : scheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+    ),
+    dividerTheme: DividerThemeData(
+      color: scheme.outlineVariant,
+      thickness: 0.5,
+      space: 0.5,
+    ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: scheme.primary,
+      linearTrackColor: scheme.onSurface.withValues(alpha: 0.1),
+      linearMinHeight: 6,
+      borderRadius: BorderRadius.circular(AppRadii.pill),
     ),
     // Task sheets look like iOS cards: grouped grey, 14 pt corners, grabber.
     bottomSheetTheme: BottomSheetThemeData(
@@ -134,9 +198,20 @@ ThemeData buildAppTheme(Brightness brightness) {
         borderSide: BorderSide.none,
       ),
     ),
-    listTileTheme: const ListTileThemeData(
-      contentPadding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+    listTileTheme: ListTileThemeData(
+      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       minVerticalPadding: AppSpacing.sm,
+      iconColor: scheme.primary,
+      titleTextStyle: TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 16,
+        color: scheme.onSurface,
+      ),
+      subtitleTextStyle: TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 13,
+        color: scheme.onSurfaceVariant,
+      ),
     ),
   );
 }

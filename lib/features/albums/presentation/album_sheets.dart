@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoSlidingSegmentedControl;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -9,6 +11,7 @@ import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
+import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/toast.dart';
 import '../data/album_prefs.dart';
@@ -149,6 +152,7 @@ class _SortSheetState extends State<_SortSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     final (String first, String second) = _by.directions;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -161,36 +165,63 @@ class _SortSheetState extends State<_SortSheet> {
             AppSpacing.lg,
             AppSpacing.sm,
           ),
-          child: Text('Sort', style: Theme.of(context).textTheme.titleLarge),
-        ),
-        RadioGroup<AlbumSortBy>(
-          groupValue: _by,
-          onChanged: (AlbumSortBy? v) => setState(() {
-            if (v == null) return;
-            _by = v;
-            _reversed = false;
-          }),
-          child: Column(
-            children: <Widget>[
-              for (final AlbumSortBy b in AlbumSortBy.values)
-                RadioListTile<AlbumSortBy>(value: b, title: Text(b.label)),
-            ],
+          child: Text(
+            'Sort',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface,
+            ),
           ),
+        ),
+        // iOS marks the choice with a checkmark, not a radio button.
+        InsetGroup(
+          children: <Widget>[
+            for (final AlbumSortBy by in AlbumSortBy.values)
+              Semantics(
+                selected: by == _by,
+                inMutuallyExclusiveGroup: true,
+                child: GroupRow(
+                  title: by.label,
+                  chevron: false,
+                  trailing: by == _by
+                      ? Icon(
+                          CupertinoIcons.checkmark,
+                          size: 20,
+                          color: cs.primary,
+                        )
+                      : null,
+                  onTap: () => setState(() {
+                    _by = by;
+                    _reversed = false;
+                  }),
+                ),
+              ),
+          ],
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.sm,
           ),
-          child: SegmentedButton<bool>(
-            showSelectedIcon: false,
-            segments: <ButtonSegment<bool>>[
-              ButtonSegment<bool>(value: false, label: Text(first)),
-              ButtonSegment<bool>(value: true, label: Text(second)),
-            ],
-            selected: <bool>{_reversed},
-            onSelectionChanged: (Set<bool> s) =>
-                setState(() => _reversed = s.first),
+          child: CupertinoSlidingSegmentedControl<bool>(
+            groupValue: _reversed,
+            children: <bool, Widget>{
+              false: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(first),
+              ),
+              true: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(second),
+              ),
+            },
+            onValueChanged: (bool? v) {
+              if (v != null) setState(() => _reversed = v);
+            },
           ),
         ),
         Padding(

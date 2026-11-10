@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/app_tokens.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/inset_group.dart';
 import 'media_providers.dart';
 import 'media_repository.dart';
 
@@ -106,46 +107,22 @@ class _LimitedBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        0,
-        AppSpacing.lg,
-        AppSpacing.sm,
-      ),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: cs.primaryContainer,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final MediaRepository repo = ref.read(mediaRepositoryProvider);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: InsetGroup(
+        footer: 'fotos can see only the photos you picked.',
         children: <Widget>[
-          Text(
-            'fotos can see only the photos you picked.',
-            style: TextStyle(color: cs.onPrimaryContainer),
+          GroupRow(
+            leading: const Icon(CupertinoIcons.plus_circle),
+            title: 'Pick more',
+            chevron: false,
+            onTap: repo.pickMoreForLimitedAccess,
           ),
-          Wrap(
-            alignment: WrapAlignment.end,
-            children: <Widget>[
-              TextButton(
-                onPressed: () => ref
-                    .read(mediaRepositoryProvider)
-                    .pickMoreForLimitedAccess(),
-                child: const Text('Pick more'),
-              ),
-              TextButton(
-                onPressed: () =>
-                    ref.read(mediaRepositoryProvider).openAppSettings(),
-                child: const Text('Allow all photos'),
-              ),
-            ],
+          GroupRow(
+            leading: const Icon(CupertinoIcons.photo_on_rectangle),
+            title: 'Allow all photos',
+            onTap: repo.openAppSettings,
           ),
         ],
       ),
