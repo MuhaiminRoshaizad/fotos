@@ -197,6 +197,25 @@ class _Section extends StatelessWidget {
   }
 }
 
+/// Columns of album tiles at this screen width: three on phones, more on
+/// tablets so covers stay a sensible size.
+int _albumColumns(BuildContext context) {
+  final double width = MediaQuery.sizeOf(context).width;
+  return width >= 900 ? 6 : (width >= 600 ? 4 : 3);
+}
+
+/// Height of one album tile: the square cover plus two lines of text at the
+/// user's text size. A fixed aspect ratio overflowed at large text sizes.
+double _albumTileExtent(BuildContext context, int columns) {
+  final double width = MediaQuery.sizeOf(context).width;
+  final double cover =
+      (width - AppSpacing.lg * 2 - AppSpacing.md * (columns - 1)) / columns;
+  final TextScaler s = MediaQuery.textScalerOf(context);
+  // Name (14 on a 20 line) and count (13 on a 19 line).
+  final double text = s.scale(14) / 14 * 20 + s.scale(13) / 13 * 19;
+  return cover + AppSpacing.sm + text + AppSpacing.xs;
+}
+
 class _AlbumGrid extends StatelessWidget {
   const _AlbumGrid({
     required this.albums,
@@ -211,9 +230,7 @@ class _AlbumGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double width = MediaQuery.sizeOf(context).width;
-    // Three across on phones, more on tablets so covers stay a sensible size.
-    final int columns = width >= 900 ? 6 : (width >= 600 ? 4 : 3);
+    final int columns = _albumColumns(context);
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       sliver: SliverGrid.builder(
@@ -221,7 +238,7 @@ class _AlbumGrid extends StatelessWidget {
           crossAxisCount: columns,
           crossAxisSpacing: AppSpacing.md,
           mainAxisSpacing: AppSpacing.lg,
-          childAspectRatio: 0.74,
+          mainAxisExtent: _albumTileExtent(context, columns),
         ),
         itemCount: empty.length + albums.length,
         itemBuilder: (BuildContext context, int i) {
@@ -331,6 +348,8 @@ class _AlbumTile extends ConsumerWidget {
             ),
             Text(
               Fmt.count(album.count, 'item'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             ),
           ],
@@ -447,11 +466,11 @@ class _AlbumsSkeleton extends StatelessWidget {
           0,
         ),
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _albumColumns(context),
           crossAxisSpacing: AppSpacing.md,
           mainAxisSpacing: AppSpacing.lg,
-          childAspectRatio: 0.74,
+          mainAxisExtent: _albumTileExtent(context, _albumColumns(context)),
         ),
         itemCount: 9,
         itemBuilder: (_, _) => Column(
@@ -467,8 +486,16 @@ class _AlbumsSkeleton extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            const Text('Album name'),
-            const Text('000 items'),
+            const Text(
+              'Album name',
+              maxLines: 1,
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const Text(
+              '000 items',
+              maxLines: 1,
+              style: TextStyle(fontSize: 13),
+            ),
           ],
         ),
       ),
