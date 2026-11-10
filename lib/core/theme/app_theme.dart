@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart'
-    show CupertinoIcons, CupertinoPageTransitionsBuilder;
+    show CupertinoIcons, CupertinoPageTransitionsBuilder, CupertinoThemeData;
 import 'package:flutter/material.dart';
 
 import 'app_tokens.dart';
@@ -57,6 +57,13 @@ ThemeData buildAppTheme(Brightness brightness) {
     colorScheme: scheme,
     useMaterial3: true,
     fontFamily: 'Inter',
+    // Cupertino widgets (sheets, alerts, menus, nav bars) take the same accent
+    // and translucent bar colour.
+    cupertinoOverrideTheme: CupertinoThemeData(
+      primaryColor: scheme.primary,
+      barBackgroundColor: scheme.surface.withValues(alpha: 0.78),
+      scaffoldBackgroundColor: scheme.surface,
+    ),
     // iOS dims what you press; it never ripples.
     splashFactory: NoSplash.splashFactory,
     highlightColor: scheme.onSurface.withValues(alpha: 0.08),
@@ -84,26 +91,34 @@ ThemeData buildAppTheme(Brightness brightness) {
         color: scheme.onSurface,
       ),
     ),
+    // Task sheets look like iOS cards: grouped grey, 14 pt corners, grabber.
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: scheme.surfaceContainerLow,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
+      dragHandleSize: const Size(36, 5),
+      dragHandleColor: scheme.onSurfaceVariant.withValues(alpha: 0.4),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.xl)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
       ),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: scheme.surfaceContainerLow,
       surfaceTintColor: Colors.transparent,
     ),
+    // Toasts float as a soft rounded banner rather than Material's snackbar.
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: scheme.onSurface,
-      contentTextStyle: TextStyle(color: scheme.surface, fontSize: 14),
-      actionTextColor: scheme.primaryContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.md),
+      elevation: 0,
+      backgroundColor: scheme.surfaceContainerHighest,
+      contentTextStyle: TextStyle(
+        fontFamily: 'Inter',
+        color: scheme.onSurface,
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
       ),
+      actionTextColor: scheme.primary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: ButtonStyle(

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,7 +18,6 @@ import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../domain/file_entry.dart';
-import 'file_row.dart';
 import 'files_providers.dart';
 import 'folder_picker.dart';
 
@@ -94,79 +92,32 @@ Future<void> showEntryActions(
     }
     if (!context.mounted) return;
   }
-  final String? choice = await showAppSheet<String>(
+  final String? choice = await showActionSheet<String>(
     context,
-    builder: (BuildContext ctx) => Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        ListTile(
-          leading: FileIcon(entry: entry),
-          title: Text(entry.name, maxLines: 2, overflow: TextOverflow.ellipsis),
-          subtitle: Text(
-            entry.kind == FileKind.zip
-                ? (zip == null
-                      ? 'This ZIP can\'t be read. It may be damaged.'
-                      : '${Fmt.size(entry.size)} · ${Fmt.count(zip.files, 'file')} inside')
-                : entry.isFolder
-                ? Fmt.date(entry.modified)
-                : '${Fmt.size(entry.size)} · ${Fmt.date(entry.modified)}',
-          ),
-        ),
-        const Divider(height: 1),
-        if (zip != null && zip.takeout)
-          SheetAction(
-            icon: CupertinoIcons.arrow_down_circle,
-            label: 'Import from Google Takeout',
-            onTap: () => Navigator.of(ctx).pop('takeout'),
-          ),
-        if (zip != null && !zip.takeout) ...<Widget>[
-          SheetAction(
-            icon: CupertinoIcons.tray_arrow_up,
-            label: 'Extract here',
-            onTap: () => Navigator.of(ctx).pop('extractHere'),
-          ),
-          SheetAction(
-            icon: CupertinoIcons.folder,
-            label: 'Extract to…',
-            onTap: () => Navigator.of(ctx).pop('extractTo'),
-          ),
-        ],
-        if (!entry.isFolder) ...<Widget>[
-          SheetAction(
-            icon: CupertinoIcons.arrow_up_right_square,
-            label: 'Open with another app',
-            onTap: () => Navigator.of(ctx).pop('openWith'),
-          ),
-          SheetAction(
-            icon: CupertinoIcons.square_arrow_up,
-            label: 'Share',
-            onTap: () => Navigator.of(ctx).pop('share'),
-          ),
-        ],
-        SheetAction(
-          icon: CupertinoIcons.pencil,
-          label: 'Rename',
-          onTap: () => Navigator.of(ctx).pop('rename'),
-        ),
-        SheetAction(
-          icon: CupertinoIcons.folder,
-          label: 'Move to…',
-          onTap: () => Navigator.of(ctx).pop('move'),
-        ),
-        SheetAction(
-          icon: CupertinoIcons.doc_on_doc,
-          label: 'Copy to…',
-          onTap: () => Navigator.of(ctx).pop('copy'),
-        ),
-        SheetAction(
-          icon: CupertinoIcons.trash,
-          label: 'Delete',
-          destructive: true,
-          onTap: () => Navigator.of(ctx).pop('delete'),
-        ),
+    title: entry.name,
+    message: entry.kind == FileKind.zip
+        ? (zip == null
+              ? "This ZIP can't be read. It may be damaged."
+              : '${Fmt.size(entry.size)} · ${Fmt.count(zip.files, 'file')} inside')
+        : entry.isFolder
+        ? Fmt.date(entry.modified)
+        : '${Fmt.size(entry.size)} · ${Fmt.date(entry.modified)}',
+    choices: <SheetChoice<String>>[
+      if (zip != null && zip.takeout)
+        const SheetChoice<String>('takeout', 'Import from Google Takeout'),
+      if (zip != null && !zip.takeout) ...const <SheetChoice<String>>[
+        SheetChoice<String>('extractHere', 'Extract here'),
+        SheetChoice<String>('extractTo', 'Extract to…'),
       ],
-    ),
+      if (!entry.isFolder) ...const <SheetChoice<String>>[
+        SheetChoice<String>('openWith', 'Open with another app'),
+        SheetChoice<String>('share', 'Share'),
+      ],
+      const SheetChoice<String>('rename', 'Rename'),
+      const SheetChoice<String>('move', 'Move to…'),
+      const SheetChoice<String>('copy', 'Copy to…'),
+      const SheetChoice<String>('delete', 'Delete', destructive: true),
+    ],
   );
   if (choice == null || !context.mounted) return;
   switch (choice) {

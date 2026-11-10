@@ -122,34 +122,14 @@ class TrashScreen extends ConsumerWidget {
     WidgetRef ref,
     TrashedItem item,
   ) async {
-    final String? choice = await showAppSheet<String>(
+    final String? choice = await showActionSheet<String>(
       context,
-      builder: (BuildContext ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          ListTile(
-            title: Text(
-              item.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(_left(item)),
-          ),
-          const Divider(height: 1),
-          SheetAction(
-            icon: CupertinoIcons.arrow_counterclockwise,
-            label: 'Restore',
-            onTap: () => Navigator.of(ctx).pop('restore'),
-          ),
-          SheetAction(
-            icon: CupertinoIcons.trash,
-            label: 'Delete for good',
-            destructive: true,
-            onTap: () => Navigator.of(ctx).pop('purge'),
-          ),
-        ],
-      ),
+      title: item.name,
+      message: _left(item),
+      choices: const <SheetChoice<String>>[
+        SheetChoice<String>('restore', 'Restore'),
+        SheetChoice<String>('purge', 'Delete for good', destructive: true),
+      ],
     );
     if (choice == null || !context.mounted) return;
     if (choice == 'restore') {

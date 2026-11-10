@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/app/app.dart';
@@ -56,7 +56,7 @@ void main() {
 
     await tester.tap(find.byTooltip('New album'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Holiday 2026');
+    await tester.enterText(find.byType(CupertinoTextField), 'Holiday 2026');
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
 

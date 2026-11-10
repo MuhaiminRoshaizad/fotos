@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -23,44 +22,15 @@ Future<void> showAlbumOptions(
   final AlbumPrefs prefs =
       ref.read(albumPrefsProvider).value ?? const AlbumPrefs();
   final bool pinned = prefs.pinned.contains(album.id);
-  final String? choice = await showAppSheet<String>(
+  final String? choice = await showActionSheet<String>(
     context,
-    builder: (BuildContext ctx) => Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            0,
-            AppSpacing.lg,
-            AppSpacing.sm,
-          ),
-          child: Text(album.name, style: Theme.of(ctx).textTheme.titleLarge),
-        ),
-        SheetAction(
-          icon: pinned ? CupertinoIcons.pin_fill : CupertinoIcons.pin,
-          label: pinned ? 'Unpin' : 'Pin to top',
-          onTap: () => Navigator.of(ctx).pop('pin'),
-        ),
-        SheetAction(
-          icon: CupertinoIcons.photo,
-          label: 'Change cover',
-          onTap: () => Navigator.of(ctx).pop('cover'),
-        ),
-        SheetAction(
-          icon: CupertinoIcons.arrow_up_arrow_down,
-          label: 'Sort',
-          onTap: () => Navigator.of(ctx).pop('sort'),
-        ),
-        SheetAction(
-          icon: CupertinoIcons.trash,
-          label: 'Delete album',
-          destructive: true,
-          onTap: () => Navigator.of(ctx).pop('delete'),
-        ),
-      ],
-    ),
+    title: album.name,
+    choices: <SheetChoice<String>>[
+      SheetChoice<String>('pin', pinned ? 'Unpin' : 'Pin to top'),
+      const SheetChoice<String>('cover', 'Change cover'),
+      const SheetChoice<String>('sort', 'Sort'),
+      const SheetChoice<String>('delete', 'Delete album', destructive: true),
+    ],
   );
   if (choice == null || !context.mounted) return;
   switch (choice) {

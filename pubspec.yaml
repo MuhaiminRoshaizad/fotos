@@ -78,3 +78,25 @@ flutter:
           weight: 600
         - asset: assets/fonts/inter/Inter-Bold.ttf
           weight: 700
+    # Flutter's Cupertino widgets ask for these two names, which only iOS
+    # maps to its system font; on Android they would fall back to Roboto.
+    - family: CupertinoSystemText
+      fonts:
+        - asset: assets/fonts/inter/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/inter/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/inter/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/inter/Inter-Bold.ttf
+          weight: 700
+    - family: CupertinoSystemDisplay
+      fonts:
+        - asset: assets/fonts/inter/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/inter/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/inter/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/inter/Inter-Bold.ttf
+          weight: 700

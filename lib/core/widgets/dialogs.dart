@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../haptics/app_haptics.dart';
@@ -10,29 +11,28 @@ Future<bool> confirmAction(
   required String confirmLabel,
   bool destructive = true,
 }) async {
-  final bool? ok = await showDialog<bool>(
+  final bool? ok = await showCupertinoDialog<bool>(
     context: context,
     useRootNavigator: true,
-    builder: (BuildContext ctx) {
-      final ColorScheme cs = Theme.of(ctx).colorScheme;
-      return AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: destructive
-                ? TextButton.styleFrom(foregroundColor: cs.error)
-                : null,
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(confirmLabel),
-          ),
-        ],
-      );
-    },
+    barrierDismissible: true,
+    builder: (BuildContext ctx) => CupertinoAlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: <Widget>[
+        // iOS bolds the safe choice: Cancel when the action destroys.
+        CupertinoDialogAction(
+          isDefaultAction: destructive,
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancel'),
+        ),
+        CupertinoDialogAction(
+          isDestructiveAction: destructive,
+          isDefaultAction: !destructive,
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(confirmLabel),
+        ),
+      ],
+    ),
   );
   return ok ?? false;
 }
@@ -50,9 +50,10 @@ Future<String?> promptName(
   String initial = '',
   bool selectStem = false,
 }) {
-  return showDialog<String>(
+  return showCupertinoDialog<String>(
     context: context,
     useRootNavigator: true,
+    barrierDismissible: true,
     builder: (BuildContext ctx) => _NameDialog(
       title: title,
       label: label,
@@ -134,29 +135,51 @@ class _NameDialogState extends State<_NameDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return CupertinoAlertDialog(
       title: Text(widget.title),
-      content: TextField(
-        controller: _controller,
-        focusNode: _focus,
-        autofocus: true,
-        textInputAction: TextInputAction.done,
-        onSubmitted: (_) => _submit(),
-        onChanged: (_) {
-          if (_armed && _error != null) _check();
-        },
-        decoration: InputDecoration(
-          labelText: widget.label,
-          hintText: widget.hint,
-          errorText: _error,
+      content: Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Semantics(
+              label: widget.label,
+              textField: true,
+              child: CupertinoTextField(
+                controller: _controller,
+                focusNode: _focus,
+                autofocus: true,
+                placeholder: widget.hint,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
+                onChanged: (_) {
+                  if (_armed && _error != null) _check();
+                },
+              ),
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _error!,
+                  textAlign: TextAlign.start,
+                  style: TextStyle(color: cs.error, fontSize: 13),
+                ),
+              ),
+          ],
         ),
       ),
       actions: <Widget>[
-        TextButton(
+        CupertinoDialogAction(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        TextButton(onPressed: _submit, child: Text(widget.confirmLabel)),
+        CupertinoDialogAction(
+          isDefaultAction: true,
+          onPressed: _submit,
+          child: Text(widget.confirmLabel),
+        ),
       ],
     );
   }
