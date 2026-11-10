@@ -64,6 +64,8 @@ class _LargeTitleScaffoldState extends State<LargeTitleScaffold> {
     final Color background = widget.grouped ? cs.groupedBackground : cs.surface;
     return Scaffold(
       backgroundColor: background,
+      // Nothing here takes text; dialogs handle the keyboard themselves.
+      resizeToAvoidBottomInset: false,
       body: NotificationListener<ScrollNotification>(
         onNotification: _onScroll,
         child: Stack(

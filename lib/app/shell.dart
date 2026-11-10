@@ -25,6 +25,9 @@ class AppShell extends ConsumerWidget {
     final double bottom =
         MediaQuery.paddingOf(context).bottom + AppNavMetrics.bottomGap;
     return Scaffold(
+      // The keyboard covers the tab bar, as on iOS; without this the bar
+      // rode up above the keyboard, over whatever dialog was asking.
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: <Widget>[
           Positioned.fill(child: shell),
