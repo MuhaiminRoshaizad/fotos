@@ -16,28 +16,60 @@ import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/toast.dart';
 import '../data/album_prefs.dart';
 
-/// Long-press menu for an album: pin, cover, sort, delete.
+/// What can be done to an album from its menu.
+enum AlbumOption {
+  pin('Pin to top', CupertinoIcons.pin),
+  cover('Change cover', CupertinoIcons.photo),
+  sort('Sort', CupertinoIcons.arrow_up_arrow_down),
+  delete('Delete album', CupertinoIcons.trash);
+
+  const AlbumOption(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+
+  /// The label for an album that is [pinned] or not.
+  String labelFor({required bool pinned}) =>
+      this == AlbumOption.pin && pinned ? 'Unpin' : label;
+}
+
+bool albumIsPinned(WidgetRef ref, Album album) =>
+    (ref.read(albumPrefsProvider).value ?? const AlbumPrefs()).pinned.contains(
+      album.id,
+    );
+
+/// The album's menu as an action sheet, for the button inside an album.
 Future<void> showAlbumOptions(
   BuildContext context,
   WidgetRef ref,
   Album album,
 ) async {
-  final AlbumPrefs prefs =
-      ref.read(albumPrefsProvider).value ?? const AlbumPrefs();
-  final bool pinned = prefs.pinned.contains(album.id);
-  final String? choice = await showActionSheet<String>(
+  final bool pinned = albumIsPinned(ref, album);
+  final AlbumOption? choice = await showActionSheet<AlbumOption>(
     context,
     title: album.name,
-    choices: <SheetChoice<String>>[
-      SheetChoice<String>('pin', pinned ? 'Unpin' : 'Pin to top'),
-      const SheetChoice<String>('cover', 'Change cover'),
-      const SheetChoice<String>('sort', 'Sort'),
-      const SheetChoice<String>('delete', 'Delete album', destructive: true),
+    choices: <SheetChoice<AlbumOption>>[
+      for (final AlbumOption o in AlbumOption.values)
+        SheetChoice<AlbumOption>(
+          o,
+          o.labelFor(pinned: pinned),
+          destructive: o == AlbumOption.delete,
+        ),
     ],
   );
   if (choice == null || !context.mounted) return;
-  switch (choice) {
-    case 'pin':
+  await runAlbumOption(context, ref, album, choice);
+}
+
+Future<void> runAlbumOption(
+  BuildContext context,
+  WidgetRef ref,
+  Album album,
+  AlbumOption option,
+) async {
+  switch (option) {
+    case AlbumOption.pin:
+      final bool pinned = albumIsPinned(ref, album);
       await ref.read(albumPrefsProvider.notifier).togglePin(album.id);
       if (context.mounted) {
         showToast(
@@ -45,11 +77,11 @@ Future<void> showAlbumOptions(
           pinned ? 'Unpinned ${album.name}' : 'Pinned ${album.name}',
         );
       }
-    case 'cover':
+    case AlbumOption.cover:
       await pickAlbumCover(context, ref, album);
-    case 'sort':
+    case AlbumOption.sort:
       await showSortSheet(context, ref, album);
-    case 'delete':
+    case AlbumOption.delete:
       await deleteAlbum(context, ref, album);
   }
 }
@@ -73,18 +105,7 @@ Future<void> pickAlbumCover(
       builder: (BuildContext ctx, ScrollController scroll) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              0,
-              AppSpacing.lg,
-              AppSpacing.md,
-            ),
-            child: Text(
-              'Choose a cover',
-              style: Theme.of(ctx).textTheme.titleLarge,
-            ),
-          ),
+          const SheetTitle('Choose a cover'),
           Expanded(
             child: GridView.builder(
               controller: scroll,

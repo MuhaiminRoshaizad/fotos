@@ -17,6 +17,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
+import '../../../core/widgets/lift_menu.dart';
 import '../data/album_prefs.dart';
 import 'album_sheets.dart';
 import 'albums_providers.dart';
@@ -238,6 +239,46 @@ class _AlbumTile extends ConsumerWidget {
     final AssetEntity? cover = coverId == null
         ? album.cover
         : (ref.watch(assetByIdProvider(coverId!)).value ?? album.cover);
+    // The cover lifts out of its square with the album's menu under it.
+    Future<void> hold() async {
+      // The cover is the square at the top of this tile.
+      final RenderBox box = context.findRenderObject()! as RenderBox;
+      final Rect square =
+          box.localToGlobal(Offset.zero) & Size.square(box.size.width);
+      final AlbumOption? choice = await showLiftMenu<AlbumOption>(
+        context,
+        from: square,
+        fromRadius: AppRadii.md,
+        aspectRatio: 1,
+        preview: ColoredBox(
+          color: cs.surfaceContainerHigh,
+          child: cover == null
+              ? Icon(CupertinoIcons.rectangle_stack, color: cs.onSurfaceVariant)
+              : Image(
+                  image: AssetEntityImageProvider(
+                    cover,
+                    isOriginal: false,
+                    thumbnailSize: const ThumbnailSize.square(384),
+                  ),
+                  fit: BoxFit.cover,
+                ),
+        ),
+        actions: <LiftAction<AlbumOption>>[
+          for (final AlbumOption o in AlbumOption.values)
+            LiftAction<AlbumOption>(
+              o,
+              o.labelFor(pinned: pinned),
+              o == AlbumOption.pin && pinned
+                  ? CupertinoIcons.pin_slash
+                  : o.icon,
+              destructive: o == AlbumOption.delete,
+            ),
+        ],
+      );
+      if (choice == null || !context.mounted) return;
+      await runAlbumOption(context, ref, album, choice);
+    }
+
     return Semantics(
       button: true,
       label:
@@ -248,10 +289,7 @@ class _AlbumTile extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.md),
         onTap: () => context.push('/albums/folder/${album.id}'),
-        onLongPress: () {
-          AppHaptics.longPress();
-          showAlbumOptions(context, ref, album);
-        },
+        onLongPress: hold,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
