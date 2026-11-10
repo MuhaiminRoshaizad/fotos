@@ -11,6 +11,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/validation/validators.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/toast.dart';
@@ -197,10 +198,19 @@ class NewFolderButton extends ConsumerWidget {
 /// A folder's contents with loading, empty and error states, as one long
 /// inset group under [header], with iOS pull-to-refresh.
 class FolderBody extends ConsumerWidget {
-  const FolderBody({super.key, required this.dir, required this.header});
+  const FolderBody({
+    super.key,
+    required this.dir,
+    required this.header,
+    this.animateIn = false,
+  });
 
   final String dir;
   final Widget header;
+
+  /// Rows slide up as they first appear: for a folder the user opened, not
+  /// for the Files tab, which is visited too often for motion.
+  final bool animateIn;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -230,47 +240,50 @@ class FolderBody extends ConsumerWidget {
           onAction: () => ref.invalidate(folderProvider(dir)),
         ),
       ),
-      data: (List<FileEntry> entries) => CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        slivers: <Widget>[
-          SliverToBoxAdapter(child: header),
-          CupertinoSliverRefreshControl(
-            onRefresh: () => ref.refresh(folderProvider(dir).future),
+      data: (List<FileEntry> entries) => EntranceScope(
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
           ),
-          if (entries.isEmpty)
-            const SliverToBoxAdapter(
-              child: SizedBox(
-                height: 360,
-                child: EmptyState(
-                  icon: CupertinoIcons.folder,
-                  title: 'This folder is empty',
-                  message:
-                      'Files you save or extract here appear in this list.',
-                ),
-              ),
-            )
-          else
-            SliverList.builder(
-              itemCount: entries.length,
-              itemBuilder: (BuildContext context, int i) {
-                final FileEntry e = entries[i];
-                return InsetGroupItem(
-                  first: i == 0,
-                  last: i == entries.length - 1,
-                  child: FileRow(
-                    key: ValueKey<String>(e.path),
-                    entry: e,
-                    onTap: () => openEntry(context, ref, e, entries),
-                    onMore: () => showEntryActions(context, ref, e),
-                    onDelete: () => deleteEntry(context, ref, e),
-                  ),
-                );
-              },
+          slivers: <Widget>[
+            SliverToBoxAdapter(child: header),
+            CupertinoSliverRefreshControl(
+              onRefresh: () => ref.refresh(folderProvider(dir).future),
             ),
-          SliverToBoxAdapter(child: SizedBox(height: bottom)),
-        ],
+            if (entries.isEmpty)
+              const SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 360,
+                  child: EmptyState(
+                    icon: CupertinoIcons.folder,
+                    title: 'This folder is empty',
+                    message:
+                        'Files you save or extract here appear in this list.',
+                  ),
+                ),
+              )
+            else
+              SliverList.builder(
+                itemCount: entries.length,
+                itemBuilder: (BuildContext context, int i) {
+                  final FileEntry e = entries[i];
+                  final Widget row = InsetGroupItem(
+                    first: i == 0,
+                    last: i == entries.length - 1,
+                    child: FileRow(
+                      key: ValueKey<String>(e.path),
+                      entry: e,
+                      onTap: () => openEntry(context, ref, e, entries),
+                      onMore: () => showEntryActions(context, ref, e),
+                      onDelete: () => deleteEntry(context, ref, e),
+                    ),
+                  );
+                  return animateIn ? SlideUpIn(index: i, child: row) : row;
+                },
+              ),
+            SliverToBoxAdapter(child: SizedBox(height: bottom)),
+          ],
+        ),
       ),
     );
   }

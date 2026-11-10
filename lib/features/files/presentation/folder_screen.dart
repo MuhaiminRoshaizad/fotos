@@ -28,7 +28,7 @@ class FolderScreen extends ConsumerWidget {
       ),
       trailing: <Widget>[NewFolderButton(dir: path)],
       body: (BuildContext context, Widget header) =>
-          FolderBody(dir: path, header: header),
+          FolderBody(dir: path, header: header, animateIn: true),
     );
   }
 }
