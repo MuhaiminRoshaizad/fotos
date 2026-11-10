@@ -1,5 +1,4 @@
-import 'package:flutter/cupertino.dart'
-    show CupertinoIcons, CupertinoMenuAnchor, CupertinoMenuItem;
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -100,10 +99,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ? null
                       : () => selection.start(_owner, _actions()),
                 ),
-                _LevelMenu(
-                  level: _level,
-                  onChanged: (GridLevel l) => setState(() => _level = l),
-                ),
               ],
         body: (BuildContext context, Widget header) =>
             MediaAccessGate(header: header, builder: _body),
@@ -169,36 +164,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
         );
       },
-    );
-  }
-}
-
-/// How dense the grid is. Pinching changes it too; this is the visible way in.
-class _LevelMenu extends StatelessWidget {
-  const _LevelMenu({required this.level, required this.onChanged});
-
-  final GridLevel level;
-  final ValueChanged<GridLevel> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoMenuAnchor(
-      menuChildren: <Widget>[
-        for (final GridLevel l in GridLevel.values)
-          CupertinoMenuItem(
-            onPressed: () => onChanged(l),
-            trailing: l == level
-                ? const Icon(CupertinoIcons.checkmark, size: 18)
-                : null,
-            child: Text(l.label),
-          ),
-      ],
-      builder: (BuildContext context, MenuController menu, Widget? child) =>
-          BarButton.icon(
-            icon: CupertinoIcons.square_grid_2x2,
-            tooltip: 'Grid size',
-            onPressed: () => menu.isOpen ? menu.close() : menu.open(),
-          ),
     );
   }
 }
