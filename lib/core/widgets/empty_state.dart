@@ -41,15 +41,9 @@ class EmptyState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(AppRadii.lg + 4),
-                ),
-                child: Icon(icon, size: 32, color: cs.primary),
-              ),
+              // A plain glyph, not an accent-tinted tile: the accent belongs
+              // to the one action below it.
+              Icon(icon, size: 48, color: cs.onSurfaceVariant),
               const SizedBox(height: AppSpacing.lg),
               Text(
                 title,

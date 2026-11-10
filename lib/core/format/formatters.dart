@@ -47,12 +47,16 @@ abstract final class Fmt {
 
   /// File size in decimal units, as Android's own Files app shows them.
   static String size(int bytes) {
-    if (bytes >= 1000000000) {
-      return '${(bytes / 1000000000).toStringAsFixed(2)} GB';
-    }
-    if (bytes >= 1000000) return '${(bytes / 1000000).toStringAsFixed(1)} MB';
+    if (bytes >= 1000000000) return '${_oneDecimal(bytes / 1000000000)} GB';
+    if (bytes >= 1000000) return '${_oneDecimal(bytes / 1000000)} MB';
     if (bytes >= 1000) return '${(bytes / 1000).round()} KB';
     return '$bytes B';
+  }
+
+  /// 110.86 reads as 110.9 and 4.0 as 4, like Android's own storage screens.
+  static String _oneDecimal(double v) {
+    final String s = v.toStringAsFixed(1);
+    return s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
   }
 
   static String count(int n, String singular, [String? plural]) =>

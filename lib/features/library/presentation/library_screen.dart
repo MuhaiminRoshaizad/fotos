@@ -60,7 +60,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.lg,
                   AppSpacing.lg,
-                  AppSpacing.sm,
+                  AppSpacing.xs,
                   AppSpacing.xs,
                 ),
                 child: SizedBox(
@@ -72,48 +72,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             allIds: () =>
                                 _items.map((AssetEntity e) => e.id).toSet(),
                           )
-                        : Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              widget.kind.title,
-                              style: Theme.of(context).textTheme.headlineMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
+                        : Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: Text(
+                                  widget.kind.title,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              _LevelMenu(
+                                level: _level,
+                                onChanged: (GridLevel l) =>
+                                    setState(() => _level = l),
+                              ),
+                            ],
                           ),
                   ),
                 ),
               ),
-              Expanded(
-                child: MediaAccessGate(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.lg,
-                          0,
-                          AppSpacing.lg,
-                          AppSpacing.sm,
-                        ),
-                        child: SegmentedButton<GridLevel>(
-                          showSelectedIcon: false,
-                          segments: <ButtonSegment<GridLevel>>[
-                            for (final GridLevel l in GridLevel.values)
-                              ButtonSegment<GridLevel>(
-                                value: l,
-                                label: Text(l.label),
-                              ),
-                          ],
-                          selected: <GridLevel>{_level},
-                          onSelectionChanged: (Set<GridLevel> s) =>
-                              setState(() => _level = s.first),
-                        ),
-                      ),
-                      Expanded(child: _body()),
-                    ],
-                  ),
-                ),
-              ),
+              Expanded(child: MediaAccessGate(child: _body())),
             ],
           ),
         ),
@@ -177,6 +157,32 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// How dense the grid is. Pinching changes it too; this is the visible way in.
+class _LevelMenu extends StatelessWidget {
+  const _LevelMenu({required this.level, required this.onChanged});
+
+  final GridLevel level;
+  final ValueChanged<GridLevel> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<GridLevel>(
+      tooltip: 'Grid size',
+      icon: const Icon(Icons.grid_view_outlined),
+      initialValue: level,
+      onSelected: onChanged,
+      itemBuilder: (_) => <PopupMenuEntry<GridLevel>>[
+        for (final GridLevel l in GridLevel.values)
+          CheckedPopupMenuItem<GridLevel>(
+            value: l,
+            checked: l == level,
+            child: Text(l.label),
+          ),
+      ],
     );
   }
 }

@@ -64,7 +64,7 @@ class FileIcon extends StatelessWidget {
       );
     }
     final (IconData icon, Color? tint) = switch (entry.kind) {
-      FileKind.folder => (Icons.folder_outlined, cs.primary),
+      FileKind.folder => (Icons.folder_outlined, null),
       FileKind.video => (Icons.movie_outlined, null),
       FileKind.pdf => (Icons.picture_as_pdf_outlined, cs.error),
       FileKind.zip => (Icons.folder_zip_outlined, null),
@@ -78,7 +78,7 @@ class FileIcon extends StatelessWidget {
     width: size,
     height: size,
     decoration: BoxDecoration(
-      color: tint == cs.primary ? cs.primaryContainer : cs.surfaceContainerHigh,
+      color: cs.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(AppRadii.sm),
     ),
     child: Icon(

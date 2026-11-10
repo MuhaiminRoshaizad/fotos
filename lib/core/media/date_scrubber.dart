@@ -165,7 +165,9 @@ class _DateScrubberState extends State<DateScrubber> {
                               height: _thumbHeight,
                               decoration: BoxDecoration(
                                 color: cs.surfaceContainerLowest,
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadii.lg,
+                                ),
                                 boxShadow: const <BoxShadow>[
                                   BoxShadow(
                                     blurRadius: 8,

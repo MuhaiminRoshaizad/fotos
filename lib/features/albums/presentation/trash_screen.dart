@@ -200,7 +200,7 @@ class _TrashTile extends ConsumerWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
