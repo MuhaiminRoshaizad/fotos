@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
@@ -54,6 +55,11 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   bool _chrome = true;
   bool _passedThreshold = false;
 
+  /// True while a finger (or its fling) is scrubbing the filmstrip: the strip
+  /// then chooses the photo, not the other way round.
+  bool _scrubbing = false;
+  Timer? _scrubJump;
+
   AssetEntity get _current => _items[_index];
   String _hero(AssetEntity e) => '${widget.args.heroPrefix}-${e.id}';
 
@@ -66,6 +72,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _scrubJump?.cancel();
     _pages.dispose();
     _strip.dispose();
     super.dispose();
@@ -94,6 +101,39 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             curve: AppMotion.emphasized,
           )
         : _strip.jumpTo(target);
+  }
+
+  /// The filmstrip moved under the fixed centre frame: whichever thumbnail
+  /// sits there becomes the current item. The big photo follows at most
+  /// every 60 ms, so a fast fling doesn't decode every photo it passes.
+  bool _onStripScroll(ScrollNotification n) {
+    if (n is ScrollStartNotification && n.dragDetails != null) {
+      _scrubbing = true;
+    } else if (n is ScrollUpdateNotification && _scrubbing) {
+      final int i = (n.metrics.pixels / (_thumbW + _thumbGap)).round().clamp(
+        0,
+        _items.length - 1,
+      );
+      if (i != _index) {
+        setState(() => _index = i);
+        AppHaptics.tick();
+        _scrubJump ??= Timer(const Duration(milliseconds: 60), () {
+          _scrubJump = null;
+          if (mounted) _pages.jumpToPage(_index);
+        });
+      }
+    } else if (n is ScrollEndNotification && _scrubbing) {
+      _scrubbing = false;
+      _scrubJump?.cancel();
+      _scrubJump = null;
+      // Settle the chosen thumbnail exactly under the frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _pages.jumpToPage(_index);
+        _centreStrip(true);
+      });
+    }
+    return false;
   }
 
   Future<void> _toggleFavourite() async {
@@ -231,6 +271,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                   controller: _pages,
                   itemCount: _items.length,
                   onPageChanged: (int i) {
+                    if (_scrubbing) return;
                     setState(() => _index = i);
                     _centreStrip(true);
                   },
@@ -315,49 +356,56 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints c) {
           final double side = c.maxWidth / 2 - _thumbW / 2;
-          return ListView.builder(
-            controller: _strip,
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: side),
-            itemExtent: _thumbW + _thumbGap,
-            itemCount: _items.length,
-            itemBuilder: (BuildContext context, int i) {
-              final bool on = i == _index;
-              return Semantics(
-                button: true,
-                selected: on,
-                label: 'Item ${i + 1} of ${_items.length}',
-                child: GestureDetector(
-                  onTap: () => _pages.jumpToPage(i),
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: _thumbGap),
-                    child: AnimatedContainer(
-                      duration: AppMotion.short,
-                      margin: EdgeInsets.symmetric(vertical: on ? 2 : 8),
-                      decoration: BoxDecoration(
-                        border: on
-                            ? Border.all(color: Colors.white, width: 2)
-                            : null,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Opacity(
-                        opacity: on ? 1 : 0.6,
-                        child: Image(
-                          image: AssetEntityImageProvider(
-                            _items[i],
-                            isOriginal: false,
-                            thumbnailSize: const ThumbnailSize.square(160),
+          return NotificationListener<ScrollNotification>(
+            onNotification: _onStripScroll,
+            child: ListView.builder(
+              controller: _strip,
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: side),
+              itemExtent: _thumbW + _thumbGap,
+              itemCount: _items.length,
+              itemBuilder: (BuildContext context, int i) {
+                final bool on = i == _index;
+                return Semantics(
+                  button: true,
+                  selected: on,
+                  label: 'Item ${i + 1} of ${_items.length}',
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => _index = i);
+                      _pages.jumpToPage(i);
+                      _centreStrip(true);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: _thumbGap),
+                      child: AnimatedContainer(
+                        duration: AppMotion.short,
+                        margin: EdgeInsets.symmetric(vertical: on ? 2 : 8),
+                        decoration: BoxDecoration(
+                          border: on
+                              ? Border.all(color: Colors.white, width: 2)
+                              : null,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Opacity(
+                          opacity: on ? 1 : 0.6,
+                          child: Image(
+                            image: AssetEntityImageProvider(
+                              _items[i],
+                              isOriginal: false,
+                              thumbnailSize: const ThumbnailSize.square(160),
+                            ),
+                            fit: BoxFit.cover,
+                            gaplessPlayback: true,
                           ),
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
                         ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),
