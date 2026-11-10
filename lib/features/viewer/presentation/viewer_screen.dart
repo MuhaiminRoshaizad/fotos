@@ -1,4 +1,6 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'dart:ui' show ImageFilter;
+
+import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -402,40 +404,75 @@ class _TopBar extends StatelessWidget {
                   AppSpacing.lg,
                   AppSpacing.xl,
                 ),
-                child: Row(
-                  children: <Widget>[
-                    IconButton(
-                      tooltip: 'Close',
-                      color: Colors.white,
+                child: NavigationToolbar(
+                  leading: _Glass(
+                    shape: const CircleBorder(),
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(44, 44),
                       onPressed: onClose,
-                      icon: const Icon(CupertinoIcons.chevron_back),
+                      child: const Icon(
+                        CupertinoIcons.chevron_back,
+                        color: Colors.white,
+                        semanticLabel: 'Close',
+                      ),
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          Fmt.date(date),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+                  ),
+                  middle: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        Fmt.date(date),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
-                        Text(
-                          Fmt.time(date),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                          ),
+                      ),
+                      Text(
+                        Fmt.time(date),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Frosted dark glass for the viewer's controls, over any photo.
+class _Glass extends StatelessWidget {
+  const _Glass({required this.shape, required this.child});
+
+  final ShapeBorder shape;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipPath(
+      clipper: ShapeBorderClipper(shape: shape),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: DecoratedBox(
+          decoration: ShapeDecoration(
+            color: const Color(0x8C1C1C1E),
+            shape: shape is CircleBorder
+                ? const CircleBorder(
+                    side: BorderSide(color: Color(0x1FFFFFFF), width: 0.5),
+                  )
+                : const StadiumBorder(
+                    side: BorderSide(color: Color(0x1FFFFFFF), width: 0.5),
+                  ),
+          ),
+          child: child,
         ),
       ),
     );
@@ -459,58 +496,43 @@ class _Actions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget action(
-      IconData icon,
-      String label,
-      VoidCallback onTap, {
-      Color? color,
-    }) {
-      return Semantics(
-        button: true,
-        label: label,
-        excludeSemantics: true,
-        child: InkResponse(
-          onTap: onTap,
-          radius: 32,
-          child: SizedBox(
-            width: 72,
-            height: 60,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Icon(icon, color: color ?? Colors.white),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
+    Widget action(IconData icon, String label, VoidCallback onTap) {
+      return Tooltip(
+        message: label,
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(56, 48),
+          onPressed: onTap,
+          child: Icon(icon, color: Colors.white, semanticLabel: label),
         ),
       );
     }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
         AppSpacing.sm,
-        AppSpacing.xs,
-        AppSpacing.sm,
+        AppSpacing.lg,
         AppSpacing.sm,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: <Widget>[
-          action(CupertinoIcons.square_arrow_up, 'Share', onShare),
-          action(
-            favourite ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-            'Favourite',
-            onFavourite,
-            color: favourite ? const Color(0xFFFF8FA3) : null,
+      child: _Glass(
+        shape: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: <Widget>[
+              action(CupertinoIcons.square_arrow_up, 'Share', onShare),
+              action(
+                favourite ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+                favourite ? 'Remove from Favourites' : 'Favourite',
+                onFavourite,
+              ),
+              action(CupertinoIcons.info_circle, 'Details', onDetails),
+              action(CupertinoIcons.trash, 'Delete', onDelete),
+            ],
           ),
-          action(CupertinoIcons.info_circle, 'Details', onDetails),
-          action(CupertinoIcons.trash, 'Delete', onDelete),
-        ],
+        ),
       ),
     );
   }
