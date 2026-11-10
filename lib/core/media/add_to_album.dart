@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoSlidingSegmentedControl;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -10,6 +11,7 @@ import '../theme/app_tokens.dart';
 import '../validation/validators.dart';
 import '../widgets/app_sheet.dart';
 import '../widgets/dialogs.dart';
+import '../widgets/inset_group.dart';
 import '../widgets/toast.dart';
 import 'empty_albums.dart';
 import 'media_providers.dart';
@@ -134,37 +136,32 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
       builder: (BuildContext context, ScrollController scroll) => ListView(
         controller: scroll,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              0,
-              AppSpacing.lg,
-              AppSpacing.md,
-            ),
-            child: Text(
-              'Add ${Fmt.count(widget.count, 'item')} to album',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ),
+          SheetTitle('Add to album', subtitle: Fmt.count(widget.count, 'item')),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: SegmentedButton<bool>(
-              showSelectedIcon: false,
-              segments: const <ButtonSegment<bool>>[
-                ButtonSegment<bool>(value: true, label: Text('Move')),
-                ButtonSegment<bool>(value: false, label: Text('Copy')),
-              ],
-              selected: <bool>{_move},
-              onSelectionChanged: (Set<bool> s) =>
-                  setState(() => _move = s.first),
+            child: CupertinoSlidingSegmentedControl<bool>(
+              groupValue: _move,
+              children: const <bool, Widget>{
+                true: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('Move'),
+                ),
+                false: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('Copy'),
+                ),
+              },
+              onValueChanged: (bool? v) {
+                if (v != null) setState(() => _move = v);
+              },
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
+              AppSpacing.xxl,
               AppSpacing.sm,
+              AppSpacing.xxl,
               AppSpacing.lg,
-              AppSpacing.sm,
             ),
             child: Text(
               _move
@@ -173,41 +170,59 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             ),
           ),
-          ListTile(
-            leading: _Thumb(
-              child: Icon(CupertinoIcons.plus, color: cs.primary),
-            ),
-            title: const Text('New album'),
-            onTap: () => Navigator.of(context).pop(_Choice(null, _move)),
+          InsetGroup(
+            children: <Widget>[
+              GroupRow(
+                leading: const Icon(CupertinoIcons.plus),
+                leadingWidth: _Thumb.size,
+                title: 'New album',
+                chevron: false,
+                onTap: () => Navigator.of(context).pop(_Choice(null, _move)),
+              ),
+            ],
           ),
-          for (final String n in widget.empty)
-            ListTile(
-              leading: const _Thumb(
-                child: Icon(CupertinoIcons.rectangle_stack),
-              ),
-              title: Text(n),
-              subtitle: const Text('Empty'),
-              onTap: () =>
-                  Navigator.of(context).pop(_Choice(null, _move, emptyName: n)),
+          if (widget.empty.isNotEmpty || widget.albums.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.lg),
+            InsetGroup(
+              dividerIndent: 14 + _Thumb.size + AppSpacing.md,
+              children: <Widget>[
+                for (final String n in widget.empty)
+                  GroupRow(
+                    leading: const _Thumb(
+                      child: Icon(CupertinoIcons.rectangle_stack),
+                    ),
+                    leadingWidth: _Thumb.size,
+                    title: n,
+                    subtitle: 'Empty',
+                    chevron: false,
+                    onTap: () => Navigator.of(
+                      context,
+                    ).pop(_Choice(null, _move, emptyName: n)),
+                  ),
+                for (final Album a in widget.albums)
+                  GroupRow(
+                    leading: _Thumb(
+                      child: a.cover == null
+                          ? const Icon(CupertinoIcons.rectangle_stack)
+                          : Image(
+                              image: AssetEntityImageProvider(
+                                a.cover!,
+                                isOriginal: false,
+                                thumbnailSize: const ThumbnailSize.square(160),
+                              ),
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                    leadingWidth: _Thumb.size,
+                    title: a.name,
+                    subtitle: Fmt.count(a.count, 'item'),
+                    chevron: false,
+                    onTap: () => Navigator.of(context).pop(_Choice(a, _move)),
+                  ),
+              ],
             ),
-          for (final Album a in widget.albums)
-            ListTile(
-              leading: _Thumb(
-                child: a.cover == null
-                    ? const Icon(CupertinoIcons.rectangle_stack)
-                    : Image(
-                        image: AssetEntityImageProvider(
-                          a.cover!,
-                          isOriginal: false,
-                          thumbnailSize: const ThumbnailSize.square(160),
-                        ),
-                        fit: BoxFit.cover,
-                      ),
-              ),
-              title: Text(a.name),
-              subtitle: Text(Fmt.count(a.count, 'item')),
-              onTap: () => Navigator.of(context).pop(_Choice(a, _move)),
-            ),
+          ],
+          const SizedBox(height: AppSpacing.lg),
         ],
       ),
     );
@@ -218,14 +233,16 @@ class _Thumb extends StatelessWidget {
   const _Thumb({required this.child});
   final Widget child;
 
+  static const double size = 44;
+
   @override
   Widget build(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(AppRadii.sm),
     child: SizedBox(
-      width: 48,
-      height: 48,
+      width: size,
+      height: size,
       child: ColoredBox(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: child,
       ),
     ),

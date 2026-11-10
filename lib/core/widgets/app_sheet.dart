@@ -1,6 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../theme/app_tokens.dart';
+import 'inset_group.dart';
+
 /// The only way the app opens a task sheet (a picker, a form, details).
 ///
 /// `showModalBottomSheet` draws under the system navigation bar and its
@@ -18,9 +21,57 @@ Future<T?> showAppSheet<T>(
     useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: scrollControlled,
-    builder: (BuildContext sheetContext) =>
-        SafeArea(top: false, child: builder(sheetContext)),
+    builder: (BuildContext sheetContext) => OnSheet(
+      child: SafeArea(top: false, child: Builder(builder: builder)),
+    ),
   );
+}
+
+/// The heading of a task sheet: a small centred title, as on iOS, with an
+/// optional line under it.
+class SheetTitle extends StatelessWidget {
+  const SheetTitle(this.title, {super.key, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.md,
+      ),
+      child: Semantics(
+        header: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
+            if (subtitle != null)
+              Text(
+                subtitle!,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// One choice in an action sheet.

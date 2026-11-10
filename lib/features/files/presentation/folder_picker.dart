@@ -7,6 +7,8 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/validation/validators.dart';
 import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/dialogs.dart';
+import '../../../core/widgets/inset_group.dart';
+import '../../../core/widgets/large_title_scaffold.dart';
 import '../domain/file_entry.dart';
 import 'files_providers.dart';
 
@@ -89,35 +91,73 @@ class _FolderPickerState extends ConsumerState<_FolderPicker> {
       builder: (BuildContext context, ScrollController scroll) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          ListTile(
-            leading: _atRoot
-                ? const Icon(CupertinoIcons.device_phone_portrait)
-                : IconButton(
-                    tooltip: 'Up one folder',
-                    onPressed: () => setState(() => _dir = p.dirname(_dir)),
-                    icon: const Icon(CupertinoIcons.arrow_up),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.sm,
+              0,
+              AppSpacing.sm,
+              AppSpacing.sm,
+            ),
+            child: Row(
+              children: <Widget>[
+                // Kept in place at the root, dimmed, so the title stays
+                // centred as the user walks in and out.
+                BarButton.icon(
+                  icon: CupertinoIcons.chevron_up,
+                  tooltip: 'Up one folder',
+                  onPressed: _atRoot
+                      ? null
+                      : () => setState(() => _dir = p.dirname(_dir)),
+                ),
+                Expanded(
+                  child: Text(
+                    _label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
-            title: Text(_label, maxLines: 2, overflow: TextOverflow.ellipsis),
-            trailing: IconButton(
-              tooltip: 'New folder',
-              onPressed: () => _newFolder(list.value ?? const <FileEntry>[]),
-              icon: const Icon(CupertinoIcons.folder_badge_plus),
+                ),
+                BarButton.icon(
+                  icon: CupertinoIcons.folder_badge_plus,
+                  tooltip: 'New folder',
+                  onPressed: () =>
+                      _newFolder(list.value ?? const <FileEntry>[]),
+                ),
+              ],
             ),
           ),
-          const Divider(height: 1),
           Expanded(
             child: list.isLoading && !list.hasValue
                 ? const SizedBox.shrink()
                 : folders.isEmpty
-                ? const Center(child: Text('No folders here'))
+                ? Center(
+                    child: Text(
+                      'No folders here',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
                 : ListView.builder(
                     controller: scroll,
+                    padding: EdgeInsets.zero,
                     itemCount: folders.length,
-                    itemBuilder: (BuildContext context, int i) => ListTile(
-                      leading: const Icon(CupertinoIcons.folder),
-                      title: Text(folders[i].name),
-                      onTap: () => setState(() => _dir = folders[i].path),
-                    ),
+                    itemBuilder: (BuildContext context, int i) =>
+                        InsetGroupItem(
+                          first: i == 0,
+                          last: i == folders.length - 1,
+                          child: GroupRow(
+                            leading: const Icon(CupertinoIcons.folder_fill),
+                            title: folders[i].name,
+                            onTap: () => setState(() => _dir = folders[i].path),
+                          ),
+                        ),
                   ),
           ),
           Padding(

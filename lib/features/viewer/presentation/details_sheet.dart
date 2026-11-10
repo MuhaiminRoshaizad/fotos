@@ -7,6 +7,8 @@ import 'package:photo_manager/photo_manager.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/platform/native_channel.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_sheet.dart';
+import '../../../core/widgets/inset_group.dart';
 
 /// Date, file, camera and place for one photo or video.
 class DetailsSheet extends StatefulWidget {
@@ -53,49 +55,44 @@ class _DetailsSheetState extends State<DetailsSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                0,
-                AppSpacing.lg,
-                AppSpacing.sm,
-              ),
-              child: Text(
-                'Details',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+            SheetTitle(Fmt.dayHeading(d), subtitle: Fmt.time(d)),
+            InsetGroup(
+              children: <Widget>[
+                _Row(
+                  icon: video ? CupertinoIcons.videocam : CupertinoIcons.photo,
+                  title: a.title ?? 'Untitled',
+                  subtitle: x == null ? dims : '${Fmt.size(x.size)} · $dims',
+                ),
+                if (camera != null)
+                  _Row(
+                    icon: CupertinoIcons.camera,
+                    title: camera,
+                    subtitle: x!.camera!.settings,
+                  ),
+              ],
             ),
-            _Row(
-              icon: CupertinoIcons.calendar,
-              title: Fmt.dayHeading(d),
-              subtitle: Fmt.time(d),
-            ),
-            _Row(
-              icon: video ? CupertinoIcons.videocam : CupertinoIcons.photo,
-              title: a.title ?? 'Untitled',
-              subtitle: x == null ? dims : '${Fmt.size(x.size)} · $dims',
-            ),
-            if (camera != null)
-              _Row(
-                icon: CupertinoIcons.camera,
-                title: camera,
-                subtitle: x!.camera!.settings,
+            if (hasPlace || a.relativePath != null) ...<Widget>[
+              const SizedBox(height: AppSpacing.lg),
+              InsetGroup(
+                children: <Widget>[
+                  if (hasPlace)
+                    _Row(
+                      icon: CupertinoIcons.location,
+                      title:
+                          '${where.latitude.toStringAsFixed(5)}, '
+                          '${where.longitude.toStringAsFixed(5)}',
+                      subtitle: 'Where it was taken',
+                    ),
+                  if (a.relativePath != null)
+                    _Row(
+                      icon: CupertinoIcons.folder,
+                      title: a.relativePath!.replaceAll(RegExp(r'/$'), ''),
+                      subtitle: 'Folder',
+                    ),
+                ],
               ),
-            if (hasPlace)
-              _Row(
-                icon: CupertinoIcons.location,
-                title:
-                    '${where.latitude.toStringAsFixed(5)}, '
-                    '${where.longitude.toStringAsFixed(5)}',
-                subtitle: 'Where it was taken',
-              ),
-            if (a.relativePath != null)
-              _Row(
-                icon: CupertinoIcons.folder,
-                title: a.relativePath!.replaceAll(RegExp(r'/$'), ''),
-                subtitle: 'Folder',
-              ),
-            const SizedBox(height: AppSpacing.sm),
+            ],
+            const SizedBox(height: AppSpacing.lg),
           ],
         );
       },
@@ -118,10 +115,10 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
+    return GroupRow(
       leading: Icon(icon),
-      title: Text(title),
-      subtitle: subtitle == null || subtitle!.isEmpty ? null : Text(subtitle!),
+      title: title,
+      subtitle: subtitle == null || subtitle!.isEmpty ? null : subtitle,
     );
   }
 }

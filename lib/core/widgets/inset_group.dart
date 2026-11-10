@@ -15,6 +15,25 @@ extension GroupedColors on ColorScheme {
       : surfaceContainerLow;
 }
 
+/// Marks everything below it as sitting on a sheet. A sheet is already the
+/// colour a group's rows have on a page, so rows on a sheet step one layer
+/// lighter to stay visible (iOS does the same).
+class OnSheet extends InheritedWidget {
+  const OnSheet({super.key, required super.child});
+
+  /// The colour for a group's rows at [context].
+  static Color rowColor(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final bool sheet = context.getInheritedWidgetOfExactType<OnSheet>() != null;
+    return sheet && cs.brightness == Brightness.dark
+        ? cs.surfaceContainerHigh
+        : cs.groupedRow;
+  }
+
+  @override
+  bool updateShouldNotify(OnSheet old) => false;
+}
+
 /// A rounded group of rows inset from the screen edges, as in iOS Settings,
 /// with an optional heading above and note below.
 class InsetGroup extends StatelessWidget {
@@ -23,11 +42,16 @@ class InsetGroup extends StatelessWidget {
     required this.children,
     this.header,
     this.footer,
+    this.dividerIndent = 52,
   });
 
   final List<Widget> children;
   final String? header;
   final String? footer;
+
+  /// Where the hairline between rows starts: after the leading icon by
+  /// default, further in for rows that lead with a thumbnail.
+  final double dividerIndent;
 
   @override
   Widget build(BuildContext context) {
@@ -42,13 +66,13 @@ class InsetGroup extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppRadii.md),
             child: Material(
-              color: cs.groupedRow,
+              color: OnSheet.rowColor(context),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   for (int i = 0; i < children.length; i++) ...<Widget>[
-                    if (i > 0) const _RowDivider(),
+                    if (i > 0) _RowDivider(indent: dividerIndent),
                     children[i],
                   ],
                 ],
@@ -99,7 +123,7 @@ class InsetGroupItem extends StatelessWidget {
           bottom: last ? r : Radius.zero,
         ),
         child: Material(
-          color: Theme.of(context).colorScheme.groupedRow,
+          color: OnSheet.rowColor(context),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,12 +176,14 @@ class GroupHeading extends StatelessWidget {
 
 /// A hairline between rows that starts after the leading icon, as iOS does.
 class _RowDivider extends StatelessWidget {
-  const _RowDivider();
+  const _RowDivider({this.indent = 52});
+
+  final double indent;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 52),
+      padding: EdgeInsets.only(left: indent),
       child: Divider(
         height: 0.5,
         thickness: 0.5,
@@ -174,6 +200,7 @@ class GroupRow extends StatelessWidget {
     super.key,
     required this.title,
     this.leading,
+    this.leadingWidth = 26,
     this.subtitle,
     this.value,
     this.trailing,
@@ -185,6 +212,9 @@ class GroupRow extends StatelessWidget {
 
   final String title;
   final Widget? leading;
+
+  /// Room for [leading]: an icon by default, wider for a thumbnail.
+  final double leadingWidth;
   final String? subtitle;
   final String? value;
   final Widget? trailing;
@@ -214,7 +244,10 @@ class GroupRow extends StatelessWidget {
                     color: destructive ? cs.error : cs.primary,
                     size: AppIconSize.standard,
                   ),
-                  child: SizedBox(width: 26, child: Center(child: leading)),
+                  child: SizedBox(
+                    width: leadingWidth,
+                    child: Center(child: leading),
+                  ),
                 ),
                 const SizedBox(width: AppSpacing.md),
               ],

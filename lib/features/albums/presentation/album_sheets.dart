@@ -158,23 +158,7 @@ class _SortSheetState extends State<_SortSheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            0,
-            AppSpacing.lg,
-            AppSpacing.sm,
-          ),
-          child: Text(
-            'Sort',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-              color: cs.onSurface,
-            ),
-          ),
-        ),
+        const SheetTitle('Sort'),
         // iOS marks the choice with a checkmark, not a radio button.
         InsetGroup(
           children: <Widget>[
