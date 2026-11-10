@@ -70,102 +70,27 @@ class AppShell extends ConsumerWidget {
   }
 }
 
-/// Material "fade through" between tabs: the old tab fades out quickly, the
-/// new one fades in while settling from 96% scale. Inactive tabs stay mounted
-/// so each keeps its scroll position and navigation stack.
-class FadeThroughBranches extends StatefulWidget {
-  const FadeThroughBranches({
-    super.key,
-    required this.index,
-    required this.children,
-  });
+/// Switches tabs instantly, as iOS does: a tab change happens dozens of
+/// times a day, so it gets no animation. Inactive tabs stay mounted, with
+/// their tickers paused, so each keeps its scroll position and stack.
+class TabBranches extends StatelessWidget {
+  const TabBranches({super.key, required this.index, required this.children});
 
   final int index;
   final List<Widget> children;
 
   @override
-  State<FadeThroughBranches> createState() => _FadeThroughBranchesState();
-}
-
-class _FadeThroughBranchesState extends State<FadeThroughBranches>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: AppMotion.medium,
-    value: 1,
-  );
-  int? _previous;
-
-  @override
-  void didUpdateWidget(FadeThroughBranches old) {
-    super.didUpdateWidget(old);
-    if (old.index != widget.index) {
-      _previous = old.index;
-      final bool reduce = MediaQuery.of(context).disableAnimations;
-      _c.forward(from: reduce ? 1 : 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final Animation<double> fadeOut = CurvedAnimation(
-      parent: _c,
-      curve: const Interval(0, 0.3, curve: AppMotion.accelerate),
-    );
-    final Animation<double> fadeIn = CurvedAnimation(
-      parent: _c,
-      curve: const Interval(0.3, 1, curve: AppMotion.decelerate),
-    );
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (BuildContext context, _) {
-        final bool animating = _c.isAnimating;
-        return Stack(
-          children: <Widget>[
-            for (int i = 0; i < widget.children.length; i++)
-              _branch(i, animating, fadeIn, fadeOut),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _branch(
-    int i,
-    bool animating,
-    Animation<double> fadeIn,
-    Animation<double> fadeOut,
-  ) {
-    final bool current = i == widget.index;
-    final bool leaving = animating && i == _previous;
-    final Widget child = widget.children[i];
-    if (current) {
-      return Positioned.fill(
-        child: Opacity(
-          opacity: fadeIn.value,
-          child: Transform.scale(
-            scale: 0.96 + 0.04 * fadeIn.value,
-            child: child,
+    return Stack(
+      children: <Widget>[
+        for (int i = 0; i < children.length; i++)
+          Positioned.fill(
+            child: Offstage(
+              offstage: i != index,
+              child: TickerMode(enabled: i == index, child: children[i]),
+            ),
           ),
-        ),
-      );
-    }
-    return Positioned.fill(
-      child: Offstage(
-        offstage: !leaving,
-        child: TickerMode(
-          enabled: leaving,
-          child: IgnorePointer(
-            child: Opacity(opacity: 1 - fadeOut.value, child: child),
-          ),
-        ),
-      ),
+      ],
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
@@ -107,7 +109,7 @@ class _FloatingNavState extends State<FloatingNav>
               },
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: cs.primaryContainer,
+                  color: cs.onSurface.withValues(alpha: 0.09),
                   borderRadius: BorderRadius.circular(AppRadii.pill),
                 ),
               ),
@@ -326,6 +328,8 @@ class SelectionBar extends StatelessWidget {
   }
 }
 
+/// Frosted glass: whatever scrolls behind shows through, blurred, as on
+/// iOS. A hairline edge keeps it distinct over photos of any colour.
 class _Pill extends StatelessWidget {
   const _Pill({required this.child});
   final Widget child;
@@ -333,15 +337,41 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    return Material(
-      color: cs.surfaceContainerLowest,
-      elevation: 6,
-      shadowColor: Colors.black.withValues(alpha: 0.35),
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: child,
+    final bool dark = Theme.of(context).brightness == Brightness.dark;
+    const ShapeBorder shape = StadiumBorder();
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        shape: shape,
+        shadows: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.35 : 0.12),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipPath(
+        clipper: const ShapeBorderClipper(shape: shape),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: DecoratedBox(
+            decoration: ShapeDecoration(
+              color: cs.surfaceContainerLow.withValues(
+                alpha: dark ? 0.68 : 0.74,
+              ),
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color: cs.onSurface.withValues(alpha: 0.08),
+                  width: 0.5,
+                ),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: child,
+            ),
+          ),
+        ),
       ),
     );
   }

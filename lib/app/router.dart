@@ -75,10 +75,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               BuildContext context,
               StatefulNavigationShell shell,
               List<Widget> children,
-            ) => FadeThroughBranches(
-              index: shell.currentIndex,
-              children: children,
-            ),
+            ) => TabBranches(index: shell.currentIndex, children: children),
         branches: <StatefulShellBranch>[
           StatefulShellBranch(
             routes: <RouteBase>[
