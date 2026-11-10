@@ -64,7 +64,8 @@ class _LargeTitleScaffoldState extends State<LargeTitleScaffold> {
     final Color background = widget.grouped ? cs.groupedBackground : cs.surface;
     return Scaffold(
       backgroundColor: background,
-      // Nothing here takes text; dialogs handle the keyboard themselves.
+      // The keyboard covers the floating tab bar instead of lifting it; a
+      // page with a text field pads its own list by the keyboard's height.
       resizeToAvoidBottomInset: false,
       body: NotificationListener<ScrollNotification>(
         onNotification: _onScroll,

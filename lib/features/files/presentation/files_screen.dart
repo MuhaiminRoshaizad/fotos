@@ -1,5 +1,9 @@
 import 'package:flutter/cupertino.dart'
-    show CupertinoIcons, CupertinoSliverRefreshControl;
+    show
+        CupertinoButton,
+        CupertinoIcons,
+        CupertinoSearchTextField,
+        CupertinoSliverRefreshControl;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -74,14 +78,11 @@ class _FilesScreenState extends ConsumerState<FilesScreen> {
           (AsyncData<bool>(value: true), AsyncData<String>(:final value)) =>
             FolderBody(
               dir: value,
-              header: Column(
+              header: header,
+              preface: const Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  header,
-                  const _StorageGroup(),
-                  const GroupHeading('Folders'),
-                ],
+                children: <Widget>[_StorageGroup(), GroupHeading('Folders')],
               ),
             ),
           (AsyncData<bool>(value: false), _) => headed(
@@ -196,28 +197,62 @@ class NewFolderButton extends ConsumerWidget {
 }
 
 /// A folder's contents with loading, empty and error states, as one long
-/// inset group under [header], with iOS pull-to-refresh.
-class FolderBody extends ConsumerWidget {
+/// inset group under [header], with a search field that filters the folder
+/// by name and iOS pull-to-refresh.
+class FolderBody extends ConsumerStatefulWidget {
   const FolderBody({
     super.key,
     required this.dir,
     required this.header,
+    this.preface,
     this.animateIn = false,
   });
 
   final String dir;
   final Widget header;
 
+  /// Shown between the search field and the rows, and hidden while a search
+  /// is typed so results sit directly under the field.
+  final Widget? preface;
+
   /// Rows slide up as they first appear: for a folder the user opened, not
   /// for the Files tab, which is visited too often for motion.
   final bool animateIn;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FolderBody> createState() => _FolderBodyState();
+}
+
+class _FolderBodyState extends ConsumerState<FolderBody> {
+  final TextEditingController _query = TextEditingController();
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _query.addListener(_changed);
+    _focus.addListener(_changed);
+  }
+
+  void _changed() => setState(() {});
+
+  @override
+  void dispose() {
+    _query.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String dir = widget.dir;
+    final Widget header = widget.header;
     final AsyncValue<List<FileEntry>> list = ref.watch(folderProvider(dir));
-    final double bottom = AppNavMetrics.clearance(
-      MediaQuery.paddingOf(context).bottom,
-    );
+    // The page does not resize for the keyboard, so the list makes room for
+    // it itself and the last match can scroll clear.
+    final double bottom =
+        AppNavMetrics.clearance(MediaQuery.paddingOf(context).bottom) +
+        MediaQuery.viewInsetsOf(context).bottom;
     Widget headed(Widget state) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -227,7 +262,7 @@ class FolderBody extends ConsumerWidget {
     );
     return list.when(
       skipLoadingOnRefresh: true,
-      loading: () => _RowsSkeleton(header: header),
+      loading: () => _RowsSkeleton(header: header, preface: widget.preface),
       error: (_, _) => headed(
         EmptyState(
           icon: CupertinoIcons.folder_badge_minus,
@@ -240,58 +275,154 @@ class FolderBody extends ConsumerWidget {
           onAction: () => ref.invalidate(folderProvider(dir)),
         ),
       ),
-      data: (List<FileEntry> entries) => EntranceScope(
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          slivers: <Widget>[
-            SliverToBoxAdapter(child: header),
-            CupertinoSliverRefreshControl(
-              onRefresh: () => ref.refresh(folderProvider(dir).future),
+      data: (List<FileEntry> entries) {
+        final String q = _query.text.trim().toLowerCase();
+        final List<FileEntry> shown = q.isEmpty
+            ? entries
+            : entries
+                  .where((FileEntry e) => e.name.toLowerCase().contains(q))
+                  .toList();
+        return EntranceScope(
+          child: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
             ),
-            if (entries.isEmpty)
-              const SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 360,
-                  child: EmptyState(
-                    icon: CupertinoIcons.folder,
-                    title: 'This folder is empty',
-                    message:
-                        'Files you save or extract here appear in this list.',
+            slivers: <Widget>[
+              SliverToBoxAdapter(child: header),
+              CupertinoSliverRefreshControl(
+                onRefresh: () => ref.refresh(folderProvider(dir).future),
+              ),
+              if (entries.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: _SearchField(
+                    controller: _query,
+                    focus: _focus,
+                    active: _focus.hasFocus || _query.text.isNotEmpty,
                   ),
                 ),
-              )
-            else
-              SliverList.builder(
-                itemCount: entries.length,
-                itemBuilder: (BuildContext context, int i) {
-                  final FileEntry e = entries[i];
-                  final Widget row = InsetGroupItem(
-                    first: i == 0,
-                    last: i == entries.length - 1,
-                    child: FileRow(
-                      key: ValueKey<String>(e.path),
-                      entry: e,
-                      onTap: () => openEntry(context, ref, e, entries),
-                      onMore: () => showEntryActions(context, ref, e),
-                      onDelete: () => deleteEntry(context, ref, e),
+              if (widget.preface != null && q.isEmpty)
+                SliverToBoxAdapter(child: widget.preface),
+              if (entries.isEmpty)
+                const SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 360,
+                    child: EmptyState(
+                      icon: CupertinoIcons.folder,
+                      title: 'This folder is empty',
+                      message:
+                          'Files you save or extract here appear in this list.',
                     ),
-                  );
-                  return animateIn ? SlideUpIn(index: i, child: row) : row;
-                },
+                  ),
+                )
+              else if (shown.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xxl),
+                    child: Text(
+                      'Nothing in this folder matches “${_query.text.trim()}”.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                SliverList.builder(
+                  itemCount: shown.length,
+                  itemBuilder: (BuildContext context, int i) {
+                    final FileEntry e = shown[i];
+                    final Widget row = InsetGroupItem(
+                      first: i == 0,
+                      last: i == shown.length - 1,
+                      child: FileRow(
+                        key: ValueKey<String>(e.path),
+                        entry: e,
+                        onTap: () => openEntry(context, ref, e, entries),
+                        onMore: () => showEntryActions(context, ref, e),
+                        onDelete: () => deleteEntry(context, ref, e),
+                      ),
+                    );
+                    return widget.animateIn
+                        ? SlideUpIn(index: i, child: row)
+                        : row;
+                  },
+                ),
+              SliverToBoxAdapter(child: SizedBox(height: bottom)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// iOS's search field, with Cancel sliding in beside it while it is in use.
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.focus,
+    required this.active,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focus;
+  final bool active;
+
+  static const double height = 36;
+  static const EdgeInsets padding = EdgeInsets.fromLTRB(
+    AppSpacing.lg,
+    AppSpacing.xs,
+    AppSpacing.lg,
+    AppSpacing.sm,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: padding,
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: height),
+              child: CupertinoSearchTextField(
+                controller: controller,
+                focusNode: focus,
+                placeholder: 'Search this folder',
+                style: TextStyle(fontSize: 16, color: cs.onSurface),
               ),
-            SliverToBoxAdapter(child: SizedBox(height: bottom)),
-          ],
-        ),
+            ),
+          ),
+          AnimatedSize(
+            duration: AppMotion.medium,
+            curve: AppMotion.decelerate,
+            alignment: Alignment.centerLeft,
+            child: active
+                ? CupertinoButton(
+                    padding: const EdgeInsets.only(left: AppSpacing.md),
+                    minimumSize: const Size(44, 44),
+                    onPressed: () {
+                      controller.clear();
+                      focus.unfocus();
+                    },
+                    child: const Text('Cancel'),
+                  )
+                : const SizedBox(height: 44),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _RowsSkeleton extends StatelessWidget {
-  const _RowsSkeleton({required this.header});
+  const _RowsSkeleton({required this.header, this.preface});
   final Widget header;
+  final Widget? preface;
 
   @override
   Widget build(BuildContext context) {
@@ -300,6 +431,22 @@ class _RowsSkeleton extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       children: <Widget>[
         header,
+        // Stands in for the search field, so nothing moves when it arrives.
+        Padding(
+          padding: _SearchField.padding,
+          child: Container(
+            height: 44,
+            alignment: Alignment.center,
+            child: Container(
+              height: _SearchField.height,
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(9),
+              ),
+            ),
+          ),
+        ),
+        ?preface,
         Skeletonizer(
           enabled: true,
           child: Column(
