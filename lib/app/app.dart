@@ -13,6 +13,7 @@ class FotosApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'fotos',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const AppScrollBehavior(),
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
       routerConfig: ref.watch(routerProvider),
