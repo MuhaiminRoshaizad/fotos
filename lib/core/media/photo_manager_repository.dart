@@ -24,12 +24,16 @@ class PhotoManagerRepository implements MediaRepository {
   static const int _pageSize = 500;
 
   /// Newest first by when the photo was taken, not when it reached the
-  /// phone, so imported Takeout items land in their real months.
+  /// phone, so imported Takeout items land in their real months. Items with
+  /// no date taken (WhatsApp, Telegram, downloads) sort by when they were
+  /// added: the same fallback photo_manager uses for `createDateTime`, which
+  /// the grid's month headings read. Sorting on `datetaken` alone put those
+  /// items after everything else, so months repeated further down the grid.
   static CustomFilter _filter(String where) => CustomFilter.sql(
     where: where,
     orderBy: const <OrderByItem>[
-      OrderByItem.desc('datetaken'),
-      OrderByItem.desc('date_added'),
+      OrderByItem.desc('COALESCE(NULLIF(datetaken, 0), date_added * 1000)'),
+      OrderByItem.desc('_id'),
     ],
   )..needTitle = true;
 
