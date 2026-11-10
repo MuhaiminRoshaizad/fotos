@@ -311,42 +311,16 @@ class BarButton extends StatelessWidget {
 }
 
 /// iOS's back button for a pushed page: a chevron and the previous page's
-/// name in the accent colour. Does what the system back gesture does.
+/// name in the accent colour (Flutter's own Cupertino widget, so it matches
+/// iOS exactly). Does what the system back gesture does.
 class BackBarButton extends StatelessWidget {
   const BackBarButton({super.key, required this.label});
 
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    return Semantics(
-      button: true,
-      label: 'Back to $label',
-      excludeSemantics: true,
-      child: CupertinoButton(
-        padding: const EdgeInsets.only(right: AppSpacing.sm),
-        minimumSize: const Size(44, 44),
-        onPressed: () => Navigator.of(context).maybePop(),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(CupertinoIcons.chevron_back, color: cs.primary, size: 26),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 120),
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textScaler: MediaQuery.textScalerOf(
-                  context,
-                ).clamp(maxScaleFactor: 1.2),
-                style: TextStyle(color: cs.primary, fontSize: 17),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => MediaQuery.withClampedTextScaling(
+    maxScaleFactor: 1.2,
+    child: CupertinoNavigationBarBackButton(previousPageTitle: label),
+  );
 }

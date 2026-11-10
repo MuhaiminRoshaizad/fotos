@@ -13,6 +13,7 @@ import '../../../core/platform/native_channel.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/toast.dart';
 import 'albums_providers.dart';
 
@@ -27,70 +28,88 @@ class TrashScreen extends ConsumerWidget {
     final double bottom = AppNavMetrics.clearance(
       MediaQuery.paddingOf(context).bottom,
     );
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recently deleted'),
-        actions: <Widget>[
-          if ((trash.value ?? const <TrashedItem>[]).isNotEmpty)
-            TextButton(
-              onPressed: () => _restore(context, ref, trash.value!),
-              child: const Text('Restore all'),
+    final List<TrashedItem> loaded = trash.value ?? const <TrashedItem>[];
+    return LargeTitleScaffold(
+      title: 'Recently deleted',
+      subtitle: trash.hasValue ? Fmt.count(loaded.length, 'item') : '',
+      leading: const BackBarButton(label: 'Albums'),
+      trailing: <Widget>[
+        if (loaded.isNotEmpty)
+          BarButton.text(
+            label: 'Restore all',
+            onPressed: () => _restore(context, ref, loaded),
+          ),
+      ],
+      body: (BuildContext context, Widget header) {
+        Widget headed(Widget state) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            header,
+            Expanded(child: state),
+          ],
+        );
+        return trash.when(
+          skipLoadingOnRefresh: true,
+          loading: () => headed(const GridSkeleton(level: GridLevel.all)),
+          error: (_, _) => headed(
+            EmptyState(
+              icon: CupertinoIcons.exclamationmark_circle,
+              title: 'Couldn\'t read the trash',
+              message: 'Android didn\'t return the deleted items.',
+              actionLabel: 'Try again',
+              onAction: () => ref.invalidate(trashProvider),
             ),
-        ],
-      ),
-      body: trash.when(
-        skipLoadingOnRefresh: true,
-        loading: () => const GridSkeleton(level: GridLevel.all),
-        error: (_, _) => EmptyState(
-          icon: CupertinoIcons.exclamationmark_circle,
-          title: 'Couldn\'t read the trash',
-          message: 'Android didn\'t return the deleted items.',
-          actionLabel: 'Try again',
-          onAction: () => ref.invalidate(trashProvider),
-        ),
-        data: (List<TrashedItem> items) => items.isEmpty
-            ? const EmptyState(
-                icon: CupertinoIcons.trash,
-                title: 'Nothing deleted',
-                message:
-                    'Photos and videos you delete stay here for 30 days, then '
-                    'Android removes them for good.',
-              )
-            : CustomScrollView(
-                slivers: <Widget>[
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.lg,
-                        0,
-                        AppSpacing.lg,
-                        AppSpacing.md,
-                      ),
-                      child: Text(
-                        'Android deletes each item for good when its days run out.',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          data: (List<TrashedItem> items) => items.isEmpty
+              ? headed(
+                  const EmptyState(
+                    icon: CupertinoIcons.trash,
+                    title: 'Nothing deleted',
+                    message:
+                        'Photos and videos you delete stay here for 30 days, '
+                        'then Android removes them for good.',
+                  ),
+                )
+              : CustomScrollView(
+                  slivers: <Widget>[
+                    SliverToBoxAdapter(child: header),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          0,
+                          AppSpacing.lg,
+                          AppSpacing.md,
+                        ),
+                        child: Text(
+                          'Android deletes each item for good when its days '
+                          'run out.',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  SliverGrid.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          mainAxisSpacing: 2,
-                          crossAxisSpacing: 2,
-                        ),
-                    itemCount: items.length,
-                    itemBuilder: (BuildContext context, int i) => _TrashTile(
-                      item: items[i],
-                      onTap: () => _actions(context, ref, items[i]),
+                    SliverGrid.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            mainAxisSpacing: 2,
+                            crossAxisSpacing: 2,
+                          ),
+                      itemCount: items.length,
+                      itemBuilder: (BuildContext context, int i) => _TrashTile(
+                        item: items[i],
+                        onTap: () => _actions(context, ref, items[i]),
+                      ),
                     ),
-                  ),
-                  SliverToBoxAdapter(child: SizedBox(height: bottom)),
-                ],
-              ),
-      ),
+                    SliverToBoxAdapter(child: SizedBox(height: bottom)),
+                  ],
+                ),
+        );
+      },
     );
   }
 

@@ -58,38 +58,3 @@ List<SelectionAction> mediaSelectionActions(
     ),
   ];
 }
-
-/// The header that replaces a grid's title while selecting.
-class SelectionHeader extends ConsumerWidget {
-  const SelectionHeader({super.key, required this.allIds});
-
-  final Set<String> Function() allIds;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final SelectionState s = ref.watch(selectionProvider);
-    final int n = s.ids.length;
-    return Row(
-      children: <Widget>[
-        IconButton(
-          tooltip: 'Cancel selection',
-          onPressed: () => ref.read(selectionProvider.notifier).clear(),
-          icon: const Icon(CupertinoIcons.xmark),
-        ),
-        Expanded(
-          child: Text(
-            n == 1 ? '1 selected' : '$n selected',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        TextButton(
-          onPressed: () =>
-              ref.read(selectionProvider.notifier).setIds(allIds()),
-          child: const Text('Select all'),
-        ),
-      ],
-    );
-  }
-}
