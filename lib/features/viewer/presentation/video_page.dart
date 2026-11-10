@@ -12,6 +12,7 @@ import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../data/viewer_settings.dart';
+import 'seek_queue.dart';
 
 /// One video in the viewer.
 ///
@@ -40,6 +41,12 @@ class VideoPage extends ConsumerStatefulWidget {
 
 class _VideoPageState extends ConsumerState<VideoPage> {
   VideoPlayerController? _c;
+  SeekQueue? _seeks;
+
+  /// Where the last seek asked to go. Shown in place of the player's own
+  /// position until the player has caught up, so the playhead stays under
+  /// the finger.
+  Duration? _target;
   bool _failed = false;
   bool _fast = false;
   bool _scrubbing = false;
@@ -79,12 +86,59 @@ class _VideoPageState extends ConsumerState<VideoPage> {
     await c.setLooping(s.loop);
     await c.setVolume(s.muted ? 0 : 1);
     c.addListener(_tick);
+    _seeks = SeekQueue((Duration p) => _seekAndSettle(c, p));
     setState(() => _c = c);
     if (widget.active) c.play();
   }
 
   void _tick() {
     if (mounted) setState(() {});
+  }
+
+  void _seekTo(Duration position) {
+    final VideoPlayerController? c = _c;
+    if (c == null) return;
+    final Duration p = position < Duration.zero
+        ? Duration.zero
+        : (position > c.value.duration ? c.value.duration : position);
+    setState(() => _target = p);
+    _seeks?.request(p);
+    _seeks?.idle.then((_) {
+      if (mounted) setState(() => _target = null);
+    });
+  }
+
+  /// One seek, finished when the player has the frame ready.
+  ///
+  /// The plugin's own future completes as soon as the request is handed
+  /// over. ExoPlayer goes to buffering on every seek and back to ready once
+  /// the frame is decoded, which the plugin reports as [isBuffering], so
+  /// wait for that round trip. The timers cover a seek so quick that the
+  /// change is never seen, and a player that never reports back.
+  Future<void> _seekAndSettle(VideoPlayerController c, Duration p) async {
+    await c.seekTo(p);
+    if (!mounted) return;
+    final Completer<void> done = Completer<void>();
+    bool buffering = c.value.isBuffering;
+    void listen() {
+      if (c.value.isBuffering) {
+        buffering = true;
+      } else if (buffering && !done.isCompleted) {
+        done.complete();
+      }
+    }
+
+    c.addListener(listen);
+    final Timer unseen = Timer(const Duration(milliseconds: 60), () {
+      if (!buffering && !done.isCompleted) done.complete();
+    });
+    final Timer limit = Timer(const Duration(milliseconds: 500), () {
+      if (!done.isCompleted) done.complete();
+    });
+    await done.future;
+    unseen.cancel();
+    limit.cancel();
+    c.removeListener(listen);
   }
 
   @override
@@ -119,12 +173,9 @@ class _VideoPageState extends ConsumerState<VideoPage> {
     _streakSide = side;
     _streakCount++;
     _streakAt = now;
-    final Duration target = c.value.position + Duration(seconds: 10 * side);
-    c.seekTo(
-      target < Duration.zero
-          ? Duration.zero
-          : (target > c.value.duration ? c.value.duration : target),
-    );
+    // Count from the last target, so quick taps add up instead of all
+    // starting from the position the player has yet to leave.
+    _seekTo((_target ?? c.value.position) + Duration(seconds: 10 * side));
     AppHaptics.light();
     _seekBadge?.cancel();
     _seekBadge = Timer(const Duration(milliseconds: 700), () {
@@ -139,7 +190,7 @@ class _VideoPageState extends ConsumerState<VideoPage> {
     if (c.value.isPlaying) {
       c.pause();
     } else {
-      if (c.value.position >= c.value.duration) c.seekTo(Duration.zero);
+      if (c.value.position >= c.value.duration) _seekTo(Duration.zero);
       c.play();
     }
   }
@@ -257,14 +308,22 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                       child: _Controls(
                         asset: widget.asset,
                         controller: c,
+                        position: _target ?? c.value.position,
+                        gliding: c.value.isPlaying && _target == null,
+                        onSeek: _seekTo,
                         onScrubStart: () {
                           _wasPlaying = c.value.isPlaying;
                           c.pause();
                           setState(() => _scrubbing = true);
                         },
                         onScrubEnd: () {
-                          if (_wasPlaying) c.play();
                           setState(() => _scrubbing = false);
+                          if (!_wasPlaying) return;
+                          // Start again only once the last seek has landed,
+                          // so playback picks up from the chosen frame.
+                          _seeks?.idle.then((_) {
+                            if (mounted && !_scrubbing) c.play();
+                          });
                         },
                       ),
                     ),
@@ -367,12 +426,23 @@ class _Controls extends ConsumerWidget {
   const _Controls({
     required this.asset,
     required this.controller,
+    required this.position,
+    required this.gliding,
+    required this.onSeek,
     required this.onScrubStart,
     required this.onScrubEnd,
   });
 
   final AssetEntity asset;
   final VideoPlayerController controller;
+
+  /// The position to show: the seek target while one is under way.
+  final Duration position;
+
+  /// Whether the playhead should glide between the player's position
+  /// reports, which arrive ten times a second.
+  final bool gliding;
+  final ValueChanged<Duration> onSeek;
   final VoidCallback onScrubStart;
   final VoidCallback onScrubEnd;
 
@@ -407,7 +477,7 @@ class _Controls extends ConsumerWidget {
               ),
               Expanded(
                 child: Text(
-                  '${Fmt.duration(v.position)} / ${Fmt.duration(v.duration)}',
+                  '${Fmt.duration(position)} / ${Fmt.duration(v.duration)}',
                   maxLines: 1,
                   style: const TextStyle(
                     color: fg,
@@ -446,6 +516,9 @@ class _Controls extends ConsumerWidget {
           _Filmstrip(
             asset: asset,
             controller: controller,
+            position: position,
+            gliding: gliding,
+            onSeek: onSeek,
             onStart: onScrubStart,
             onEnd: onScrubEnd,
           ),
@@ -460,6 +533,9 @@ class _Filmstrip extends StatelessWidget {
   const _Filmstrip({
     required this.asset,
     required this.controller,
+    required this.position,
+    required this.gliding,
+    required this.onSeek,
     required this.onStart,
     required this.onEnd,
   });
@@ -468,6 +544,9 @@ class _Filmstrip extends StatelessWidget {
 
   final AssetEntity asset;
   final VideoPlayerController controller;
+  final Duration position;
+  final bool gliding;
+  final ValueChanged<Duration> onSeek;
   final VoidCallback onStart;
   final VoidCallback onEnd;
 
@@ -476,19 +555,18 @@ class _Filmstrip extends StatelessWidget {
     final Duration total = controller.value.duration;
     final double f = total.inMilliseconds == 0
         ? 0
-        : controller.value.position.inMilliseconds / total.inMilliseconds;
+        : (position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints c) {
         void seekTo(double dx) {
           final double t = (dx / c.maxWidth).clamp(0, 1);
-          controller.seekTo(total * t);
+          onSeek(total * t);
         }
 
         return Semantics(
           slider: true,
           label: 'Video position',
-          value:
-              '${Fmt.duration(controller.value.position)} of ${Fmt.duration(total)}',
+          value: '${Fmt.duration(position)} of ${Fmt.duration(total)}',
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onHorizontalDragStart: (DragStartDetails d) {
@@ -545,7 +623,12 @@ class _Filmstrip extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Positioned(
+                  AnimatedPositioned(
+                    // The player reports its position every 100 ms; glide
+                    // across that gap while playing, and jump when seeking.
+                    duration: gliding
+                        ? const Duration(milliseconds: 100)
+                        : Duration.zero,
                     left: (c.maxWidth * f) - 2,
                     top: -3,
                     bottom: -3,
