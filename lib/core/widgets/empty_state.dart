@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_tokens.dart';
+import 'entrance.dart';
 
 /// Centred icon, headline, explanation and an optional action. Used for empty,
-/// error and permission states so they all look alike.
+/// error and permission states so they all look alike. On a page the user
+/// opened, the four parts rise in turn like the page's rows would have.
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
@@ -26,8 +28,7 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme cs = theme.colorScheme;
+    final ColorScheme cs = Theme.of(context).colorScheme;
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
@@ -40,39 +41,56 @@ class EmptyState extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 420),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
+            children: staggered(<Widget>[
               // A plain glyph, not an accent-tinted tile: the accent belongs
               // to the one action below it.
-              Icon(icon, size: 48, color: cs.onSurfaceVariant),
-              const SizedBox(height: AppSpacing.lg),
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                child: Icon(
+                  icon,
+                  size: 44,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                ),
+              ),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.titleLarge?.copyWith(
+                style: TextStyle(
+                  fontSize: 20,
                   fontWeight: FontWeight.w600,
+                  letterSpacing: -0.3,
+                  color: cs.onSurface,
                 ),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  height: 1.5,
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xs + 2),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.4,
+                    color: cs.onSurfaceVariant,
+                  ),
                 ),
               ),
-              if (actionLabel != null) ...<Widget>[
-                const SizedBox(height: AppSpacing.xl),
-                FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-              ],
-              if (secondaryLabel != null) ...<Widget>[
-                const SizedBox(height: AppSpacing.sm),
-                TextButton(
-                  onPressed: onSecondary,
-                  child: Text(secondaryLabel!),
+              if (actionLabel != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xl),
+                  child: FilledButton(
+                    onPressed: onAction,
+                    child: Text(actionLabel!),
+                  ),
                 ),
-              ],
-            ],
+              if (secondaryLabel != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.sm),
+                  child: TextButton(
+                    onPressed: onSecondary,
+                    child: Text(secondaryLabel!),
+                  ),
+                ),
+            ]),
           ),
         ),
       ),
