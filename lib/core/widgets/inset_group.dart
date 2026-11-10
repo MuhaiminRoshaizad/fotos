@@ -74,6 +74,43 @@ class InsetGroup extends StatelessWidget {
   }
 }
 
+/// One row of a long inset group built lazily by a list builder: rounds the
+/// group's top and bottom corners and draws the hairline between rows.
+class InsetGroupItem extends StatelessWidget {
+  const InsetGroupItem({
+    super.key,
+    required this.first,
+    required this.last,
+    required this.child,
+  });
+
+  final bool first;
+  final bool last;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    const Radius r = Radius.circular(AppRadii.md);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: ClipRRect(
+        borderRadius: BorderRadius.vertical(
+          top: first ? r : Radius.zero,
+          bottom: last ? r : Radius.zero,
+        ),
+        child: Material(
+          color: Theme.of(context).colorScheme.groupedRow,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[if (!first) const _RowDivider(), child],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A section heading in the iOS large style ("On this phone").
 class GroupHeading extends StatelessWidget {
   const GroupHeading(this.text, {super.key, this.trailing});

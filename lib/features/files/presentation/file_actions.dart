@@ -158,7 +158,7 @@ Future<void> showEntryActions(
     case 'copy':
       await _transfer(context, ref, entry, move: choice == 'move');
     case 'delete':
-      await _delete(context, ref, entry);
+      await deleteEntry(context, ref, entry);
   }
 }
 
@@ -229,7 +229,8 @@ Future<void> _transfer(
   }
 }
 
-Future<void> _delete(
+/// Asks, then deletes [entry] for good (files have no system trash).
+Future<void> deleteEntry(
   BuildContext context,
   WidgetRef ref,
   FileEntry entry,

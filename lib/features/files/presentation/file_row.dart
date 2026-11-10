@@ -2,24 +2,30 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 
 import '../../../core/format/formatters.dart';
+import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/inset_group.dart';
+import '../../../core/widgets/swipe_actions.dart';
 import '../domain/file_entry.dart';
 
-/// One line in a folder: icon (or thumbnail), name, date and size, and a
-/// More button for the actions sheet.
+/// One line in a folder: icon (or thumbnail), name, size and date. Swipe
+/// left for More and Delete, or long-press for every action.
 class FileRow extends StatelessWidget {
   const FileRow({
     super.key,
     required this.entry,
     required this.onTap,
     required this.onMore,
+    required this.onDelete,
   });
 
   final FileEntry entry;
   final VoidCallback onTap;
   final VoidCallback onMore;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -27,16 +33,69 @@ class FileRow extends StatelessWidget {
     final String meta = entry.isFolder
         ? Fmt.date(entry.modified)
         : '${Fmt.size(entry.size)} · ${Fmt.date(entry.modified)}';
-    return ListTile(
-      onTap: onTap,
-      onLongPress: onMore,
-      leading: FileIcon(entry: entry),
-      title: Text(entry.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(meta),
-      trailing: IconButton(
-        tooltip: 'More options for ${entry.name}',
-        onPressed: onMore,
-        icon: Icon(CupertinoIcons.ellipsis, color: cs.onSurfaceVariant),
+    return SwipeActions(
+      actions: <SwipeAction>[
+        SwipeAction(label: 'More', onTap: onMore),
+        SwipeAction(label: 'Delete', destructive: true, onTap: onDelete),
+      ],
+      child: Semantics(
+        customSemanticsActions: <CustomSemanticsAction, VoidCallback>{
+          const CustomSemanticsAction(label: 'More options'): onMore,
+          const CustomSemanticsAction(label: 'Delete'): onDelete,
+        },
+        child: Material(
+          color: cs.groupedRow,
+          child: InkWell(
+            onTap: onTap,
+            onLongPress: () {
+              AppHaptics.longPress();
+              onMore();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Row(
+                children: <Widget>[
+                  FileIcon(entry: entry, size: 36),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          entry.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 16, color: cs.onSurface),
+                        ),
+                        Text(
+                          meta,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (entry.isFolder)
+                    Padding(
+                      padding: const EdgeInsets.only(left: AppSpacing.sm),
+                      child: Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 16,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -65,7 +124,7 @@ class FileIcon extends StatelessWidget {
       );
     }
     final (IconData icon, Color? tint) = switch (entry.kind) {
-      FileKind.folder => (CupertinoIcons.folder, null),
+      FileKind.folder => (CupertinoIcons.folder_fill, cs.primary),
       FileKind.video => (CupertinoIcons.film, null),
       FileKind.pdf => (CupertinoIcons.doc_richtext, cs.error),
       FileKind.zip => (CupertinoIcons.archivebox, null),

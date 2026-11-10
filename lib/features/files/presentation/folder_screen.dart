@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../core/widgets/large_title_scaffold.dart';
 import 'files_providers.dart';
 import 'files_screen.dart';
 
-/// A pushed folder inside the Files tab.
+/// A pushed folder inside the Files tab: its name as the large title, with
+/// the path from Internal storage under it.
 class FolderScreen extends ConsumerWidget {
   const FolderScreen({super.key, required this.path});
   final String path;
@@ -13,30 +15,20 @@ class FolderScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final String? root = ref.watch(storageRootProvider).value;
+    final String parent = p.dirname(path);
     final String crumb = root == null
         ? path
         : 'Internal storage › ${p.relative(path, from: root).replaceAll('/', ' › ')}';
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              p.basename(path),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              crumb,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        actions: <Widget>[NewFolderButton(dir: path)],
+    return LargeTitleScaffold(
+      title: p.basename(path),
+      subtitle: crumb,
+      grouped: true,
+      leading: BackBarButton(
+        label: root == null || parent == root ? 'Files' : p.basename(parent),
       ),
-      body: FolderBody(dir: path),
+      trailing: <Widget>[NewFolderButton(dir: path)],
+      body: (BuildContext context, Widget header) =>
+          FolderBody(dir: path, header: header),
     );
   }
 }

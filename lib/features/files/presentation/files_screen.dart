@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoSliverRefreshControl;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -10,6 +11,8 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/validation/validators.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/inset_group.dart';
+import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../domain/file_entry.dart';
@@ -51,120 +54,112 @@ class _FilesScreenState extends ConsumerState<FilesScreen> {
   Widget build(BuildContext context) {
     final AsyncValue<bool> access = ref.watch(filesAccessProvider);
     final AsyncValue<String> root = ref.watch(storageRootProvider);
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+    return LargeTitleScaffold(
+      title: 'Files',
+      grouped: true,
+      trailing: <Widget>[
+        if (access.value == true && root.hasValue)
+          NewFolderButton(dir: root.value!),
+      ],
+      body: (BuildContext context, Widget header) {
+        Widget headed(Widget state) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.xs,
-                AppSpacing.xs,
-              ),
-              child: SizedBox(
-                height: 48,
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Files',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    if (access.value == true && root.hasValue)
-                      NewFolderButton(dir: root.value!),
-                  ],
-                ),
+            header,
+            Expanded(child: state),
+          ],
+        );
+        return switch ((access, root)) {
+          (AsyncData<bool>(value: true), AsyncData<String>(:final value)) =>
+            FolderBody(
+              dir: value,
+              header: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  header,
+                  const _StorageGroup(),
+                  const GroupHeading('Folders'),
+                ],
               ),
             ),
-            Expanded(
-              child: switch ((access, root)) {
-                (
-                  AsyncData<bool>(value: true),
-                  AsyncData<String>(:final value),
-                ) =>
-                  FolderBody(dir: value, header: const _StorageCard()),
-                (AsyncData<bool>(value: false), _) => EmptyState(
-                  icon: CupertinoIcons.folder_open,
-                  title: 'See every file on your phone',
-                  message:
-                      'Files shows all your folders, including PDFs and ZIPs. '
-                      'Android asks you to turn on All files access for fotos '
-                      'first. Photos, Videos and Albums work without it.',
-                  actionLabel: 'Open settings',
-                  onAction: () => ref
-                      .read(nativeChannelProvider)
-                      .openAllFilesAccessSettings(),
-                ),
-                (AsyncError<bool>(), _) ||
-                (_, AsyncError<String>()) => EmptyState(
-                  icon: CupertinoIcons.exclamationmark_circle,
-                  title: 'Couldn\'t open Files',
-                  message: 'Android didn\'t answer. Try again.',
-                  actionLabel: 'Try again',
-                  onAction: () {
-                    ref.invalidate(filesAccessProvider);
-                    ref.invalidate(storageRootProvider);
-                  },
-                ),
-                _ => const SizedBox.shrink(),
+          (AsyncData<bool>(value: false), _) => headed(
+            EmptyState(
+              icon: CupertinoIcons.folder_open,
+              title: 'See every file on your phone',
+              message:
+                  'Files shows all your folders, including PDFs and ZIPs. '
+                  'Android asks you to turn on All files access for fotos '
+                  'first. Photos, Videos and Albums work without it.',
+              actionLabel: 'Open settings',
+              onAction: () =>
+                  ref.read(nativeChannelProvider).openAllFilesAccessSettings(),
+            ),
+          ),
+          (AsyncError<bool>(), _) || (_, AsyncError<String>()) => headed(
+            EmptyState(
+              icon: CupertinoIcons.exclamationmark_circle,
+              title: 'Couldn\'t open Files',
+              message: 'Android didn\'t answer. Try again.',
+              actionLabel: 'Try again',
+              onAction: () {
+                ref.invalidate(filesAccessProvider);
+                ref.invalidate(storageRootProvider);
               },
             ),
-          ],
-        ),
-      ),
+          ),
+          _ => headed(const SizedBox.shrink()),
+        };
+      },
     );
   }
 }
 
-class _StorageCard extends ConsumerWidget {
-  const _StorageCard();
+/// Storage use as the first group, iOS Settings style.
+class _StorageGroup extends ConsumerWidget {
+  const _StorageGroup();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ColorScheme cs = Theme.of(context).colorScheme;
     final StorageStats? s = ref.watch(storageStatsProvider).value;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.xs,
-        AppSpacing.lg,
-        AppSpacing.sm,
-      ),
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
+    return InsetGroup(
+      header: 'Storage',
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.md + 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const Expanded(child: Text('Internal storage')),
-              Text(
-                s == null
-                    ? ''
-                    : '${Fmt.size(s.used)} of ${Fmt.size(s.total)} used',
-                style: TextStyle(color: cs.onSurfaceVariant),
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: AppSpacing.sm,
+                children: <Widget>[
+                  const Text(
+                    'Internal storage',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  Text(
+                    s == null
+                        ? ''
+                        : '${Fmt.size(s.used)} of ${Fmt.size(s.total)}',
+                    style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.pill),
+                child: LinearProgressIndicator(
+                  value: s == null ? 0 : s.used / s.total,
+                  minHeight: 6,
+                  backgroundColor: cs.onSurface.withValues(alpha: 0.1),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.pill),
-            child: LinearProgressIndicator(
-              value: s == null ? 0 : s.used / s.total,
-              minHeight: 8,
-              backgroundColor: cs.surfaceContainerHighest,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -175,9 +170,9 @@ class NewFolderButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return IconButton(
+    return BarButton.icon(
+      icon: CupertinoIcons.folder_badge_plus,
       tooltip: 'New folder',
-      icon: const Icon(CupertinoIcons.folder_badge_plus),
       onPressed: () async {
         final List<FileEntry> here =
             ref.read(folderProvider(dir)).value ?? const <FileEntry>[];
@@ -199,12 +194,13 @@ class NewFolderButton extends ConsumerWidget {
   }
 }
 
-/// A folder's contents with loading, empty and error states.
+/// A folder's contents with loading, empty and error states, as one long
+/// inset group under [header], with iOS pull-to-refresh.
 class FolderBody extends ConsumerWidget {
-  const FolderBody({super.key, required this.dir, this.header});
+  const FolderBody({super.key, required this.dir, required this.header});
 
   final String dir;
-  final Widget? header;
+  final Widget header;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -212,82 +208,134 @@ class FolderBody extends ConsumerWidget {
     final double bottom = AppNavMetrics.clearance(
       MediaQuery.paddingOf(context).bottom,
     );
+    Widget headed(Widget state) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        header,
+        Expanded(child: state),
+      ],
+    );
     return list.when(
       skipLoadingOnRefresh: true,
       loading: () => _RowsSkeleton(header: header),
-      error: (_, _) => EmptyState(
-        icon: CupertinoIcons.folder_badge_minus,
-        title: 'Can\'t open ${p.basename(dir)}',
-        message: p.basename(dir) == 'Android'
-            ? 'Android protects app data in this folder. Other apps, fotos '
-                  'included, can\'t open it.'
-            : 'Android didn\'t allow reading this folder.',
-        actionLabel: 'Try again',
-        onAction: () => ref.invalidate(folderProvider(dir)),
+      error: (_, _) => headed(
+        EmptyState(
+          icon: CupertinoIcons.folder_badge_minus,
+          title: 'Can\'t open ${p.basename(dir)}',
+          message: p.basename(dir) == 'Android'
+              ? 'Android protects app data in this folder. Other apps, fotos '
+                    'included, can\'t open it.'
+              : 'Android didn\'t allow reading this folder.',
+          actionLabel: 'Try again',
+          onAction: () => ref.invalidate(folderProvider(dir)),
+        ),
       ),
-      data: (List<FileEntry> entries) => RefreshIndicator(
-        onRefresh: () => ref.refresh(folderProvider(dir).future),
-        child: entries.isEmpty
-            ? ListView(
-                children: <Widget>[
-                  ?header,
-                  const SizedBox(
-                    height: 360,
-                    child: EmptyState(
-                      icon: CupertinoIcons.folder,
-                      title: 'This folder is empty',
-                      message:
-                          'Files you save or extract here appear in this list.',
-                    ),
-                  ),
-                ],
-              )
-            : ListView.builder(
-                padding: EdgeInsets.only(bottom: bottom),
-                itemCount: entries.length + (header == null ? 0 : 1),
-                itemBuilder: (BuildContext context, int i) {
-                  if (header != null && i == 0) return header!;
-                  final FileEntry e = entries[i - (header == null ? 0 : 1)];
-                  return FileRow(
+      data: (List<FileEntry> entries) => CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        slivers: <Widget>[
+          SliverToBoxAdapter(child: header),
+          CupertinoSliverRefreshControl(
+            onRefresh: () => ref.refresh(folderProvider(dir).future),
+          ),
+          if (entries.isEmpty)
+            const SliverToBoxAdapter(
+              child: SizedBox(
+                height: 360,
+                child: EmptyState(
+                  icon: CupertinoIcons.folder,
+                  title: 'This folder is empty',
+                  message:
+                      'Files you save or extract here appear in this list.',
+                ),
+              ),
+            )
+          else
+            SliverList.builder(
+              itemCount: entries.length,
+              itemBuilder: (BuildContext context, int i) {
+                final FileEntry e = entries[i];
+                return InsetGroupItem(
+                  first: i == 0,
+                  last: i == entries.length - 1,
+                  child: FileRow(
+                    key: ValueKey<String>(e.path),
                     entry: e,
                     onTap: () => openEntry(context, ref, e, entries),
                     onMore: () => showEntryActions(context, ref, e),
-                  );
-                },
-              ),
+                    onDelete: () => deleteEntry(context, ref, e),
+                  ),
+                );
+              },
+            ),
+          SliverToBoxAdapter(child: SizedBox(height: bottom)),
+        ],
       ),
     );
   }
 }
 
 class _RowsSkeleton extends StatelessWidget {
-  const _RowsSkeleton({this.header});
-  final Widget? header;
+  const _RowsSkeleton({required this.header});
+  final Widget header;
 
   @override
   Widget build(BuildContext context) {
-    return Skeletonizer(
-      enabled: true,
-      child: ListView(
-        physics: const NeverScrollableScrollPhysics(),
-        children: <Widget>[
-          ?header,
-          for (int i = 0; i < 8; i++)
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(AppRadii.sm),
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      children: <Widget>[
+        header,
+        Skeletonizer(
+          enabled: true,
+          child: Column(
+            children: <Widget>[
+              for (int i = 0; i < 8; i++)
+                InsetGroupItem(
+                  first: i == 0,
+                  last: i == 7,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(AppRadii.sm),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                'Folder name here',
+                                maxLines: 1,
+                                style: TextStyle(fontSize: 16),
+                              ),
+                              Text(
+                                '09/11/2026',
+                                maxLines: 1,
+                                style: TextStyle(fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              title: const Text('Folder name here'),
-              subtitle: const Text('09/11/2026'),
-              trailing: const Icon(CupertinoIcons.ellipsis),
-            ),
-        ],
-      ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
