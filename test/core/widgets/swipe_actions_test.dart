@@ -14,8 +14,9 @@ void main() {
         home: Scaffold(
           body: SwipeActions(
             actions: <SwipeAction>[
-              SwipeAction(label: 'More', onTap: () {}),
+              SwipeAction(icon: Icons.more_horiz, label: 'More', onTap: () {}),
               SwipeAction(
+                icon: Icons.delete,
                 label: 'Delete',
                 destructive: true,
                 onTap: () => deleted++,

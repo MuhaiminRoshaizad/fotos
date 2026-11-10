@@ -6,11 +6,13 @@ import '../theme/app_tokens.dart';
 /// A button revealed by swiping a row to the left.
 class SwipeAction {
   const SwipeAction({
+    required this.icon,
     required this.label,
     required this.onTap,
     this.destructive = false,
   });
 
+  final IconData icon;
   final String label;
   final VoidCallback onTap;
 
@@ -18,7 +20,11 @@ class SwipeAction {
   final bool destructive;
 }
 
-const double _actionWidth = 76;
+const double _actionWidth = 72;
+
+// iOS's own swipe-action colours, the same in light and dark.
+const Color _grey = Color(0xFF8E8E93);
+const Color _red = Color(0xFFFF3B30);
 
 /// A row that slides left to reveal [actions], as in iOS lists. A flick or a
 /// drag past half opens it; tapping the row while open closes it. [child]
@@ -67,7 +73,6 @@ class _SwipeActionsState extends State<SwipeActions>
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
     return Stack(
       children: <Widget>[
         Positioned.fill(
@@ -78,20 +83,29 @@ class _SwipeActionsState extends State<SwipeActions>
                 SizedBox(
                   width: _actionWidth,
                   child: Material(
-                    color: a.destructive ? cs.error : cs.onSurfaceVariant,
+                    color: a.destructive ? _red : _grey,
                     child: InkWell(
                       onTap: () => _run(a),
-                      child: Center(
-                        child: Text(
-                          a.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: a.destructive ? cs.onError : cs.surface,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Icon(a.icon, color: Colors.white, size: 22),
+                          const SizedBox(height: 2),
+                          Text(
+                            a.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            // The row is only as tall as its two text lines.
+                            textScaler: MediaQuery.textScalerOf(
+                              context,
+                            ).clamp(maxScaleFactor: 1.2),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),

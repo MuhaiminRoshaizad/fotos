@@ -35,8 +35,17 @@ class FileRow extends StatelessWidget {
         : '${Fmt.size(entry.size)} · ${Fmt.date(entry.modified)}';
     return SwipeActions(
       actions: <SwipeAction>[
-        SwipeAction(label: 'More', onTap: onMore),
-        SwipeAction(label: 'Delete', destructive: true, onTap: onDelete),
+        SwipeAction(
+          icon: CupertinoIcons.ellipsis_circle,
+          label: 'More',
+          onTap: onMore,
+        ),
+        SwipeAction(
+          icon: CupertinoIcons.trash,
+          label: 'Delete',
+          destructive: true,
+          onTap: onDelete,
+        ),
       ],
       child: Semantics(
         customSemanticsActions: <CustomSemanticsAction, VoidCallback>{
@@ -134,17 +143,9 @@ class FileIcon extends StatelessWidget {
     return _box(cs, icon, tint);
   }
 
-  Widget _box(ColorScheme cs, IconData icon, Color? tint) => Container(
+  Widget _box(ColorScheme cs, IconData icon, Color? tint) => SizedBox(
     width: size,
     height: size,
-    decoration: BoxDecoration(
-      color: cs.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(AppRadii.sm),
-    ),
-    child: Icon(
-      icon,
-      color: tint ?? cs.onSurfaceVariant,
-      size: AppIconSize.dense + 2,
-    ),
+    child: Icon(icon, color: tint ?? cs.onSurfaceVariant, size: size * 0.78),
   );
 }
