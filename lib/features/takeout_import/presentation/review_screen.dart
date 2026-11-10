@@ -11,6 +11,8 @@ import '../../../core/media/media_actions.dart';
 import '../../../core/media/media_providers.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/entrance.dart';
+import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/toast.dart';
 import '../data/takeout_repository.dart';
 import '../domain/takeout_models.dart';
@@ -24,43 +26,74 @@ class ReviewScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<ReviewItem>> items = ref.watch(reviewsProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Possible duplicates')),
-      body: items.when(
-        loading: () => const SizedBox.shrink(),
-        error: (_, _) => EmptyState(
-          icon: CupertinoIcons.exclamationmark_circle,
-          title: 'Couldn\'t load the list',
-          message: 'Try again.',
-          actionLabel: 'Try again',
-          onAction: () => ref.invalidate(reviewsProvider),
-        ),
-        data: (List<ReviewItem> list) => list.isEmpty
-            ? const EmptyState(
-                icon: CupertinoIcons.checkmark_circle,
-                title: 'Nothing left to check',
-                message: 'Every possible duplicate has been decided.',
-              )
-            : ListView.separated(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  AppSpacing.sm,
-                  AppSpacing.lg,
-                  MediaQuery.paddingOf(context).bottom + AppSpacing.xl,
+    return LargeTitleScaffold(
+      title: 'Duplicates',
+      subtitle: items.hasValue
+          ? '${Fmt.count(items.value!.length, 'possible duplicate')} to check'
+          : '',
+      grouped: true,
+      leading: const BackBarButton(label: 'Takeout'),
+      body: (BuildContext context, Widget header) {
+        Widget headed(Widget state) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            header,
+            Expanded(child: state),
+          ],
+        );
+        return items.when(
+          loading: () => Align(alignment: Alignment.topCenter, child: header),
+          error: (_, _) => headed(
+            EmptyState(
+              icon: CupertinoIcons.exclamationmark_circle,
+              title: 'Couldn\'t load the list',
+              message: 'Try again.',
+              actionLabel: 'Try again',
+              onAction: () => ref.invalidate(reviewsProvider),
+            ),
+          ),
+          data: (List<ReviewItem> list) => list.isEmpty
+              ? headed(
+                  const EmptyState(
+                    icon: CupertinoIcons.checkmark_circle,
+                    title: 'Nothing left to check',
+                    message: 'Every possible duplicate has been decided.',
+                  ),
+                )
+              : EntranceScope(
+                  child: ListView.builder(
+                    padding: EdgeInsets.only(
+                      bottom:
+                          MediaQuery.paddingOf(context).bottom + AppSpacing.xl,
+                    ),
+                    itemCount: list.length + 1,
+                    itemBuilder: (BuildContext context, int i) => i == 0
+                        ? header
+                        : SlideUpIn(
+                            index: i - 1,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.lg,
+                                AppSpacing.sm,
+                                AppSpacing.lg,
+                                AppSpacing.sm,
+                              ),
+                              child: _ReviewCard(
+                                key: ValueKey<String>(list[i - 1].id),
+                                item: list[i - 1],
+                              ),
+                            ),
+                          ),
+                  ),
                 ),
-                itemCount: list.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AppSpacing.lg),
-                itemBuilder: (BuildContext context, int i) =>
-                    _ReviewCard(item: list[i]),
-              ),
-      ),
+        );
+      },
     );
   }
 }
 
 class _ReviewCard extends ConsumerStatefulWidget {
-  const _ReviewCard({required this.item});
+  const _ReviewCard({super.key, required this.item});
   final ReviewItem item;
 
   @override

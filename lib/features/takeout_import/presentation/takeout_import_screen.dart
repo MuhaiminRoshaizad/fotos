@@ -14,6 +14,8 @@ import '../../../core/platform/native_channel.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/inset_group.dart';
+import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../../files/presentation/files_providers.dart';
@@ -164,21 +166,23 @@ class _TakeoutImportScreenState extends ConsumerState<TakeoutImportScreen> {
       onPopInvokedWithResult: (bool didPop, _) {
         if (!didPop) _cancel();
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            p.basename(widget.path),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        body: SafeArea(
-          top: false,
-          child: switch (_stage) {
-            _Stage.ready => _ready(),
-            _Stage.running => _running(),
-            _Stage.finished => _finished(),
-            _Stage.failed => EmptyState(
+      child: LargeTitleScaffold(
+        title: switch (_stage) {
+          _Stage.ready || _Stage.failed => 'Import',
+          _Stage.running => 'Importing',
+          _Stage.finished =>
+            _counts.cancelled ? 'Import stopped' : 'Import finished',
+        },
+        subtitle: p.basename(widget.path),
+        grouped: true,
+        leading: const BackBarButton(label: 'Takeout'),
+        body: (BuildContext context, Widget header) => switch (_stage) {
+          _Stage.ready => _ready(header),
+          _Stage.running => _running(header),
+          _Stage.finished => _finished(header),
+          _Stage.failed => _headed(
+            header,
+            EmptyState(
               icon: CupertinoIcons.exclamationmark_circle,
               title: 'Import didn\'t finish',
               message: _error ?? '',
@@ -191,117 +195,163 @@ class _TakeoutImportScreenState extends ConsumerState<TakeoutImportScreen> {
                 _inspect();
               },
             ),
-          },
-        ),
+          ),
+        },
       ),
     );
   }
 
-  Widget _ready() {
+  Widget _headed(Widget header, Widget state) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      header,
+      Expanded(child: state),
+    ],
+  );
+
+  /// The page as a list under [header], ending clear of the system bar.
+  Widget _page(Widget header, List<Widget> children) => ListView(
+    padding: EdgeInsets.only(
+      bottom: MediaQuery.paddingOf(context).bottom + AppSpacing.xl,
+    ),
+    children: <Widget>[
+      header,
+      const SizedBox(height: AppSpacing.sm),
+      ...children,
+    ],
+  );
+
+  Widget _button(Widget button) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.lg,
+      AppSpacing.md,
+      AppSpacing.lg,
+      0,
+    ),
+    child: button,
+  );
+
+  Widget _ready(Widget header) {
     final ZipInfo? info = _info;
     final StorageStats? space = _space;
-    if (info == null || space == null) return const SizedBox.shrink();
+    if (info == null || space == null) {
+      return Align(alignment: Alignment.topCenter, child: header);
+    }
     if (!info.takeout) {
-      return const EmptyState(
-        icon: CupertinoIcons.archivebox,
-        title: 'This isn\'t a Google Photos Takeout',
-        message:
-            'It has no Takeout folder. Open it in Files to extract it instead.',
+      return _headed(
+        header,
+        const EmptyState(
+          icon: CupertinoIcons.archivebox,
+          title: 'This isn\'t a Google Photos Takeout',
+          message:
+              'It has no Takeout folder. Open it in Files to extract it '
+              'instead.',
+        ),
       );
     }
     final bool roomy = space.free > info.bytes;
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      children: <Widget>[
-        _Line(label: 'Files inside', value: '${info.files}'),
-        _Line(
-          label: 'Size once imported',
-          value: 'Up to ${Fmt.size(info.bytes)}',
-        ),
-        _Line(label: 'Free on the phone', value: Fmt.size(space.free)),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          roomy
-              ? 'Photos and videos go to Pictures/Takeout and Movies/Takeout, '
-                    'by year, with their original dates. Locked Folder items '
-                    'are skipped.'
-              : 'There isn\'t enough room. Free up ${Fmt.size(info.bytes - space.free)} '
-                    'and try again.',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            height: 1.5,
+    return _page(header, <Widget>[
+      InsetGroup(
+        footer: roomy
+            ? 'Photos and videos go to Pictures/Takeout and Movies/Takeout, '
+                  'by year, with their original dates. Locked Folder items '
+                  'are skipped.'
+            : 'There isn\'t enough room. Free up '
+                  '${Fmt.size(info.bytes - space.free)} and try again.',
+        children: <Widget>[
+          GroupRow(title: 'Files inside', value: '${info.files}'),
+          GroupRow(
+            title: 'Size once imported',
+            value: 'Up to ${Fmt.size(info.bytes)}',
           ),
-        ),
-        const SizedBox(height: AppSpacing.xl),
+          GroupRow(title: 'Free on the phone', value: Fmt.size(space.free)),
+        ],
+      ),
+      const SizedBox(height: AppSpacing.md),
+      _button(
         FilledButton(
           onPressed: roomy ? _start : null,
           child: const Text('Start import'),
         ),
-      ],
-    );
+      ),
+    ]);
   }
 
-  Widget _running() {
+  Widget _running(Widget header) {
     final TakeoutCounts c = _counts;
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      children: <Widget>[
-        Text(
-          c.total == 0
-              ? 'Reading the archive…'
-              : 'Importing ${c.done} of ${c.total}',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        LinearProgressIndicator(
-          value: c.total == 0 ? null : c.fraction,
-          minHeight: 8,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(c.current, maxLines: 1, overflow: TextOverflow.ellipsis),
-        const SizedBox(height: AppSpacing.lg),
-        _Counts(c),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          'Keep fotos open. The screen stays on until this finishes.',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return _page(header, <Widget>[
+      InsetGroup(
+        footer: 'Keep fotos open. The screen stays on until this finishes.',
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md + 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  c.total == 0
+                      ? 'Reading the archive…'
+                      : '${c.done} of ${c.total}',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                    fontFeatures: const <FontFeature>[
+                      FontFeature.tabularFigures(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.pill),
+                  child: LinearProgressIndicator(
+                    value: c.total == 0 ? null : c.fraction,
+                    minHeight: 6,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  c.current,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        OutlinedButton(onPressed: _cancel, child: const Text('Stop')),
-      ],
-    );
+        ],
+      ),
+      const SizedBox(height: AppSpacing.lg),
+      _Counts(c),
+      const SizedBox(height: AppSpacing.md),
+      _button(OutlinedButton(onPressed: _cancel, child: const Text('Stop'))),
+    ]);
   }
 
-  Widget _finished() {
+  Widget _finished(Widget header) {
     final TakeoutCounts c = _counts;
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      children: <Widget>[
-        Text(
-          c.cancelled ? 'Import stopped' : 'Import finished',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        _Counts(c),
-        const SizedBox(height: AppSpacing.xl),
-        if (c.review > 0)
+    return _page(header, <Widget>[
+      _Counts(c),
+      const SizedBox(height: AppSpacing.md),
+      if (c.review > 0)
+        _button(
           FilledButton(
             onPressed: () => context.push('/takeout/review'),
             child: Text('Review ${Fmt.count(c.review, 'possible duplicate')}'),
           ),
-        if (!c.cancelled) ...<Widget>[
-          const SizedBox(height: AppSpacing.sm),
+        ),
+      if (!c.cancelled)
+        _button(
           OutlinedButton(
             onPressed: _deleteZip,
             child: const Text('Delete this ZIP'),
           ),
-        ],
-        const SizedBox(height: AppSpacing.sm),
+        ),
+      _button(
         TextButton(onPressed: () => context.pop(), child: const Text('Done')),
-      ],
-    );
+      ),
+    ]);
   }
 }
 
@@ -311,43 +361,18 @@ class _Counts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return InsetGroup(
       children: <Widget>[
-        _Line(label: 'Imported', value: '${c.imported}'),
-        _Line(
-          label: 'Already on the phone (skipped)',
+        GroupRow(title: 'Imported', value: '${c.imported}'),
+        GroupRow(
+          title: 'Already on the phone (skipped)',
           value: '${c.duplicates}',
         ),
-        _Line(label: 'Possible duplicates to check', value: '${c.review}'),
-        _Line(label: 'Locked Folder (skipped)', value: '${c.locked}'),
+        GroupRow(title: 'Possible duplicates to check', value: '${c.review}'),
+        GroupRow(title: 'Locked Folder (skipped)', value: '${c.locked}'),
         if (c.failed > 0)
-          _Line(label: 'Couldn\'t import', value: '${c.failed}'),
+          GroupRow(title: 'Couldn\'t import', value: '${c.failed}'),
       ],
-    );
-  }
-}
-
-class _Line extends StatelessWidget {
-  const _Line({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs + 2),
-      child: Row(
-        children: <Widget>[
-          Expanded(child: Text(label)),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
