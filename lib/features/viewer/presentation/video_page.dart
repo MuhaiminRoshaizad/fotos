@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -13,6 +13,7 @@ import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../data/viewer_settings.dart';
 import 'seek_queue.dart';
+import 'viewer_glass.dart';
 
 /// One video in the viewer.
 ///
@@ -283,16 +284,19 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                   !_scrubbing &&
                   widget.chrome)
                 Center(
-                  child: IconButton.filled(
-                    tooltip: 'Play',
-                    iconSize: 36,
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.black54,
-                      foregroundColor: Colors.white,
+                  child: ViewerGlass(
+                    shape: const CircleBorder(),
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
                       minimumSize: const Size(72, 72),
+                      onPressed: _togglePlay,
+                      child: const Icon(
+                        CupertinoIcons.play_fill,
+                        size: 32,
+                        color: Colors.white,
+                        semanticLabel: 'Play',
+                      ),
                     ),
-                    onPressed: _togglePlay,
-                    icon: const Icon(CupertinoIcons.play_fill),
                   ),
                 ),
               if (c != null)
@@ -396,11 +400,8 @@ class _Pill extends StatelessWidget {
   final IconData icon;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: Colors.black54,
-      borderRadius: BorderRadius.circular(AppRadii.pill),
-    ),
+  Widget build(BuildContext context) => ViewerGlass(
+    shape: const StadiumBorder(),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
@@ -452,6 +453,25 @@ class _Controls extends ConsumerWidget {
     final ViewerSettings s =
         ref.watch(viewerSettingsProvider).value ?? const ViewerSettings();
     const Color fg = Colors.white;
+    Widget button(
+      IconData icon,
+      String label,
+      VoidCallback onTap, {
+      bool dim = false,
+    }) => Tooltip(
+      message: label,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(48, 44),
+        onPressed: onTap,
+        child: Icon(
+          icon,
+          size: AppIconSize.dense + 2,
+          color: dim ? Colors.white54 : fg,
+          semanticLabel: label,
+        ),
+      ),
+    );
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.lg,
@@ -462,57 +482,54 @@ class _Controls extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              IconButton(
-                tooltip: v.isPlaying ? 'Pause' : 'Play',
-                color: fg,
-                onPressed: () =>
-                    v.isPlaying ? controller.pause() : controller.play(),
-                icon: Icon(
+          ViewerGlass(
+            shape: const StadiumBorder(),
+            child: Row(
+              children: <Widget>[
+                button(
                   v.isPlaying
                       ? CupertinoIcons.pause_fill
                       : CupertinoIcons.play_fill,
+                  v.isPlaying ? 'Pause' : 'Play',
+                  () => v.isPlaying ? controller.pause() : controller.play(),
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  '${Fmt.duration(position)} / ${Fmt.duration(v.duration)}',
-                  maxLines: 1,
-                  style: const TextStyle(
-                    color: fg,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
+                Expanded(
+                  child: Text(
+                    '${Fmt.duration(position)} / ${Fmt.duration(v.duration)}',
+                    maxLines: 1,
+                    style: const TextStyle(
+                      color: fg,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                tooltip: s.loop ? 'Loop on' : 'Loop off',
-                isSelected: s.loop,
-                color: fg,
-                selectedIcon: const Icon(CupertinoIcons.repeat_1),
-                onPressed: () {
-                  ref.read(viewerSettingsProvider.notifier).setLoop(!s.loop);
-                  controller.setLooping(!s.loop);
-                },
-                icon: const Icon(CupertinoIcons.repeat),
-              ),
-              IconButton(
-                tooltip: s.muted ? 'Unmute' : 'Mute',
-                color: fg,
-                onPressed: () {
-                  ref.read(viewerSettingsProvider.notifier).setMuted(!s.muted);
-                  controller.setVolume(s.muted ? 1 : 0);
-                },
-                icon: Icon(
+                button(
+                  s.loop ? CupertinoIcons.repeat_1 : CupertinoIcons.repeat,
+                  s.loop ? 'Loop on' : 'Loop off',
+                  () {
+                    ref.read(viewerSettingsProvider.notifier).setLoop(!s.loop);
+                    controller.setLooping(!s.loop);
+                  },
+                  dim: !s.loop,
+                ),
+                button(
                   s.muted
                       ? CupertinoIcons.speaker_slash
                       : CupertinoIcons.speaker_2,
+                  s.muted ? 'Unmute' : 'Mute',
+                  () {
+                    ref
+                        .read(viewerSettingsProvider.notifier)
+                        .setMuted(!s.muted);
+                    controller.setVolume(s.muted ? 1 : 0);
+                  },
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(height: AppSpacing.sm),
           _Filmstrip(
             asset: asset,
             controller: controller,

@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +15,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
 import 'details_sheet.dart';
 import 'video_page.dart';
+import 'viewer_glass.dart';
 
 /// What the viewer opens with: the list it pages through, where to start,
 /// and the hero tag prefix of the grid it came from.
@@ -465,7 +464,7 @@ class _TopBar extends StatelessWidget {
                 child: SizedBox(
                   height: 48,
                   child: NavigationToolbar(
-                    leading: _Glass(
+                    leading: ViewerGlass(
                       shape: const CircleBorder(),
                       child: CupertinoButton(
                         padding: EdgeInsets.zero,
@@ -509,37 +508,6 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// Frosted dark glass for the viewer's controls, over any photo.
-class _Glass extends StatelessWidget {
-  const _Glass({required this.shape, required this.child});
-
-  final ShapeBorder shape;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipPath(
-      clipper: ShapeBorderClipper(shape: shape),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: DecoratedBox(
-          decoration: ShapeDecoration(
-            color: const Color(0x8C1C1C1E),
-            shape: shape is CircleBorder
-                ? const CircleBorder(
-                    side: BorderSide(color: Color(0x1FFFFFFF), width: 0.5),
-                  )
-                : const StadiumBorder(
-                    side: BorderSide(color: Color(0x1FFFFFFF), width: 0.5),
-                  ),
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
 class _Actions extends StatelessWidget {
   const _Actions({
     required this.favourite,
@@ -576,7 +544,7 @@ class _Actions extends StatelessWidget {
         AppSpacing.lg,
         AppSpacing.sm,
       ),
-      child: _Glass(
+      child: ViewerGlass(
         shape: const StadiumBorder(),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
