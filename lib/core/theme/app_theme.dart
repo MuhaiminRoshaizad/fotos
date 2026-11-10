@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 import 'app_tokens.dart';
@@ -59,6 +60,11 @@ ThemeData buildAppTheme(Brightness brightness) {
     // iOS dims what you press; it never ripples.
     splashFactory: NoSplash.splashFactory,
     highlightColor: scheme.onSurface.withValues(alpha: 0.08),
+    // App bars draw iOS's back chevron, not Android's arrow.
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (BuildContext context) =>
+          const Icon(CupertinoIcons.chevron_back),
+    ),
     // Pages slide in from the right with the old page drifting behind.
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: <TargetPlatform, PageTransitionsBuilder>{

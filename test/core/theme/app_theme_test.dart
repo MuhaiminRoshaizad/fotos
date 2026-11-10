@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/core/theme/app_theme.dart';
@@ -15,6 +16,31 @@ void main() {
       );
     });
   }
+
+  testWidgets('pushed pages show the iOS back chevron', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(Brightness.dark),
+        home: Builder(
+          builder: (BuildContext c) => TextButton(
+            onPressed: () => Navigator.of(c).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    Scaffold(appBar: AppBar(title: const Text('x'))),
+              ),
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(CupertinoIcons.chevron_back), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+  });
 
   testWidgets('scrolling bounces and draws no overscroll stretch', (
     WidgetTester tester,
