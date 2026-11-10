@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -48,7 +49,7 @@ class _MediaAccessGateState extends ConsumerState<MediaAccessGate> {
       skipLoadingOnRefresh: true,
       loading: () => const SizedBox.shrink(),
       error: (_, _) => EmptyState(
-        icon: Icons.error_outline,
+        icon: CupertinoIcons.exclamationmark_circle,
         title: 'Couldn\'t check photo access',
         message: 'Android didn\'t answer. Try again.',
         actionLabel: 'Try again',
@@ -63,7 +64,7 @@ class _MediaAccessGateState extends ConsumerState<MediaAccessGate> {
           ],
         ),
         MediaAccess.denied => EmptyState(
-          icon: Icons.photo_library_outlined,
+          icon: CupertinoIcons.photo_on_rectangle,
           title: 'Let fotos show your photos',
           message: _askedOnce
               ? 'Access is off. Turn on Photos and videos for fotos in '

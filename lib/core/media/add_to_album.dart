@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -169,13 +170,17 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
             ),
           ),
           ListTile(
-            leading: _Thumb(child: Icon(Icons.add, color: cs.primary)),
+            leading: _Thumb(
+              child: Icon(CupertinoIcons.plus, color: cs.primary),
+            ),
             title: const Text('New album'),
             onTap: () => Navigator.of(context).pop(_Choice(null, _move)),
           ),
           for (final String n in widget.empty)
             ListTile(
-              leading: const _Thumb(child: Icon(Icons.photo_album_outlined)),
+              leading: const _Thumb(
+                child: Icon(CupertinoIcons.rectangle_stack),
+              ),
               title: Text(n),
               subtitle: const Text('Empty'),
               onTap: () =>
@@ -185,7 +190,7 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
             ListTile(
               leading: _Thumb(
                 child: a.cover == null
-                    ? const Icon(Icons.photo_album_outlined)
+                    ? const Icon(CupertinoIcons.rectangle_stack)
                     : Image(
                         image: AssetEntityImageProvider(
                           a.cover!,

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -28,7 +29,7 @@ class ReviewScreen extends ConsumerWidget {
       body: items.when(
         loading: () => const SizedBox.shrink(),
         error: (_, _) => EmptyState(
-          icon: Icons.error_outline,
+          icon: CupertinoIcons.exclamationmark_circle,
           title: 'Couldn\'t load the list',
           message: 'Try again.',
           actionLabel: 'Try again',
@@ -36,7 +37,7 @@ class ReviewScreen extends ConsumerWidget {
         ),
         data: (List<ReviewItem> list) => list.isEmpty
             ? const EmptyState(
-                icon: Icons.check_circle_outline,
+                icon: CupertinoIcons.checkmark_circle,
                 title: 'Nothing left to check',
                 message: 'Every possible duplicate has been decided.',
               )
@@ -231,7 +232,7 @@ class _TakeoutSide extends StatelessWidget {
       image: item.video
           ? const ColoredBox(
               color: Colors.black,
-              child: Icon(Icons.movie_outlined, color: Colors.white, size: 40),
+              child: Icon(CupertinoIcons.film, color: Colors.white, size: 40),
             )
           : Image.file(File(item.path), fit: BoxFit.cover, cacheWidth: 384),
       lines: <String>[

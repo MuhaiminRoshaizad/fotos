@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
@@ -34,7 +35,7 @@ class TextScreen extends StatelessWidget {
         builder: (BuildContext context, AsyncSnapshot<(String, bool)> s) {
           if (s.hasError) {
             return const EmptyState(
-              icon: Icons.description_outlined,
+              icon: CupertinoIcons.doc_text,
               title: 'This file can\'t be read',
               message: 'Android didn\'t allow opening it.',
             );

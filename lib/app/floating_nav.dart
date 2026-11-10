@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
@@ -12,10 +13,22 @@ class NavDestination {
 }
 
 const List<NavDestination> navDestinations = <NavDestination>[
-  NavDestination(Icons.photo_library_outlined, Icons.photo_library, 'Photos'),
-  NavDestination(Icons.video_library_outlined, Icons.video_library, 'Videos'),
-  NavDestination(Icons.photo_album_outlined, Icons.photo_album, 'Albums'),
-  NavDestination(Icons.folder_outlined, Icons.folder, 'Files'),
+  NavDestination(
+    CupertinoIcons.photo_on_rectangle,
+    CupertinoIcons.photo_fill_on_rectangle_fill,
+    'Photos',
+  ),
+  NavDestination(
+    CupertinoIcons.play_rectangle,
+    CupertinoIcons.play_rectangle_fill,
+    'Videos',
+  ),
+  NavDestination(
+    CupertinoIcons.rectangle_stack,
+    CupertinoIcons.rectangle_stack_fill,
+    'Albums',
+  ),
+  NavDestination(CupertinoIcons.folder, CupertinoIcons.folder_fill, 'Files'),
 ];
 
 const double _itemWidth = 72;

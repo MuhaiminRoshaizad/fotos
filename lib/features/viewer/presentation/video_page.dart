@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -222,7 +223,7 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                   child: Center(
                     child: _Pill(
                       text: '2× speed',
-                      icon: Icons.fast_forward_rounded,
+                      icon: CupertinoIcons.forward_fill,
                     ),
                   ),
                 ),
@@ -240,7 +241,7 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                       minimumSize: const Size(72, 72),
                     ),
                     onPressed: _togglePlay,
-                    icon: const Icon(Icons.play_arrow_rounded),
+                    icon: const Icon(CupertinoIcons.play_fill),
                   ),
                 ),
               if (c != null)
@@ -307,8 +308,8 @@ class _SeekBadge extends StatelessWidget {
                   children: <Widget>[
                     Icon(
                       side < 0
-                          ? Icons.fast_rewind_rounded
-                          : Icons.fast_forward_rounded,
+                          ? CupertinoIcons.backward_fill
+                          : CupertinoIcons.forward_fill,
                       color: Colors.white,
                       size: 32,
                     ),
@@ -399,7 +400,9 @@ class _Controls extends ConsumerWidget {
                 onPressed: () =>
                     v.isPlaying ? controller.pause() : controller.play(),
                 icon: Icon(
-                  v.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  v.isPlaying
+                      ? CupertinoIcons.pause_fill
+                      : CupertinoIcons.play_fill,
                 ),
               ),
               Expanded(
@@ -418,12 +421,12 @@ class _Controls extends ConsumerWidget {
                 tooltip: s.loop ? 'Loop on' : 'Loop off',
                 isSelected: s.loop,
                 color: fg,
-                selectedIcon: const Icon(Icons.repeat_on_rounded),
+                selectedIcon: const Icon(CupertinoIcons.repeat_1),
                 onPressed: () {
                   ref.read(viewerSettingsProvider.notifier).setLoop(!s.loop);
                   controller.setLooping(!s.loop);
                 },
-                icon: const Icon(Icons.repeat),
+                icon: const Icon(CupertinoIcons.repeat),
               ),
               IconButton(
                 tooltip: s.muted ? 'Unmute' : 'Mute',
@@ -434,8 +437,8 @@ class _Controls extends ConsumerWidget {
                 },
                 icon: Icon(
                   s.muted
-                      ? Icons.volume_off_outlined
-                      : Icons.volume_up_outlined,
+                      ? CupertinoIcons.speaker_slash
+                      : CupertinoIcons.speaker_2,
                 ),
               ),
             ],

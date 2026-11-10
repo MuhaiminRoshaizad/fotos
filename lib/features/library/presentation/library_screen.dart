@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -109,7 +110,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       skipLoadingOnRefresh: true,
       loading: () => GridSkeleton(level: _level),
       error: (_, _) => EmptyState(
-        icon: Icons.error_outline,
+        icon: CupertinoIcons.exclamationmark_circle,
         title: 'Couldn\'t load your ${widget.kind.title.toLowerCase()}',
         message: 'Something went wrong reading the photo library.',
         actionLabel: 'Try again',
@@ -120,8 +121,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           final bool photos = widget.kind == LibraryKind.photos;
           return EmptyState(
             icon: photos
-                ? Icons.photo_library_outlined
-                : Icons.video_library_outlined,
+                ? CupertinoIcons.photo_on_rectangle
+                : CupertinoIcons.play_rectangle,
             title: photos ? 'No photos yet' : 'No videos yet',
             message: photos
                 ? 'Photos you take or import appear here.'
@@ -172,7 +173,7 @@ class _LevelMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<GridLevel>(
       tooltip: 'Grid size',
-      icon: const Icon(Icons.grid_view_outlined),
+      icon: const Icon(CupertinoIcons.square_grid_2x2),
       initialValue: level,
       onSelected: onChanged,
       itemBuilder: (_) => <PopupMenuEntry<GridLevel>>[

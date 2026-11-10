@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -88,7 +89,7 @@ class _FilesScreenState extends ConsumerState<FilesScreen> {
                 ) =>
                   FolderBody(dir: value, header: const _StorageCard()),
                 (AsyncData<bool>(value: false), _) => EmptyState(
-                  icon: Icons.folder_open_outlined,
+                  icon: CupertinoIcons.folder_open,
                   title: 'See every file on your phone',
                   message:
                       'Files shows all your folders, including PDFs and ZIPs. '
@@ -101,7 +102,7 @@ class _FilesScreenState extends ConsumerState<FilesScreen> {
                 ),
                 (AsyncError<bool>(), _) ||
                 (_, AsyncError<String>()) => EmptyState(
-                  icon: Icons.error_outline,
+                  icon: CupertinoIcons.exclamationmark_circle,
                   title: 'Couldn\'t open Files',
                   message: 'Android didn\'t answer. Try again.',
                   actionLabel: 'Try again',
@@ -176,7 +177,7 @@ class NewFolderButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return IconButton(
       tooltip: 'New folder',
-      icon: const Icon(Icons.create_new_folder_outlined),
+      icon: const Icon(CupertinoIcons.folder_badge_plus),
       onPressed: () async {
         final List<FileEntry> here =
             ref.read(folderProvider(dir)).value ?? const <FileEntry>[];
@@ -215,7 +216,7 @@ class FolderBody extends ConsumerWidget {
       skipLoadingOnRefresh: true,
       loading: () => _RowsSkeleton(header: header),
       error: (_, _) => EmptyState(
-        icon: Icons.folder_off_outlined,
+        icon: CupertinoIcons.folder_badge_minus,
         title: 'Can\'t open ${p.basename(dir)}',
         message: p.basename(dir) == 'Android'
             ? 'Android protects app data in this folder. Other apps, fotos '
@@ -233,7 +234,7 @@ class FolderBody extends ConsumerWidget {
                   const SizedBox(
                     height: 360,
                     child: EmptyState(
-                      icon: Icons.folder_outlined,
+                      icon: CupertinoIcons.folder,
                       title: 'This folder is empty',
                       message:
                           'Files you save or extract here appear in this list.',
@@ -283,7 +284,7 @@ class _RowsSkeleton extends StatelessWidget {
               ),
               title: const Text('Folder name here'),
               subtitle: const Text('09/11/2026'),
-              trailing: const Icon(Icons.more_vert),
+              trailing: const Icon(CupertinoIcons.ellipsis),
             ),
         ],
       ),

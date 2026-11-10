@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -41,7 +42,7 @@ class TrashScreen extends ConsumerWidget {
         skipLoadingOnRefresh: true,
         loading: () => const GridSkeleton(level: GridLevel.all),
         error: (_, _) => EmptyState(
-          icon: Icons.error_outline,
+          icon: CupertinoIcons.exclamationmark_circle,
           title: 'Couldn\'t read the trash',
           message: 'Android didn\'t return the deleted items.',
           actionLabel: 'Try again',
@@ -49,7 +50,7 @@ class TrashScreen extends ConsumerWidget {
         ),
         data: (List<TrashedItem> items) => items.isEmpty
             ? const EmptyState(
-                icon: Icons.delete_outline,
+                icon: CupertinoIcons.trash,
                 title: 'Nothing deleted',
                 message:
                     'Photos and videos you delete stay here for 30 days, then '
@@ -137,12 +138,12 @@ class TrashScreen extends ConsumerWidget {
           ),
           const Divider(height: 1),
           SheetAction(
-            icon: Icons.restore,
+            icon: CupertinoIcons.arrow_counterclockwise,
             label: 'Restore',
             onTap: () => Navigator.of(ctx).pop('restore'),
           ),
           SheetAction(
-            icon: Icons.delete_forever_outlined,
+            icon: CupertinoIcons.trash,
             label: 'Delete for good',
             destructive: true,
             onTap: () => Navigator.of(ctx).pop('purge'),

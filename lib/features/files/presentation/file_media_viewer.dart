@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -152,7 +153,7 @@ class _FileVideoState extends State<_FileVideo> {
           if (!v.isPlaying)
             const Center(
               child: Icon(
-                Icons.play_circle_outline,
+                CupertinoIcons.play_circle,
                 size: 72,
                 color: Colors.white,
               ),

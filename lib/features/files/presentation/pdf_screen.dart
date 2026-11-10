@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -54,14 +55,14 @@ class _PdfScreenState extends ConsumerState<PdfScreen> {
             onPressed: () => SharePlus.instance.share(
               ShareParams(files: <XFile>[XFile(widget.path)]),
             ),
-            icon: const Icon(Icons.share_outlined),
+            icon: const Icon(CupertinoIcons.square_arrow_up),
           ),
         ],
       ),
       body: count.when(
         loading: () => const SizedBox.shrink(),
         error: (_, _) => const EmptyState(
-          icon: Icons.picture_as_pdf_outlined,
+          icon: CupertinoIcons.doc_richtext,
           title: 'This PDF can\'t be opened',
           message: 'It may be damaged or protected with a password.',
         ),
@@ -201,7 +202,7 @@ class _Page extends ConsumerWidget {
                         tooltip: 'Close',
                         color: Colors.white,
                         onPressed: () => Navigator.of(ctx).pop(),
-                        icon: const Icon(Icons.close),
+                        icon: const Icon(CupertinoIcons.xmark),
                       ),
                     ),
                   ],

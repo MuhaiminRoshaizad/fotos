@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 
@@ -65,24 +66,24 @@ class _DetailsSheetState extends State<DetailsSheet> {
               ),
             ),
             _Row(
-              icon: Icons.calendar_today_outlined,
+              icon: CupertinoIcons.calendar,
               title: Fmt.dayHeading(d),
               subtitle: Fmt.time(d),
             ),
             _Row(
-              icon: video ? Icons.videocam_outlined : Icons.image_outlined,
+              icon: video ? CupertinoIcons.videocam : CupertinoIcons.photo,
               title: a.title ?? 'Untitled',
               subtitle: x == null ? dims : '${Fmt.size(x.size)} · $dims',
             ),
             if (camera != null)
               _Row(
-                icon: Icons.camera_outlined,
+                icon: CupertinoIcons.camera,
                 title: camera,
                 subtitle: x!.camera!.settings,
               ),
             if (hasPlace)
               _Row(
-                icon: Icons.place_outlined,
+                icon: CupertinoIcons.location,
                 title:
                     '${where.latitude.toStringAsFixed(5)}, '
                     '${where.longitude.toStringAsFixed(5)}',
@@ -90,7 +91,7 @@ class _DetailsSheetState extends State<DetailsSheet> {
               ),
             if (a.relativePath != null)
               _Row(
-                icon: Icons.folder_outlined,
+                icon: CupertinoIcons.folder,
                 title: a.relativePath!.replaceAll(RegExp(r'/$'), ''),
                 subtitle: 'Folder',
               ),

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,7 +54,7 @@ class AlbumsScreen extends ConsumerWidget {
                     IconButton(
                       tooltip: 'New album',
                       onPressed: () => createAlbum(context, ref),
-                      icon: const Icon(Icons.add),
+                      icon: const Icon(CupertinoIcons.plus),
                     ),
                   ],
                 ),
@@ -84,7 +85,7 @@ class _AlbumsBody extends ConsumerWidget {
       skipLoadingOnRefresh: true,
       loading: () => const _AlbumsSkeleton(),
       error: (_, _) => EmptyState(
-        icon: Icons.error_outline,
+        icon: CupertinoIcons.exclamationmark_circle,
         title: 'Couldn\'t load your albums',
         message: 'Something went wrong reading the photo library.',
         actionLabel: 'Try again',
@@ -113,7 +114,7 @@ class _AlbumsBody extends ConsumerWidget {
         return CustomScrollView(
           slivers: <Widget>[
             if (pinned.isNotEmpty) ...<Widget>[
-              const _Section(title: 'Pinned', icon: Icons.push_pin_outlined),
+              const _Section(title: 'Pinned', icon: CupertinoIcons.pin),
               _AlbumGrid(albums: pinned, prefs: prefs),
             ],
             const _Section(title: 'On this phone'),
@@ -130,19 +131,19 @@ class _AlbumsBody extends ConsumerWidget {
             SliverList.list(
               children: <Widget>[
                 _MoreRow(
-                  icon: Icons.favorite_border,
+                  icon: CupertinoIcons.heart,
                   label: 'Favourites',
                   count: ref.watch(favouritesProvider).value?.length,
                   onTap: () => context.push('/albums/favourites'),
                 ),
                 _MoreRow(
-                  icon: Icons.delete_outline,
+                  icon: CupertinoIcons.trash,
                   label: 'Recently deleted',
                   count: ref.watch(trashProvider).value?.length,
                   onTap: () => context.push('/albums/trash'),
                 ),
                 _MoreRow(
-                  icon: Icons.download_for_offline_outlined,
+                  icon: CupertinoIcons.arrow_down_circle,
                   label: 'Import from Google Takeout',
                   onTap: () => context.push('/albums/takeout'),
                 ),
@@ -310,7 +311,7 @@ class _AlbumTile extends ConsumerWidget {
                             radius: 12,
                             backgroundColor: cs.surfaceContainerLowest,
                             child: Icon(
-                              Icons.push_pin,
+                              CupertinoIcons.pin_fill,
                               size: 14,
                               color: cs.primary,
                             ),
@@ -374,7 +375,7 @@ class _EmptyAlbumTile extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(AppRadii.md),
                 ),
                 child: Icon(
-                  Icons.photo_album_outlined,
+                  CupertinoIcons.rectangle_stack,
                   color: cs.onSurfaceVariant,
                 ),
               ),
@@ -422,7 +423,7 @@ class _MoreRow extends StatelessWidget {
           if (count != null && count! > 0)
             Text('$count', style: TextStyle(color: cs.onSurfaceVariant)),
           const SizedBox(width: AppSpacing.xs),
-          Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+          Icon(CupertinoIcons.chevron_right, color: cs.onSurfaceVariant),
         ],
       ),
       onTap: onTap,

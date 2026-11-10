@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -90,17 +91,17 @@ class _FolderPickerState extends ConsumerState<_FolderPicker> {
         children: <Widget>[
           ListTile(
             leading: _atRoot
-                ? const Icon(Icons.phone_android_outlined)
+                ? const Icon(CupertinoIcons.device_phone_portrait)
                 : IconButton(
                     tooltip: 'Up one folder',
                     onPressed: () => setState(() => _dir = p.dirname(_dir)),
-                    icon: const Icon(Icons.arrow_upward),
+                    icon: const Icon(CupertinoIcons.arrow_up),
                   ),
             title: Text(_label, maxLines: 2, overflow: TextOverflow.ellipsis),
             trailing: IconButton(
               tooltip: 'New folder',
               onPressed: () => _newFolder(list.value ?? const <FileEntry>[]),
-              icon: const Icon(Icons.create_new_folder_outlined),
+              icon: const Icon(CupertinoIcons.folder_badge_plus),
             ),
           ),
           const Divider(height: 1),
@@ -113,7 +114,7 @@ class _FolderPickerState extends ConsumerState<_FolderPicker> {
                     controller: scroll,
                     itemCount: folders.length,
                     itemBuilder: (BuildContext context, int i) => ListTile(
-                      leading: const Icon(Icons.folder_outlined),
+                      leading: const Icon(CupertinoIcons.folder),
                       title: Text(folders[i].name),
                       onTap: () => setState(() => _dir = folders[i].path),
                     ),

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../../../core/format/formatters.dart';
@@ -35,7 +36,7 @@ class FileRow extends StatelessWidget {
       trailing: IconButton(
         tooltip: 'More options for ${entry.name}',
         onPressed: onMore,
-        icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
+        icon: Icon(CupertinoIcons.ellipsis, color: cs.onSurfaceVariant),
       ),
     );
   }
@@ -59,17 +60,17 @@ class FileIcon extends StatelessWidget {
           height: size,
           fit: BoxFit.cover,
           cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-          errorBuilder: (_, _, _) => _box(cs, Icons.image_outlined, null),
+          errorBuilder: (_, _, _) => _box(cs, CupertinoIcons.photo, null),
         ),
       );
     }
     final (IconData icon, Color? tint) = switch (entry.kind) {
-      FileKind.folder => (Icons.folder_outlined, null),
-      FileKind.video => (Icons.movie_outlined, null),
-      FileKind.pdf => (Icons.picture_as_pdf_outlined, cs.error),
-      FileKind.zip => (Icons.folder_zip_outlined, null),
-      FileKind.text => (Icons.description_outlined, null),
-      _ => (Icons.insert_drive_file_outlined, null),
+      FileKind.folder => (CupertinoIcons.folder, null),
+      FileKind.video => (CupertinoIcons.film, null),
+      FileKind.pdf => (CupertinoIcons.doc_richtext, cs.error),
+      FileKind.zip => (CupertinoIcons.archivebox, null),
+      FileKind.text => (CupertinoIcons.doc_text, null),
+      _ => (CupertinoIcons.doc, null),
     };
     return _box(cs, icon, tint);
   }

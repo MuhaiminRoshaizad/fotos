@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -47,12 +48,12 @@ class AlbumScreen extends ConsumerWidget {
               IconButton(
                 tooltip: 'Sort',
                 onPressed: () => showSortSheet(context, ref, album),
-                icon: const Icon(Icons.sort),
+                icon: const Icon(CupertinoIcons.arrow_up_arrow_down),
               ),
               IconButton(
                 tooltip: 'Album options',
                 onPressed: () => showAlbumOptions(context, ref, album),
-                icon: const Icon(Icons.more_vert),
+                icon: const Icon(CupertinoIcons.ellipsis),
               ),
             ],
     );
@@ -136,7 +137,7 @@ class MediaListScreen extends ConsumerWidget {
           skipLoadingOnRefresh: true,
           loading: () => const GridSkeleton(level: GridLevel.all),
           error: (_, _) => EmptyState(
-            icon: Icons.error_outline,
+            icon: CupertinoIcons.exclamationmark_circle,
             title: 'Couldn\'t load $title',
             message: 'Something went wrong reading the photo library.',
             actionLabel: 'Try again',
@@ -144,7 +145,7 @@ class MediaListScreen extends ConsumerWidget {
           ),
           data: (List<AssetEntity> data) => data.isEmpty
               ? EmptyState(
-                  icon: Icons.photo_album_outlined,
+                  icon: CupertinoIcons.rectangle_stack,
                   title: emptyTitle,
                   message: emptyMessage,
                 )

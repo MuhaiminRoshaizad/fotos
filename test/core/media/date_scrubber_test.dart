@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/core/media/date_scrubber.dart';
@@ -31,7 +32,7 @@ void main() {
     c.jumpTo(1);
     await tester.pump();
 
-    final Finder handle = find.byIcon(Icons.unfold_more);
+    final Finder handle = find.byIcon(CupertinoIcons.chevron_up_chevron_down);
     final TestGesture g = await tester.startGesture(tester.getCenter(handle));
     for (int i = 0; i < 10; i++) {
       await g.moveBy(const Offset(0, 10));

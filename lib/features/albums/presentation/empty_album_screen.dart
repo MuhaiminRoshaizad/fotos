@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,7 +21,7 @@ class EmptyAlbumScreen extends ConsumerWidget {
         actions: <Widget>[
           IconButton(
             tooltip: 'Delete album',
-            icon: const Icon(Icons.delete_outline),
+            icon: const Icon(CupertinoIcons.trash),
             onPressed: () async {
               final bool ok = await confirmAction(
                 context,
@@ -36,7 +37,7 @@ class EmptyAlbumScreen extends ConsumerWidget {
         ],
       ),
       body: EmptyState(
-        icon: Icons.photo_album_outlined,
+        icon: CupertinoIcons.rectangle_stack,
         title: '$name is empty',
         message: 'Add photos and videos now, or later with Add to album.',
         actionLabel: 'Add photos',

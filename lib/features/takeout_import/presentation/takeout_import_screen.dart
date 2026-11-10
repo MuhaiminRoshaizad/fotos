@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -178,7 +179,7 @@ class _TakeoutImportScreenState extends ConsumerState<TakeoutImportScreen> {
             _Stage.running => _running(),
             _Stage.finished => _finished(),
             _Stage.failed => EmptyState(
-              icon: Icons.error_outline,
+              icon: CupertinoIcons.exclamationmark_circle,
               title: 'Import didn\'t finish',
               message: _error ?? '',
               actionLabel: 'Try again',
@@ -202,7 +203,7 @@ class _TakeoutImportScreenState extends ConsumerState<TakeoutImportScreen> {
     if (info == null || space == null) return const SizedBox.shrink();
     if (!info.takeout) {
       return const EmptyState(
-        icon: Icons.folder_zip_outlined,
+        icon: CupertinoIcons.archivebox,
         title: 'This isn\'t a Google Photos Takeout',
         message:
             'It has no Takeout folder. Open it in Files to extract it instead.',

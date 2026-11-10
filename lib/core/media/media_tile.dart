@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
@@ -57,7 +58,7 @@ class MediaTile extends StatelessWidget {
           },
           errorBuilder: (_, _, _) => Center(
             child: Icon(
-              Icons.broken_image_outlined,
+              CupertinoIcons.exclamationmark_triangle,
               size: AppIconSize.dense,
               color: cs.onSurfaceVariant,
             ),
@@ -96,7 +97,7 @@ class MediaTile extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           const Icon(
-                            Icons.play_arrow_rounded,
+                            CupertinoIcons.play_fill,
                             size: 14,
                             color: Colors.white,
                           ),
@@ -120,7 +121,7 @@ class MediaTile extends StatelessWidget {
                     left: 4,
                     bottom: 4,
                     child: Icon(
-                      Icons.favorite,
+                      CupertinoIcons.heart_fill,
                       size: AppIconSize.badge,
                       color: Colors.white,
                       shadows: <Shadow>[
@@ -179,7 +180,9 @@ class _Check extends StatelessWidget {
           width: 2,
         ),
       ),
-      child: selected ? Icon(Icons.check, size: 14, color: cs.onPrimary) : null,
+      child: selected
+          ? Icon(CupertinoIcons.checkmark, size: 14, color: cs.onPrimary)
+          : null,
     );
   }
 }

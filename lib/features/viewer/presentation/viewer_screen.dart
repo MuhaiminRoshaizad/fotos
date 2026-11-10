@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -407,7 +408,7 @@ class _TopBar extends StatelessWidget {
                       tooltip: 'Close',
                       color: Colors.white,
                       onPressed: onClose,
-                      icon: const Icon(Icons.arrow_back),
+                      icon: const Icon(CupertinoIcons.chevron_back),
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Column(
@@ -500,15 +501,15 @@ class _Actions extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: <Widget>[
-          action(Icons.share_outlined, 'Share', onShare),
+          action(CupertinoIcons.square_arrow_up, 'Share', onShare),
           action(
-            favourite ? Icons.favorite : Icons.favorite_border,
+            favourite ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
             'Favourite',
             onFavourite,
             color: favourite ? const Color(0xFFFF8FA3) : null,
           ),
-          action(Icons.info_outlined, 'Details', onDetails),
-          action(Icons.delete_outline, 'Delete', onDelete),
+          action(CupertinoIcons.info_circle, 'Details', onDetails),
+          action(CupertinoIcons.trash, 'Delete', onDelete),
         ],
       ),
     );

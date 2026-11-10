@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -115,51 +116,51 @@ Future<void> showEntryActions(
         const Divider(height: 1),
         if (zip != null && zip.takeout)
           SheetAction(
-            icon: Icons.download_for_offline_outlined,
+            icon: CupertinoIcons.arrow_down_circle,
             label: 'Import from Google Takeout',
             onTap: () => Navigator.of(ctx).pop('takeout'),
           ),
         if (zip != null && !zip.takeout) ...<Widget>[
           SheetAction(
-            icon: Icons.unarchive_outlined,
+            icon: CupertinoIcons.tray_arrow_up,
             label: 'Extract here',
             onTap: () => Navigator.of(ctx).pop('extractHere'),
           ),
           SheetAction(
-            icon: Icons.drive_file_move_outlined,
+            icon: CupertinoIcons.folder,
             label: 'Extract to…',
             onTap: () => Navigator.of(ctx).pop('extractTo'),
           ),
         ],
         if (!entry.isFolder) ...<Widget>[
           SheetAction(
-            icon: Icons.open_in_new,
+            icon: CupertinoIcons.arrow_up_right_square,
             label: 'Open with another app',
             onTap: () => Navigator.of(ctx).pop('openWith'),
           ),
           SheetAction(
-            icon: Icons.share_outlined,
+            icon: CupertinoIcons.square_arrow_up,
             label: 'Share',
             onTap: () => Navigator.of(ctx).pop('share'),
           ),
         ],
         SheetAction(
-          icon: Icons.drive_file_rename_outline,
+          icon: CupertinoIcons.pencil,
           label: 'Rename',
           onTap: () => Navigator.of(ctx).pop('rename'),
         ),
         SheetAction(
-          icon: Icons.drive_file_move_outlined,
+          icon: CupertinoIcons.folder,
           label: 'Move to…',
           onTap: () => Navigator.of(ctx).pop('move'),
         ),
         SheetAction(
-          icon: Icons.copy_outlined,
+          icon: CupertinoIcons.doc_on_doc,
           label: 'Copy to…',
           onTap: () => Navigator.of(ctx).pop('copy'),
         ),
         SheetAction(
-          icon: Icons.delete_outline,
+          icon: CupertinoIcons.trash,
           label: 'Delete',
           destructive: true,
           onTap: () => Navigator.of(ctx).pop('delete'),

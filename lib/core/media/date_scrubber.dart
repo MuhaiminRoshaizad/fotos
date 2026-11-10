@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../haptics/app_haptics.dart';
@@ -176,7 +177,7 @@ class _DateScrubberState extends State<DateScrubber> {
                                 ],
                               ),
                               child: Icon(
-                                Icons.unfold_more,
+                                CupertinoIcons.chevron_up_chevron_down,
                                 size: AppIconSize.dense,
                                 color: cs.onSurfaceVariant,
                               ),

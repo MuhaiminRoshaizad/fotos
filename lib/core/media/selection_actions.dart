@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -19,13 +20,13 @@ List<SelectionAction> mediaSelectionActions(
 
   return <SelectionAction>[
     SelectionAction(
-      icon: Icons.share_outlined,
+      icon: CupertinoIcons.square_arrow_up,
       label: 'Share',
       run: (BuildContext context, Set<String> ids) =>
           ref.read(mediaActionsProvider).share(context, pick(ids)),
     ),
     SelectionAction(
-      icon: Icons.add_photo_alternate_outlined,
+      icon: CupertinoIcons.plus_rectangle_on_rectangle,
       label: 'Add to album',
       run: (BuildContext context, Set<String> ids) => addToAlbum(
         context,
@@ -36,7 +37,7 @@ List<SelectionAction> mediaSelectionActions(
       ),
     ),
     SelectionAction(
-      icon: Icons.favorite_border,
+      icon: CupertinoIcons.heart,
       label: 'Favourite',
       run: (BuildContext context, Set<String> ids) async {
         final List<AssetEntity> items = pick(ids);
@@ -47,7 +48,7 @@ List<SelectionAction> mediaSelectionActions(
       },
     ),
     SelectionAction(
-      icon: Icons.delete_outline,
+      icon: CupertinoIcons.trash,
       label: 'Delete',
       destructive: true,
       run: (BuildContext context, Set<String> ids) async {
@@ -73,7 +74,7 @@ class SelectionHeader extends ConsumerWidget {
         IconButton(
           tooltip: 'Cancel selection',
           onPressed: () => ref.read(selectionProvider.notifier).clear(),
-          icon: const Icon(Icons.close),
+          icon: const Icon(CupertinoIcons.xmark),
         ),
         Expanded(
           child: Text(

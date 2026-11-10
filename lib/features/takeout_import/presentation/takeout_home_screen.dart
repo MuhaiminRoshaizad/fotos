@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -43,7 +44,7 @@ class TakeoutHomeScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Import from Google Takeout')),
       body: switch (access) {
         AsyncData<bool>(value: false) => EmptyState(
-          icon: Icons.folder_open_outlined,
+          icon: CupertinoIcons.folder_open,
           title: 'fotos needs to see your Download folder',
           message:
               'The Takeout ZIPs sit in Download. Turn on All files access '
@@ -79,12 +80,12 @@ class _Body extends ConsumerWidget {
               margin: const EdgeInsets.all(AppSpacing.lg),
               color: cs.primaryContainer,
               child: ListTile(
-                leading: const Icon(Icons.compare_outlined),
+                leading: const Icon(CupertinoIcons.square_split_1x2),
                 title: Text(
                   '${Fmt.count(reviews, 'possible duplicate')} to check',
                 ),
                 subtitle: const Text('Decide which copy to keep.'),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const Icon(CupertinoIcons.chevron_right),
                 onTap: () => context.push('/takeout/review'),
               ),
             ),
@@ -139,7 +140,7 @@ class _Body extends ConsumerWidget {
             data: (List<File> list) => list.isEmpty
                 ? const <Widget>[
                     ListTile(
-                      leading: Icon(Icons.folder_zip_outlined),
+                      leading: Icon(CupertinoIcons.archivebox),
                       title: Text('No Takeout ZIPs yet'),
                       subtitle: Text('Files named takeout-….zip appear here.'),
                     ),
@@ -147,7 +148,7 @@ class _Body extends ConsumerWidget {
                 : <Widget>[
                     for (final File f in list)
                       ListTile(
-                        leading: const Icon(Icons.folder_zip_outlined),
+                        leading: const Icon(CupertinoIcons.archivebox),
                         title: Text(
                           p.basename(f.path),
                           maxLines: 1,
