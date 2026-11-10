@@ -72,7 +72,7 @@ Future<bool> addPhotosTo(
     AppHaptics.success();
     showToast(context, 'Moved ${Fmt.count(picked.length, 'item')} to $name');
   } else {
-    showToast(context, 'Nothing was moved.');
+    showToast(context, 'Nothing was moved.', failed: true);
   }
   return ok;
 }

@@ -64,7 +64,11 @@ Future<void> openEntry(
           .read(nativeChannelProvider)
           .openWith(entry.path);
       if (!opened && context.mounted) {
-        showToast(context, 'No app on this phone can open ${entry.name}.');
+        showToast(
+          context,
+          'No app on this phone can open ${entry.name}.',
+          failed: true,
+        );
       }
   }
 }
@@ -146,7 +150,11 @@ Future<void> showEntryActions(
     case 'openWith':
       final bool ok = await native.openWith(entry.path);
       if (!ok && context.mounted) {
-        showToast(context, 'No app on this phone can open ${entry.name}.');
+        showToast(
+          context,
+          'No app on this phone can open ${entry.name}.',
+          failed: true,
+        );
       }
     case 'share':
       await SharePlus.instance.share(
@@ -188,7 +196,9 @@ Future<void> _rename(
     if (context.mounted) showToast(context, 'Renamed to $name');
   } on FileSystemException {
     AppHaptics.error();
-    if (context.mounted) showToast(context, 'Couldn\'t rename ${entry.name}.');
+    if (context.mounted) {
+      showToast(context, 'Couldn\'t rename ${entry.name}.', failed: true);
+    }
   }
 }
 
@@ -224,7 +234,11 @@ Future<void> _transfer(
   } on FileSystemException {
     AppHaptics.error();
     if (context.mounted) {
-      showToast(context, 'Couldn\'t ${move ? 'move' : 'copy'} ${entry.name}.');
+      showToast(
+        context,
+        'Couldn\'t ${move ? 'move' : 'copy'} ${entry.name}.',
+        failed: true,
+      );
     }
   }
 }
@@ -250,7 +264,9 @@ Future<void> deleteEntry(
     if (context.mounted) showToast(context, 'Deleted ${entry.name}');
   } on FileSystemException {
     AppHaptics.error();
-    if (context.mounted) showToast(context, 'Couldn\'t delete ${entry.name}.');
+    if (context.mounted) {
+      showToast(context, 'Couldn\'t delete ${entry.name}.', failed: true);
+    }
   }
 }
 

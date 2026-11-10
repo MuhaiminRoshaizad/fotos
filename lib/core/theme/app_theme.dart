@@ -170,20 +170,6 @@ ThemeData buildAppTheme(Brightness brightness) {
       backgroundColor: scheme.surfaceContainerLow,
       surfaceTintColor: Colors.transparent,
     ),
-    // Toasts float as a soft rounded banner rather than Material's snackbar.
-    snackBarTheme: SnackBarThemeData(
-      behavior: SnackBarBehavior.floating,
-      elevation: 0,
-      backgroundColor: scheme.surfaceContainerHighest,
-      contentTextStyle: TextStyle(
-        fontFamily: 'Inter',
-        color: scheme.onSurface,
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-      ),
-      actionTextColor: scheme.primary,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-    ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: ButtonStyle(
         visualDensity: VisualDensity.compact,

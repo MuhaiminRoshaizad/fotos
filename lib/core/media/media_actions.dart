@@ -30,7 +30,9 @@ class MediaActions {
       if (f != null) files.add(XFile(f.path, mimeType: e.mimeType));
     }
     if (files.isEmpty) {
-      if (context.mounted) showToast(context, 'Couldn\'t read these files.');
+      if (context.mounted) {
+        showToast(context, 'Couldn\'t read these files.', failed: true);
+      }
       return;
     }
     await SharePlus.instance.share(ShareParams(files: files));

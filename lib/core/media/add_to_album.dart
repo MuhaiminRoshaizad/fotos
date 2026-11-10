@@ -76,7 +76,11 @@ Future<void> addToAlbum(
   onDone?.call();
   if (!context.mounted) return;
   if (done == 0) {
-    showToast(context, move ? 'Nothing was moved.' : 'Nothing was copied.');
+    showToast(
+      context,
+      move ? 'Nothing was moved.' : 'Nothing was copied.',
+      failed: true,
+    );
     return;
   }
   AppHaptics.success();
