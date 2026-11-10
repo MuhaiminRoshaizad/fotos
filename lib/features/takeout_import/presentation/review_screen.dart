@@ -140,6 +140,10 @@ class _ReviewCardState extends ConsumerState<_ReviewCard> {
   Widget build(BuildContext context) {
     final ReviewItem item = widget.item;
     final ColorScheme cs = Theme.of(context).colorScheme;
+    // Laid out from what the item says, not from the lookup's result: a
+    // card that changed height once its phone copy arrived made the list's
+    // length flicker at the bottom, and the bounce chased it without end.
+    final bool paired = item.phoneId != null;
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -164,8 +168,24 @@ class _ReviewCardState extends ConsumerState<_ReviewCard> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    if (phone != null) ...<Widget>[
-                      Expanded(child: _PhoneSide(asset: phone)),
+                    if (paired) ...<Widget>[
+                      Expanded(
+                        child: phone != null
+                            ? _PhoneSide(asset: phone)
+                            : _Side(
+                                label: 'On the phone',
+                                image: ColoredBox(
+                                  color: cs.surfaceContainerHigh,
+                                ),
+                                lines: <String>[
+                                  s.connectionState == ConnectionState.done
+                                      ? 'No longer on the phone'
+                                      : '',
+                                  '',
+                                  '',
+                                ],
+                              ),
+                      ),
                       const SizedBox(width: AppSpacing.md),
                     ],
                     Expanded(child: _TakeoutSide(item: item)),
@@ -174,7 +194,7 @@ class _ReviewCardState extends ConsumerState<_ReviewCard> {
                 const SizedBox(height: AppSpacing.md),
                 if (_busy)
                   const LinearProgressIndicator()
-                else if (phone == null)
+                else if (!paired)
                   Row(
                     children: <Widget>[
                       Expanded(
@@ -246,7 +266,7 @@ class _PhoneSide extends StatelessWidget {
         ),
         lines: <String>[
           '${Fmt.date(asset.createDateTime)} ${Fmt.time(asset.createDateTime)}',
-          if (size.hasData) Fmt.size(size.data!),
+          size.hasData ? Fmt.size(size.data!) : '',
           '${asset.orientatedWidth} × ${asset.orientatedHeight}',
         ],
       ),
