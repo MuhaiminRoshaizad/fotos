@@ -404,39 +404,44 @@ class _TopBar extends StatelessWidget {
                   AppSpacing.lg,
                   AppSpacing.xl,
                 ),
-                child: NavigationToolbar(
-                  leading: _Glass(
-                    shape: const CircleBorder(),
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(44, 44),
-                      onPressed: onClose,
-                      child: const Icon(
-                        CupertinoIcons.chevron_back,
-                        color: Colors.white,
-                        semanticLabel: 'Close',
+                // NavigationToolbar fills whatever height it is given, so the
+                // bar needs its own or it covers the whole photo.
+                child: SizedBox(
+                  height: 48,
+                  child: NavigationToolbar(
+                    leading: _Glass(
+                      shape: const CircleBorder(),
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(44, 44),
+                        onPressed: onClose,
+                        child: const Icon(
+                          CupertinoIcons.chevron_back,
+                          color: Colors.white,
+                          semanticLabel: 'Close',
+                        ),
                       ),
                     ),
-                  ),
-                  middle: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        Fmt.date(date),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                    middle: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          Fmt.date(date),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      Text(
-                        Fmt.time(date),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
+                        Text(
+                          Fmt.time(date),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
