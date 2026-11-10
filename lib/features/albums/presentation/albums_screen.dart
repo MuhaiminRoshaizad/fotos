@@ -284,6 +284,14 @@ class _AlbumTile extends ConsumerWidget {
                       if (cover != null)
                         AnimatedSwitcher(
                           duration: AppMotion.medium,
+                          // The default layout centres the child at its own
+                          // size, which letterboxed portrait and landscape
+                          // covers instead of filling the square.
+                          layoutBuilder: (Widget? current, List<Widget> old) =>
+                              Stack(
+                                fit: StackFit.expand,
+                                children: <Widget>[...old, ?current],
+                              ),
                           child: Image(
                             key: ValueKey<String>(cover.id),
                             image: AssetEntityImageProvider(
@@ -296,8 +304,8 @@ class _AlbumTile extends ConsumerWidget {
                         ),
                       if (pinned)
                         Positioned(
-                          right: 6,
-                          top: 6,
+                          right: AppSpacing.sm,
+                          top: AppSpacing.sm,
                           child: CircleAvatar(
                             radius: 12,
                             backgroundColor: cs.surfaceContainerLowest,
@@ -313,7 +321,7 @@ class _AlbumTile extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               album.name,
               maxLines: 1,
@@ -321,7 +329,7 @@ class _AlbumTile extends ConsumerWidget {
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             Text(
-              '${album.count}',
+              Fmt.count(album.count, 'item'),
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             ),
           ],
@@ -371,7 +379,7 @@ class _EmptyAlbumTile extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               name,
               maxLines: 1,
@@ -411,7 +419,7 @@ class _MoreRow extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          if (count != null)
+          if (count != null && count! > 0)
             Text('$count', style: TextStyle(color: cs.onSurfaceVariant)),
           const SizedBox(width: AppSpacing.xs),
           Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
@@ -457,9 +465,9 @@ class _AlbumsSkeleton extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
             const Text('Album name'),
-            const Text('000'),
+            const Text('000 items'),
           ],
         ),
       ),
