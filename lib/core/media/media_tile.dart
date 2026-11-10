@@ -5,6 +5,7 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../format/formatters.dart';
 import '../theme/app_tokens.dart';
+import 'media_flight.dart';
 
 /// Thumbnail sizes are bucketed so the same decode serves every grid level.
 int thumbnailPixels(double logicalWidth, double devicePixelRatio) {
@@ -85,7 +86,12 @@ class MediaTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(
                       selected ? AppRadii.md : 0,
                     ),
-                    child: Hero(tag: heroTag, child: image),
+                    child: Hero(
+                      tag: heroTag,
+                      createRectTween: mediaFlightTween,
+                      flightShuttleBuilder: mediaFlightShuttle(asset),
+                      child: image,
+                    ),
                   ),
                 ),
                 if (video)

@@ -12,6 +12,7 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/media/media_actions.dart';
+import '../../../core/media/media_flight.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
 import 'details_sheet.dart';
@@ -171,6 +172,14 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     );
   }
 
+  /// The viewer's end of the flight from and back to the grid tile.
+  Widget _flying(AssetEntity e, Widget child) => Hero(
+    tag: _hero(e),
+    createRectTween: mediaFlightTween,
+    flightShuttleBuilder: mediaFlightShuttle(e),
+    child: child,
+  );
+
   Widget _photo(AssetEntity e, int i) {
     return ExtendedImage(
       image: AssetEntityImageProvider(
@@ -198,8 +207,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         );
         _setChrome(scale > 1.01);
       },
-      heroBuilderForSlidingPage: (Widget child) =>
-          Hero(tag: _hero(e), child: child),
+      heroBuilderForSlidingPage: (Widget child) => _flying(e, child),
       loadStateChanged: (ExtendedImageState s) {
         if (s.extendedImageLoadState == LoadState.loading) {
           // The grid thumbnail stands in until the large decode lands.
@@ -281,7 +289,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                       return ExtendedImageSlidePageHandler(
                         extendedImageSlidePageState: _slideKey.currentState,
                         heroBuilderForSlidingPage: (Widget child) =>
-                            Hero(tag: _hero(item), child: child),
+                            _flying(item, child),
                         child: VideoPage(
                           key: ValueKey<String>(item.id),
                           asset: item,
