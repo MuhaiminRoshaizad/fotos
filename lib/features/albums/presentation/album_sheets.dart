@@ -150,47 +150,113 @@ Future<void> showSortSheet(
       (ref.read(albumPrefsProvider).value ?? const AlbumPrefs()).sortFor(
         album.id,
       );
-  final AlbumSort? next = await showAppSheet<AlbumSort>(
+  final (int, bool)? next = await _pickSort(
     context,
-    builder: (BuildContext ctx) => _SortSheet(current: current),
+    title: 'Sort',
+    labels: <String>[for (final AlbumSortBy b in AlbumSortBy.values) b.label],
+    directions: <(String, String)>[
+      for (final AlbumSortBy b in AlbumSortBy.values) b.directions,
+    ],
+    by: current.by.index,
+    reversed: current.reversed,
   );
   if (next != null) {
-    await ref.read(albumPrefsProvider.notifier).setSort(album.id, next);
+    await ref
+        .read(albumPrefsProvider.notifier)
+        .setSort(
+          album.id,
+          AlbumSort(AlbumSortBy.values[next.$1], reversed: next.$2),
+        );
   }
 }
 
+/// Chooses the order of the albums on the Albums tab.
+Future<void> showAlbumsOrderSheet(BuildContext context, WidgetRef ref) async {
+  final AlbumsOrder current =
+      (ref.read(albumPrefsProvider).value ?? const AlbumPrefs()).order;
+  final (int, bool)? next = await _pickSort(
+    context,
+    title: 'Sort albums',
+    labels: <String>[
+      for (final AlbumsOrderBy b in AlbumsOrderBy.values) b.label,
+    ],
+    directions: <(String, String)>[
+      for (final AlbumsOrderBy b in AlbumsOrderBy.values) b.directions,
+    ],
+    by: current.by.index,
+    reversed: current.reversed,
+  );
+  if (next != null) {
+    await ref
+        .read(albumPrefsProvider.notifier)
+        .setOrder(
+          AlbumsOrder(AlbumsOrderBy.values[next.$1], reversed: next.$2),
+        );
+  }
+}
+
+/// The sort sheet: a key to sort by and one of its two directions. Returns
+/// the chosen key's index and whether the second direction was picked.
+Future<(int, bool)?> _pickSort(
+  BuildContext context, {
+  required String title,
+  required List<String> labels,
+  required List<(String, String)> directions,
+  required int by,
+  required bool reversed,
+}) => showAppSheet<(int, bool)>(
+  context,
+  builder: (BuildContext ctx) => _SortSheet(
+    title: title,
+    labels: labels,
+    directions: directions,
+    by: by,
+    reversed: reversed,
+  ),
+);
+
 class _SortSheet extends StatefulWidget {
-  const _SortSheet({required this.current});
-  final AlbumSort current;
+  const _SortSheet({
+    required this.title,
+    required this.labels,
+    required this.directions,
+    required this.by,
+    required this.reversed,
+  });
+  final String title;
+  final List<String> labels;
+  final List<(String, String)> directions;
+  final int by;
+  final bool reversed;
 
   @override
   State<_SortSheet> createState() => _SortSheetState();
 }
 
 class _SortSheetState extends State<_SortSheet> {
-  late AlbumSortBy _by = widget.current.by;
-  late bool _reversed = widget.current.reversed;
+  late int _by = widget.by;
+  late bool _reversed = widget.reversed;
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final (String first, String second) = _by.directions;
+    final (String first, String second) = widget.directions[_by];
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const SheetTitle('Sort'),
+        SheetTitle(widget.title),
         // iOS marks the choice with a checkmark, not a radio button.
         InsetGroup(
           children: <Widget>[
-            for (final AlbumSortBy by in AlbumSortBy.values)
+            for (final (int i, String label) in widget.labels.indexed)
               Semantics(
-                selected: by == _by,
+                selected: i == _by,
                 inMutuallyExclusiveGroup: true,
                 child: GroupRow(
-                  title: by.label,
+                  title: label,
                   chevron: false,
-                  trailing: by == _by
+                  trailing: i == _by
                       ? Icon(
                           CupertinoIcons.checkmark,
                           size: 20,
@@ -198,7 +264,7 @@ class _SortSheetState extends State<_SortSheet> {
                         )
                       : null,
                   onTap: () => setState(() {
-                    _by = by;
+                    _by = i;
                     _reversed = false;
                   }),
                 ),
@@ -237,8 +303,7 @@ class _SortSheetState extends State<_SortSheet> {
             AppSpacing.lg,
           ),
           child: FilledButton(
-            onPressed: () =>
-                Navigator.of(context).pop(AlbumSort(_by, reversed: _reversed)),
+            onPressed: () => Navigator.of(context).pop((_by, _reversed)),
             child: const Text('Apply'),
           ),
         ),

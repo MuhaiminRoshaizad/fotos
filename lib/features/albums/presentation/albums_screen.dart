@@ -35,6 +35,11 @@ class AlbumsScreen extends ConsumerWidget {
       grouped: true,
       trailing: <Widget>[
         BarButton.icon(
+          icon: CupertinoIcons.arrow_up_arrow_down,
+          tooltip: 'Sort albums',
+          onPressed: () => showAlbumsOrderSheet(context, ref),
+        ),
+        BarButton.icon(
           icon: CupertinoIcons.plus,
           tooltip: 'New album',
           onPressed: () => createAlbum(context, ref),
@@ -87,9 +92,9 @@ class _AlbumsBody extends ConsumerWidget {
           for (final String id in prefs.pinned)
             ...list.where((Album a) => a.id == id),
         ];
-        final List<Album> rest = list
-            .where((Album a) => !prefs.pinned.contains(a.id))
-            .toList();
+        final List<Album> rest = prefs.order.apply(
+          list.where((Album a) => !prefs.pinned.contains(a.id)).toList(),
+        );
         final List<String> pending = pendingEmptyAlbums(empty, list);
         if (pending.length != empty.length) {
           // An empty album that now holds something is a real folder; forget

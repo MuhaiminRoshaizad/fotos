@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import '../../../core/media/media_repository.dart';
 import '../../../core/storage/preferences.dart';
 
 enum AlbumSortBy {
@@ -65,18 +66,97 @@ class AlbumSort {
   }
 }
 
-/// Per-album choices fotos keeps itself, because Android has no notion of
-/// them for folders: pins (in order), cover photo and sort.
+enum AlbumsOrderBy {
+  recent('Most recent photo'),
+  name('Name'),
+  count('Number of items');
+
+  const AlbumsOrderBy(this.label);
+  final String label;
+
+  /// Labels for the two directions, first being the default.
+  (String, String) get directions => switch (this) {
+    AlbumsOrderBy.recent => ('Newest first', 'Oldest first'),
+    AlbumsOrderBy.name => ('A to Z', 'Z to A'),
+    AlbumsOrderBy.count => ('Most first', 'Fewest first'),
+  };
+}
+
+/// The order of the albums on the Albums tab. Pinned albums keep their own
+/// order above these.
+class AlbumsOrder {
+  const AlbumsOrder(this.by, {this.reversed = false});
+
+  final AlbumsOrderBy by;
+
+  /// False means the first of [AlbumsOrderBy.directions].
+  final bool reversed;
+
+  static const AlbumsOrder standard = AlbumsOrder(AlbumsOrderBy.recent);
+
+  String encode() => '${by.name}:${reversed ? 1 : 0}';
+
+  static AlbumsOrder decode(String s) {
+    final List<String> p = s.split(':');
+    final AlbumsOrderBy by = AlbumsOrderBy.values.firstWhere(
+      (AlbumsOrderBy b) => b.name == p.first,
+      orElse: () => AlbumsOrderBy.recent,
+    );
+    return AlbumsOrder(by, reversed: p.length > 1 && p[1] == '1');
+  }
+
+  List<Album> apply(List<Album> albums) {
+    // An album's newest item is the one the repository hands over as its
+    // cover; an album without one sorts as the oldest.
+    int taken(Album a) => a.cover?.createDateTime.millisecondsSinceEpoch ?? 0;
+    int byName(Album a, Album b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    final List<Album> out = List<Album>.of(albums);
+    switch (by) {
+      case AlbumsOrderBy.recent:
+        out.sort((Album a, Album b) {
+          final int c = taken(b).compareTo(taken(a));
+          return c != 0 ? c : byName(a, b);
+        });
+      case AlbumsOrderBy.name:
+        out.sort(byName);
+      case AlbumsOrderBy.count:
+        out.sort((Album a, Album b) {
+          final int c = b.count.compareTo(a.count);
+          return c != 0 ? c : byName(a, b);
+        });
+    }
+    return reversed ? out.reversed.toList() : out;
+  }
+}
+
+/// Choices fotos keeps itself, because Android has no notion of them for
+/// folders: pins (in order), each album's cover photo and sort, and the
+/// order of the albums themselves.
 class AlbumPrefs {
   const AlbumPrefs({
     this.pinned = const <String>[],
     this.covers = const <String, String>{},
     this.sorts = const <String, AlbumSort>{},
+    this.order = AlbumsOrder.standard,
   });
 
   final List<String> pinned;
   final Map<String, String> covers;
   final Map<String, AlbumSort> sorts;
+  final AlbumsOrder order;
+
+  AlbumPrefs copyWith({
+    List<String>? pinned,
+    Map<String, String>? covers,
+    Map<String, AlbumSort>? sorts,
+    AlbumsOrder? order,
+  }) => AlbumPrefs(
+    pinned: pinned ?? this.pinned,
+    covers: covers ?? this.covers,
+    sorts: sorts ?? this.sorts,
+    order: order ?? this.order,
+  );
 
   AlbumSort sortFor(String albumId) => sorts[albumId] ?? AlbumSort.standard;
 }
@@ -99,6 +179,9 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
                 .entries)
           e.key: AlbumSort.decode(e.value! as String),
       },
+      order: m['order'] == null
+          ? AlbumsOrder.standard
+          : AlbumsOrder.decode(m['order']! as String),
     );
   }
 
@@ -115,6 +198,7 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
               for (final MapEntry<String, AlbumSort> e in p.sorts.entries)
                 e.key: e.value.encode(),
             },
+            'order': p.order.encode(),
           }),
         );
   }
@@ -126,30 +210,25 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
     final List<String> pinned = p.pinned.contains(albumId)
         ? (List<String>.of(p.pinned)..remove(albumId))
         : <String>[albumId, ...p.pinned];
-    return _save(AlbumPrefs(pinned: pinned, covers: p.covers, sorts: p.sorts));
+    return _save(p.copyWith(pinned: pinned));
   }
 
   Future<void> setCover(String albumId, String assetId) {
     final AlbumPrefs p = _now;
     return _save(
-      AlbumPrefs(
-        pinned: p.pinned,
-        covers: <String, String>{...p.covers, albumId: assetId},
-        sorts: p.sorts,
-      ),
+      p.copyWith(covers: <String, String>{...p.covers, albumId: assetId}),
     );
   }
 
   Future<void> setSort(String albumId, AlbumSort sort) {
     final AlbumPrefs p = _now;
     return _save(
-      AlbumPrefs(
-        pinned: p.pinned,
-        covers: p.covers,
-        sorts: <String, AlbumSort>{...p.sorts, albumId: sort},
-      ),
+      p.copyWith(sorts: <String, AlbumSort>{...p.sorts, albumId: sort}),
     );
   }
+
+  Future<void> setOrder(AlbumsOrder order) =>
+      _save(_now.copyWith(order: order));
 }
 
 final AsyncNotifierProvider<AlbumPrefsNotifier, AlbumPrefs> albumPrefsProvider =
