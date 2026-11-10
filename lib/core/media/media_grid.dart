@@ -1,15 +1,18 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../haptics/app_haptics.dart';
 import '../selection/selection.dart';
 import '../theme/app_tokens.dart';
 import '../widgets/entrance.dart';
+import '../widgets/lift_menu.dart';
 import 'date_scrubber.dart';
 import 'grid_geometry.dart';
 import 'grouping.dart';
@@ -22,8 +25,10 @@ class _TileTag {
 
 /// A grouped, zoomable media grid.
 ///
-/// Tap opens an item. Long-press starts selecting (when [selectionActions] is
-/// given) and dragging afterwards selects the whole range passed over. Two
+/// Tap opens an item. Press and hold lifts it into a preview with a menu of
+/// the [selectionActions] for that one item, plus Select. While selecting
+/// (from that menu or the page's Select button), press and hold then drag
+/// selects the whole range passed over. Two
 /// fingers pinching step between [GridLevel]s; the item at the top stays in
 /// place across the change.
 class MediaGrid extends ConsumerStatefulWidget {
@@ -135,13 +140,58 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
     return null;
   }
 
-  void _onLongPressStart(int index, LongPressStartDetails d) {
+  /// Lifts the tile at [tileContext] into a preview with its menu, then
+  /// runs what was chosen on that one item.
+  Future<void> _preview(int index, BuildContext tileContext) async {
+    final AssetEntity e = widget.items[index];
+    final RenderBox box = tileContext.findRenderObject()! as RenderBox;
+    final List<SelectionAction> actions = widget.selectionActions!();
+    final bool sized = e.orientatedWidth > 0 && e.orientatedHeight > 0;
+    final Object? choice = await showLiftMenu<Object>(
+      context,
+      from: box.localToGlobal(Offset.zero) & box.size,
+      aspectRatio: sized ? e.orientatedWidth / e.orientatedHeight : 1,
+      preview: _Preview(asset: e),
+      actions: <LiftAction<Object>>[
+        for (final SelectionAction a in actions.where(
+          (SelectionAction a) => !a.destructive,
+        ))
+          LiftAction<Object>(a, a.label, a.icon),
+        const LiftAction<Object>(
+          _startSelecting,
+          'Select',
+          CupertinoIcons.checkmark_circle,
+        ),
+        for (final SelectionAction a in actions.where(
+          (SelectionAction a) => a.destructive,
+        ))
+          LiftAction<Object>(a, a.label, a.icon, destructive: true),
+      ],
+    );
+    if (choice == null || !mounted) return;
+    if (choice is SelectionAction) {
+      await choice.run(context, <String>{e.id});
+    } else {
+      ref.read(selectionProvider.notifier)
+        ..start(widget.selectionOwner!, actions)
+        ..setIds(<String>{e.id});
+    }
+  }
+
+  static const String _startSelecting = 'select';
+
+  void _onLongPressStart(
+    int index,
+    LongPressStartDetails d,
+    BuildContext tileContext,
+  ) {
     if (!_canSelect) return;
     final SelectionNotifier sel = ref.read(selectionProvider.notifier);
     final SelectionState state = ref.read(selectionProvider);
     final String id = widget.items[index].id;
     if (!state.isActiveFor(widget.selectionOwner!)) {
-      sel.start(widget.selectionOwner!, widget.selectionActions!());
+      _preview(index, tileContext);
+      return;
     }
     _dragBase = Set<String>.of(ref.read(selectionProvider).ids)..add(id);
     _dragAnchor = index;
@@ -344,23 +394,29 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
                 final Widget tile = MetaData(
                   metaData: _TileTag(index),
                   behavior: HitTestBehavior.opaque,
-                  child: GestureDetector(
-                    onTap: () => _onTap(index),
-                    onLongPressStart: _canSelect
-                        ? (LongPressStartDetails d) =>
-                              _onLongPressStart(index, d)
-                        : null,
-                    onLongPressMoveUpdate: _canSelect ? _onLongPressMove : null,
-                    onLongPressEnd: _canSelect
-                        ? (_) => _onLongPressEnd()
-                        : null,
-                    onLongPressCancel: _canSelect ? _onLongPressEnd : null,
-                    child: MediaTile(
-                      key: ValueKey<String>(e.id),
-                      asset: e,
-                      heroTag: '${widget.heroPrefix}-${e.id}',
-                      selecting: selecting,
-                      selected: selecting && sel.ids.contains(e.id),
+                  // The Builder gives the long-press this tile's own box,
+                  // which is where its preview lifts from.
+                  child: Builder(
+                    builder: (BuildContext tileContext) => GestureDetector(
+                      onTap: () => _onTap(index),
+                      onLongPressStart: _canSelect
+                          ? (LongPressStartDetails d) =>
+                                _onLongPressStart(index, d, tileContext)
+                          : null,
+                      onLongPressMoveUpdate: _canSelect
+                          ? _onLongPressMove
+                          : null,
+                      onLongPressEnd: _canSelect
+                          ? (_) => _onLongPressEnd()
+                          : null,
+                      onLongPressCancel: _canSelect ? _onLongPressEnd : null,
+                      child: MediaTile(
+                        key: ValueKey<String>(e.id),
+                        asset: e,
+                        heroTag: '${widget.heroPrefix}-${e.id}',
+                        selecting: selecting,
+                        selected: selecting && sel.ids.contains(e.id),
+                      ),
                     ),
                   ),
                 );
@@ -449,5 +505,33 @@ class _RenderMeasureHeight extends RenderProxyBox {
   void performLayout() {
     super.performLayout();
     onHeight(size.height);
+  }
+}
+
+/// A held item's preview: the grid thumbnail at once, a sharper one over it
+/// when decoded. Both fill the frame, which ends at the item's own shape.
+class _Preview extends StatelessWidget {
+  const _Preview({required this.asset});
+
+  final AssetEntity asset;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget image(int px) => Image(
+      image: AssetEntityImageProvider(
+        asset,
+        isOriginal: false,
+        thumbnailSize: ThumbnailSize.square(px),
+      ),
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+    );
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[image(384), image(1024)],
+      ),
+    );
   }
 }
