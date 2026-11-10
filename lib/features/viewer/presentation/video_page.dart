@@ -12,7 +12,7 @@ import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../data/viewer_settings.dart';
-import 'seek_queue.dart';
+import 'video_session.dart';
 import 'viewer_glass.dart';
 
 /// One video in the viewer.
@@ -41,13 +41,9 @@ class VideoPage extends ConsumerStatefulWidget {
 }
 
 class _VideoPageState extends ConsumerState<VideoPage> {
-  VideoPlayerController? _c;
-  SeekQueue? _seeks;
-
-  /// Where the last seek asked to go. Shown in place of the player's own
-  /// position until the player has caught up, so the playhead stays under
-  /// the finger.
-  Duration? _target;
+  late final VideoSession _session = VideoSession(_newController)
+    ..addListener(_tick);
+  File? _file;
   bool _failed = false;
   bool _fast = false;
   bool _scrubbing = false;
@@ -64,97 +60,51 @@ class _VideoPageState extends ConsumerState<VideoPage> {
   }
 
   Future<void> _open() async {
-    final File? f = await widget.asset.file;
-    if (!mounted) return;
-    if (f == null) {
-      setState(() => _failed = true);
-      return;
-    }
-    final VideoPlayerController c = VideoPlayerController.file(f);
     try {
-      await c.initialize();
+      await _session.start();
     } on Exception {
-      await c.dispose();
       if (mounted) setState(() => _failed = true);
       return;
     }
-    if (!mounted) {
+    if (mounted && widget.active) _session.play();
+  }
+
+  /// An initialised player for this video with the saved loop and mute
+  /// settings, for the session to open now and again after the end.
+  Future<VideoPlayerController> _newController() async {
+    final File? f = _file ??= await widget.asset.file;
+    if (f == null) throw const FileSystemException('The video has no file');
+    final VideoPlayerController c = VideoPlayerController.file(f);
+    try {
+      await c.initialize();
+      final ViewerSettings s =
+          ref.read(viewerSettingsProvider).value ?? const ViewerSettings();
+      await c.setLooping(s.loop);
+      await c.setVolume(s.muted ? 0 : 1);
+    } on Exception {
       await c.dispose();
-      return;
+      rethrow;
     }
-    final ViewerSettings s =
-        ref.read(viewerSettingsProvider).value ?? const ViewerSettings();
-    await c.setLooping(s.loop);
-    await c.setVolume(s.muted ? 0 : 1);
-    c.addListener(_tick);
-    _seeks = SeekQueue((Duration p) => _seekAndSettle(c, p));
-    setState(() => _c = c);
-    if (widget.active) c.play();
+    return c;
   }
 
   void _tick() {
     if (mounted) setState(() {});
   }
 
-  void _seekTo(Duration position) {
-    final VideoPlayerController? c = _c;
-    if (c == null) return;
-    final Duration p = position < Duration.zero
-        ? Duration.zero
-        : (position > c.value.duration ? c.value.duration : position);
-    setState(() => _target = p);
-    _seeks?.request(p);
-    _seeks?.idle.then((_) {
-      if (mounted) setState(() => _target = null);
-    });
-  }
-
-  /// One seek, finished when the player has the frame ready.
-  ///
-  /// The plugin's own future completes as soon as the request is handed
-  /// over. ExoPlayer goes to buffering on every seek and back to ready once
-  /// the frame is decoded, which the plugin reports as [isBuffering], so
-  /// wait for that round trip. The timers cover a seek so quick that the
-  /// change is never seen, and a player that never reports back.
-  Future<void> _seekAndSettle(VideoPlayerController c, Duration p) async {
-    await c.seekTo(p);
-    if (!mounted) return;
-    final Completer<void> done = Completer<void>();
-    bool buffering = c.value.isBuffering;
-    void listen() {
-      if (c.value.isBuffering) {
-        buffering = true;
-      } else if (buffering && !done.isCompleted) {
-        done.complete();
-      }
-    }
-
-    c.addListener(listen);
-    final Timer unseen = Timer(const Duration(milliseconds: 60), () {
-      if (!buffering && !done.isCompleted) done.complete();
-    });
-    final Timer limit = Timer(const Duration(milliseconds: 500), () {
-      if (!done.isCompleted) done.complete();
-    });
-    await done.future;
-    unseen.cancel();
-    limit.cancel();
-    c.removeListener(listen);
-  }
-
   @override
   void didUpdateWidget(VideoPage old) {
     super.didUpdateWidget(old);
-    final VideoPlayerController? c = _c;
-    if (c == null || old.active == widget.active) return;
-    widget.active ? c.play() : c.pause();
+    if (old.active == widget.active) return;
+    widget.active ? _session.play() : _session.pause();
   }
 
   @override
   void dispose() {
     _seekBadge?.cancel();
-    _c?.removeListener(_tick);
-    _c?.dispose();
+    _session
+      ..removeListener(_tick)
+      ..dispose();
     super.dispose();
   }
 
@@ -165,8 +115,7 @@ class _VideoPageState extends ConsumerState<VideoPage> {
   }
 
   void _seek(int side) {
-    final VideoPlayerController? c = _c;
-    if (c == null) return;
+    if (_session.controller == null) return;
     final DateTime now = DateTime.now();
     if (side != _streakSide || now.difference(_streakAt).inMilliseconds > 700) {
       _streakCount = 0;
@@ -176,7 +125,7 @@ class _VideoPageState extends ConsumerState<VideoPage> {
     _streakAt = now;
     // Count from the last target, so quick taps add up instead of all
     // starting from the position the player has yet to leave.
-    _seekTo((_target ?? c.value.position) + Duration(seconds: 10 * side));
+    _session.seekTo(_session.position + Duration(seconds: 10 * side));
     AppHaptics.light();
     _seekBadge?.cancel();
     _seekBadge = Timer(const Duration(milliseconds: 700), () {
@@ -186,19 +135,14 @@ class _VideoPageState extends ConsumerState<VideoPage> {
   }
 
   void _togglePlay() {
-    final VideoPlayerController? c = _c;
+    final VideoPlayerController? c = _session.controller;
     if (c == null) return;
-    if (c.value.isPlaying) {
-      c.pause();
-    } else {
-      if (c.value.position >= c.value.duration) _seekTo(Duration.zero);
-      c.play();
-    }
+    c.value.isPlaying ? _session.pause() : _session.play();
   }
 
   @override
   Widget build(BuildContext context) {
-    final VideoPlayerController? c = _c;
+    final VideoPlayerController? c = _session.controller;
     if (_failed) {
       return const Center(
         child: Text(
@@ -251,15 +195,15 @@ class _VideoPageState extends ConsumerState<VideoPage> {
           onLongPressStart: (_) {
             if (c == null) return;
             _wasPlaying = c.value.isPlaying;
-            c.setPlaybackSpeed(2);
-            c.play();
+            _session.setSpeed(2);
+            _session.play();
             AppHaptics.light();
             setState(() => _fast = true);
           },
           onLongPressEnd: (_) {
             if (c == null) return;
-            c.setPlaybackSpeed(1);
-            if (!_wasPlaying) c.pause();
+            _session.setSpeed(1);
+            if (!_wasPlaying) _session.pause();
             setState(() => _fast = false);
           },
           child: Stack(
@@ -312,12 +256,13 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                       child: _Controls(
                         asset: widget.asset,
                         controller: c,
-                        position: _target ?? c.value.position,
-                        gliding: c.value.isPlaying && _target == null,
-                        onSeek: _seekTo,
+                        position: _session.position,
+                        gliding: c.value.isPlaying && _session.target == null,
+                        onPlayPause: _togglePlay,
+                        onSeek: _session.seekTo,
                         onScrubStart: () {
                           _wasPlaying = c.value.isPlaying;
-                          c.pause();
+                          _session.pause();
                           setState(() => _scrubbing = true);
                         },
                         onScrubEnd: () {
@@ -325,8 +270,8 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                           if (!_wasPlaying) return;
                           // Start again only once the last seek has landed,
                           // so playback picks up from the chosen frame.
-                          _seeks?.idle.then((_) {
-                            if (mounted && !_scrubbing) c.play();
+                          _session.settled.then((_) {
+                            if (mounted && !_scrubbing) _session.play();
                           });
                         },
                       ),
@@ -429,6 +374,7 @@ class _Controls extends ConsumerWidget {
     required this.controller,
     required this.position,
     required this.gliding,
+    required this.onPlayPause,
     required this.onSeek,
     required this.onScrubStart,
     required this.onScrubEnd,
@@ -443,6 +389,7 @@ class _Controls extends ConsumerWidget {
   /// Whether the playhead should glide between the player's position
   /// reports, which arrive ten times a second.
   final bool gliding;
+  final VoidCallback onPlayPause;
   final ValueChanged<Duration> onSeek;
   final VoidCallback onScrubStart;
   final VoidCallback onScrubEnd;
@@ -491,7 +438,7 @@ class _Controls extends ConsumerWidget {
                       ? CupertinoIcons.pause_fill
                       : CupertinoIcons.play_fill,
                   v.isPlaying ? 'Pause' : 'Play',
-                  () => v.isPlaying ? controller.pause() : controller.play(),
+                  onPlayPause,
                 ),
                 Expanded(
                   child: Text(
