@@ -96,3 +96,9 @@ class _SlideUpInState extends State<SlideUpIn>
     );
   }
 }
+
+/// [children] with each one sliding up in turn; for a page's fixed list.
+List<Widget> staggered(List<Widget> children) => <Widget>[
+  for (final (int i, Widget w) in children.indexed)
+    SlideUpIn(index: i, child: w),
+];

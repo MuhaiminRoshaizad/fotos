@@ -9,6 +9,7 @@ import 'package:photo_manager/photo_manager.dart';
 import '../haptics/app_haptics.dart';
 import '../selection/selection.dart';
 import '../theme/app_tokens.dart';
+import '../widgets/entrance.dart';
 import 'date_scrubber.dart';
 import 'grid_geometry.dart';
 import 'grouping.dart';
@@ -38,6 +39,7 @@ class MediaGrid extends ConsumerStatefulWidget {
     this.grouped = true,
     this.header,
     this.overlayTop = 0,
+    this.animateIn = false,
   });
 
   final List<AssetEntity> items;
@@ -54,6 +56,10 @@ class MediaGrid extends ConsumerStatefulWidget {
   /// Scrolls in above the first group (a large title). Its height is
   /// measured after layout so scroll offsets can be mapped past it.
   final Widget? header;
+
+  /// Rows of tiles slide up as the page opens (needs an [EntranceScope]
+  /// above). For pages the user opened, never for the tab timelines.
+  final bool animateIn;
 
   /// Height of a bar floating over the grid's top edge; the scrubber and
   /// drag-select auto-scroll stay below it.
@@ -335,7 +341,7 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
               itemBuilder: (BuildContext context, int i) {
                 final int index = start + i;
                 final AssetEntity e = g.items[i];
-                return MetaData(
+                final Widget tile = MetaData(
                   metaData: _TileTag(index),
                   behavior: HitTestBehavior.opaque,
                   child: GestureDetector(
@@ -358,6 +364,9 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
                     ),
                   ),
                 );
+                return widget.animateIn
+                    ? SlideUpIn(index: index ~/ columns, child: tile)
+                    : tile;
               },
             ),
           );

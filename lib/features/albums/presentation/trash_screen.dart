@@ -13,6 +13,7 @@ import '../../../core/platform/native_channel.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/toast.dart';
 import 'albums_providers.dart';
@@ -70,43 +71,48 @@ class TrashScreen extends ConsumerWidget {
                         'then Android removes them for good.',
                   ),
                 )
-              : CustomScrollView(
-                  slivers: <Widget>[
-                    SliverToBoxAdapter(child: header),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.lg,
-                          0,
-                          AppSpacing.lg,
-                          AppSpacing.md,
-                        ),
-                        child: Text(
-                          'Android deletes each item for good when its days '
-                          'run out.',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+              : EntranceScope(
+                  child: CustomScrollView(
+                    slivers: <Widget>[
+                      SliverToBoxAdapter(child: header),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.lg,
+                            0,
+                            AppSpacing.lg,
+                            AppSpacing.md,
+                          ),
+                          child: Text(
+                            'Android deletes each item for good when its days '
+                            'run out.',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    SliverGrid.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            mainAxisSpacing: 2,
-                            crossAxisSpacing: 2,
+                      SliverGrid.builder(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                              mainAxisSpacing: 2,
+                              crossAxisSpacing: 2,
+                            ),
+                        itemCount: items.length,
+                        itemBuilder: (BuildContext context, int i) => SlideUpIn(
+                          index: i ~/ 4,
+                          child: _TrashTile(
+                            item: items[i],
+                            onTap: () => _actions(context, ref, items[i]),
                           ),
-                      itemCount: items.length,
-                      itemBuilder: (BuildContext context, int i) => _TrashTile(
-                        item: items[i],
-                        onTap: () => _actions(context, ref, items[i]),
+                        ),
                       ),
-                    ),
-                    SliverToBoxAdapter(child: SizedBox(height: bottom)),
-                  ],
+                      SliverToBoxAdapter(child: SizedBox(height: bottom)),
+                    ],
+                  ),
                 ),
         );
       },

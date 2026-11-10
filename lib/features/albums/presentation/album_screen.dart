@@ -13,6 +13,7 @@ import '../../../core/media/media_repository.dart';
 import '../../../core/media/selection_actions.dart';
 import '../../../core/selection/selection.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
 import '../../viewer/presentation/viewer_screen.dart';
 import '../data/album_prefs.dart';
@@ -175,22 +176,26 @@ class MediaListScreen extends ConsumerWidget {
                       message: emptyMessage,
                     ),
                   )
-                : MediaGrid(
-                    items: data,
-                    level: GridLevel.all,
-                    grouped: grouped,
-                    header: header,
-                    overlayTop: MediaQuery.paddingOf(context).top + kBarHeight,
-                    heroPrefix: owner,
-                    selectionOwner: owner,
-                    selectionActions: () =>
-                        mediaSelectionActions(ref, () => data),
-                    onOpen: (int index) => context.push(
-                      '/viewer',
-                      extra: ViewerArgs(
-                        items: data,
-                        index: index,
-                        heroPrefix: owner,
+                : EntranceScope(
+                    child: MediaGrid(
+                      animateIn: true,
+                      items: data,
+                      level: GridLevel.all,
+                      grouped: grouped,
+                      header: header,
+                      overlayTop:
+                          MediaQuery.paddingOf(context).top + kBarHeight,
+                      heroPrefix: owner,
+                      selectionOwner: owner,
+                      selectionActions: () =>
+                          mediaSelectionActions(ref, () => data),
+                      onOpen: (int index) => context.push(
+                        '/viewer',
+                        extra: ViewerArgs(
+                          items: data,
+                          index: index,
+                          heroPrefix: owner,
+                        ),
                       ),
                     ),
                   ),

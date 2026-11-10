@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/entrance.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../../files/presentation/files_providers.dart';
 import '../data/takeout_repository.dart';
@@ -70,104 +71,112 @@ class _Body extends ConsumerWidget {
     final AsyncValue<List<File>> zips = ref.watch(_takeoutZipsProvider);
     return RefreshIndicator(
       onRefresh: () => ref.refresh(_takeoutZipsProvider.future),
-      child: ListView(
-        padding: EdgeInsets.only(
-          bottom: AppNavMetrics.clearance(MediaQuery.paddingOf(context).bottom),
-        ),
-        children: <Widget>[
-          if (reviews > 0)
-            Card(
-              margin: const EdgeInsets.all(AppSpacing.lg),
-              color: cs.primaryContainer,
-              child: ListTile(
-                leading: const Icon(CupertinoIcons.square_split_1x2),
-                title: Text(
-                  '${Fmt.count(reviews, 'possible duplicate')} to check',
+      child: EntranceScope(
+        child: ListView(
+          padding: EdgeInsets.only(
+            bottom: AppNavMetrics.clearance(
+              MediaQuery.paddingOf(context).bottom,
+            ),
+          ),
+          children: staggered(<Widget>[
+            if (reviews > 0)
+              Card(
+                margin: const EdgeInsets.all(AppSpacing.lg),
+                color: cs.primaryContainer,
+                child: ListTile(
+                  leading: const Icon(CupertinoIcons.square_split_1x2),
+                  title: Text(
+                    '${Fmt.count(reviews, 'possible duplicate')} to check',
+                  ),
+                  subtitle: const Text('Decide which copy to keep.'),
+                  trailing: const Icon(CupertinoIcons.chevron_right),
+                  onTap: () => context.push('/takeout/review'),
                 ),
-                subtitle: const Text('Decide which copy to keep.'),
-                trailing: const Icon(CupertinoIcons.chevron_right),
-                onTap: () => context.push('/takeout/review'),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Text(
+                'How it works',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.lg,
-              AppSpacing.lg,
-              AppSpacing.sm,
+            const _Step(
+              n: 1,
+              text:
+                  'Download each Takeout part to the phone\'s Download folder, '
+                  'one at a time. The phone needs room for the ZIP and its '
+                  'photos together.',
             ),
-            child: Text(
-              'How it works',
-              style: Theme.of(context).textTheme.titleMedium,
+            const _Step(
+              n: 2,
+              text:
+                  'Import it. Photos already on the phone are skipped; possible '
+                  'duplicates wait for you to check.',
             ),
-          ),
-          const _Step(
-            n: 1,
-            text:
-                'Download each Takeout part to the phone\'s Download folder, '
-                'one at a time. The phone needs room for the ZIP and its '
-                'photos together.',
-          ),
-          const _Step(
-            n: 2,
-            text:
-                'Import it. Photos already on the phone are skipped; possible '
-                'duplicates wait for you to check.',
-          ),
-          const _Step(
-            n: 3,
-            text:
-                'Delete the ZIP afterwards to free the space, and keep a copy '
-                'on your PC as a backup.',
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.xl,
-              AppSpacing.lg,
-              AppSpacing.sm,
+            const _Step(
+              n: 3,
+              text:
+                  'Delete the ZIP afterwards to free the space, and keep a copy '
+                  'on your PC as a backup.',
             ),
-            child: Text(
-              'In Download',
-              style: Theme.of(context).textTheme.titleMedium,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.xl,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Text(
+                'In Download',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ),
-          ),
-          ...zips.when(
-            loading: () => const <Widget>[SizedBox.shrink()],
-            error: (_, _) => const <Widget>[
-              ListTile(title: Text('Download couldn\'t be read.')),
-            ],
-            data: (List<File> list) => list.isEmpty
-                ? const <Widget>[
-                    ListTile(
-                      leading: Icon(CupertinoIcons.archivebox),
-                      title: Text('No Takeout ZIPs yet'),
-                      subtitle: Text('Files named takeout-….zip appear here.'),
-                    ),
-                  ]
-                : <Widget>[
-                    for (final File f in list)
+            ...zips.when(
+              loading: () => const <Widget>[SizedBox.shrink()],
+              error: (_, _) => const <Widget>[
+                ListTile(title: Text('Download couldn\'t be read.')),
+              ],
+              data: (List<File> list) => list.isEmpty
+                  ? const <Widget>[
                       ListTile(
-                        leading: const Icon(CupertinoIcons.archivebox),
-                        title: Text(
-                          p.basename(f.path),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(Fmt.size(f.lengthSync())),
-                        trailing: FilledButton.tonal(
-                          onPressed: () => context.push(
-                            Uri(
-                              path: '/takeout/import',
-                              queryParameters: <String, String>{'path': f.path},
-                            ).toString(),
-                          ),
-                          child: const Text('Import'),
+                        leading: Icon(CupertinoIcons.archivebox),
+                        title: Text('No Takeout ZIPs yet'),
+                        subtitle: Text(
+                          'Files named takeout-….zip appear here.',
                         ),
                       ),
-                  ],
-          ),
-        ],
+                    ]
+                  : <Widget>[
+                      for (final File f in list)
+                        ListTile(
+                          leading: const Icon(CupertinoIcons.archivebox),
+                          title: Text(
+                            p.basename(f.path),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(Fmt.size(f.lengthSync())),
+                          trailing: FilledButton.tonal(
+                            onPressed: () => context.push(
+                              Uri(
+                                path: '/takeout/import',
+                                queryParameters: <String, String>{
+                                  'path': f.path,
+                                },
+                              ).toString(),
+                            ),
+                            child: const Text('Import'),
+                          ),
+                        ),
+                    ],
+            ),
+          ]),
+        ),
       ),
     );
   }
