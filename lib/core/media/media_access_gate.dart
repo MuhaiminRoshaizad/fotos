@@ -7,13 +7,21 @@ import '../widgets/empty_state.dart';
 import 'media_providers.dart';
 import 'media_repository.dart';
 
-/// Shows [child] once fotos may read the photo library, and the explanation
-/// and request otherwise. Access is checked again whenever the app resumes,
-/// since the user may have changed it in Settings.
+/// Builds the page once fotos may read the photo library, and the
+/// explanation and request otherwise. Access is checked again whenever the
+/// app resumes, since the user may have changed it in Settings.
+///
+/// [header] (a large title) heads every state: [builder] receives it to
+/// scroll with the content, with the limited-access notice under it.
 class MediaAccessGate extends ConsumerStatefulWidget {
-  const MediaAccessGate({super.key, required this.child});
+  const MediaAccessGate({
+    super.key,
+    required this.builder,
+    this.header = const SizedBox.shrink(),
+  });
 
-  final Widget child;
+  final Widget header;
+  final Widget Function(Widget header) builder;
 
   @override
   ConsumerState<MediaAccessGate> createState() => _MediaAccessGateState();
@@ -45,36 +53,48 @@ class _MediaAccessGateState extends ConsumerState<MediaAccessGate> {
   @override
   Widget build(BuildContext context) {
     final AsyncValue<MediaAccess> access = ref.watch(mediaAccessProvider);
+    Widget headed(Widget state) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        widget.header,
+        Expanded(child: state),
+      ],
+    );
     return access.when(
       skipLoadingOnRefresh: true,
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => EmptyState(
-        icon: CupertinoIcons.exclamationmark_circle,
-        title: 'Couldn\'t check photo access',
-        message: 'Android didn\'t answer. Try again.',
-        actionLabel: 'Try again',
-        onAction: () => ref.invalidate(mediaAccessProvider),
+      loading: () => headed(const SizedBox.shrink()),
+      error: (_, _) => headed(
+        EmptyState(
+          icon: CupertinoIcons.exclamationmark_circle,
+          title: 'Couldn\'t check photo access',
+          message: 'Android didn\'t answer. Try again.',
+          actionLabel: 'Try again',
+          onAction: () => ref.invalidate(mediaAccessProvider),
+        ),
       ),
       data: (MediaAccess a) => switch (a) {
-        MediaAccess.full => widget.child,
-        MediaAccess.limited => Column(
-          children: <Widget>[
-            const _LimitedBanner(),
-            Expanded(child: widget.child),
-          ],
+        MediaAccess.full => widget.builder(widget.header),
+        MediaAccess.limited => widget.builder(
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[widget.header, const _LimitedBanner()],
+          ),
         ),
-        MediaAccess.denied => EmptyState(
-          icon: CupertinoIcons.photo_on_rectangle,
-          title: 'Let fotos show your photos',
-          message: _askedOnce
-              ? 'Access is off. Turn on Photos and videos for fotos in '
-                    'Settings, then come back.'
-              : 'fotos shows the photos and videos on this phone. Nothing '
-                    'leaves the phone.',
-          actionLabel: _askedOnce ? 'Open settings' : 'Allow access',
-          onAction: _askedOnce
-              ? () => ref.read(mediaRepositoryProvider).openAppSettings()
-              : _request,
+        MediaAccess.denied => headed(
+          EmptyState(
+            icon: CupertinoIcons.photo_on_rectangle,
+            title: 'Let fotos show your photos',
+            message: _askedOnce
+                ? 'Access is off. Turn on Photos and videos for fotos in '
+                      'Settings, then come back.'
+                : 'fotos shows the photos and videos on this phone. Nothing '
+                      'leaves the phone.',
+            actionLabel: _askedOnce ? 'Open settings' : 'Allow access',
+            onAction: _askedOnce
+                ? () => ref.read(mediaRepositoryProvider).openAppSettings()
+                : _request,
+          ),
         ),
       },
     );

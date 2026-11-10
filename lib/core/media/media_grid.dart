@@ -36,6 +36,8 @@ class MediaGrid extends ConsumerStatefulWidget {
     this.selectionOwner,
     this.selectionActions,
     this.grouped = true,
+    this.header,
+    this.overlayTop = 0,
   });
 
   final List<AssetEntity> items;
@@ -49,12 +51,21 @@ class MediaGrid extends ConsumerStatefulWidget {
   /// False for albums sorted by name or size, where date headings mislead.
   final bool grouped;
 
+  /// Scrolls in above the first group (a large title). Its height is
+  /// measured after layout so scroll offsets can be mapped past it.
+  final Widget? header;
+
+  /// Height of a bar floating over the grid's top edge; the scrubber and
+  /// drag-select auto-scroll stay below it.
+  final double overlayTop;
+
   @override
   ConsumerState<MediaGrid> createState() => _MediaGridState();
 }
 
 class _MediaGridState extends ConsumerState<MediaGrid> {
   ScrollController _scroll = ScrollController();
+  double _headerExtent = 0;
   GridGeometry? _geometry;
   int? _anchorItem;
 
@@ -74,7 +85,7 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
     super.didUpdateWidget(old);
     if (old.level != widget.level && _geometry != null) {
       final double offset = _scroll.hasClients ? _scroll.offset : 0;
-      _anchorItem = _geometry!.itemAt(offset);
+      _anchorItem = _geometry!.itemAt(_gridOffset(offset));
     }
   }
 
@@ -84,6 +95,10 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
     _autoScroll?.cancel();
     super.dispose();
   }
+
+  /// A scroll offset measured from the first group instead of the header.
+  double _gridOffset(double offset) =>
+      (offset - _headerExtent).clamp(0, double.infinity).toDouble();
 
   List<MediaGroup<AssetEntity>> get _groups => widget.grouped
       ? groupByDate(
@@ -161,7 +176,8 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
     final double y = box.globalToLocal(g).dy;
     const double zone = 80;
     double delta = 0;
-    if (y < zone) delta = -(zone - y) / 4;
+    final double top = widget.overlayTop;
+    if (y < top + zone) delta = -(top + zone - y) / 4;
     if (y > box.size.height - zone - AppNavMetrics.height) {
       delta = (y - (box.size.height - zone - AppNavMetrics.height)) / 4;
     }
@@ -185,7 +201,6 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
     if (_canSelect && state.isActiveFor(widget.selectionOwner!)) {
       final SelectionNotifier sel = ref.read(selectionProvider.notifier);
       sel.toggle(widget.items[index].id);
-      if (ref.read(selectionProvider).ids.isEmpty) sel.clear();
       return;
     }
     widget.onOpen(index);
@@ -260,7 +275,9 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
         );
         _geometry = geo;
         if (_anchorItem != null) {
-          final double target = geo.offsetOf(_anchorItem!);
+          final double target =
+              geo.offsetOf(_anchorItem!) +
+              (_anchorItem! == 0 ? 0 : _headerExtent);
           _anchorItem = null;
           // The outgoing grid still animates out on the old controller, so it
           // is disposed only after the switch finishes.
@@ -270,7 +287,15 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
         }
 
         int flat = 0;
-        final List<Widget> slivers = <Widget>[];
+        final List<Widget> slivers = <Widget>[
+          if (widget.header != null)
+            SliverToBoxAdapter(
+              child: _MeasureHeight(
+                onHeight: (double h) => _headerExtent = h,
+                child: widget.header!,
+              ),
+            ),
+        ];
         for (final MediaGroup<AssetEntity> g in groups) {
           final int start = flat;
           if (widget.grouped) {
@@ -371,13 +396,14 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
               ),
               if (widget.grouped)
                 Positioned(
-                  top: 0,
+                  top: widget.overlayTop,
                   right: 0,
                   bottom: bottom - AppSpacing.lg,
                   child: DateScrubber(
                     controller: _scroll,
-                    labelAt: (double offset) =>
-                        groups.isEmpty ? '' : groups[geo.groupAt(offset)].label,
+                    labelAt: (double offset) => groups.isEmpty
+                        ? ''
+                        : groups[geo.groupAt(_gridOffset(offset))].label,
                   ),
                 ),
             ],
@@ -385,5 +411,34 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
         );
       },
     );
+  }
+}
+
+/// Reports its child's height after each layout, without rebuilding anything.
+class _MeasureHeight extends SingleChildRenderObjectWidget {
+  const _MeasureHeight({required this.onHeight, required Widget super.child});
+
+  final ValueChanged<double> onHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderMeasureHeight(onHeight);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderMeasureHeight renderObject,
+  ) => renderObject.onHeight = onHeight;
+}
+
+class _RenderMeasureHeight extends RenderProxyBox {
+  _RenderMeasureHeight(this.onHeight);
+
+  ValueChanged<double> onHeight;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    onHeight(size.height);
   }
 }

@@ -1,9 +1,11 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoMenuAnchor, CupertinoMenuItem;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import '../../../core/format/formatters.dart';
 import '../../../core/media/grid_skeleton.dart';
 import '../../../core/media/grouping.dart';
 import '../../../core/media/media_access_gate.dart';
@@ -12,8 +14,8 @@ import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/media/selection_actions.dart';
 import '../../../core/selection/selection.dart';
-import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/large_title_scaffold.dart';
 import '../../viewer/presentation/viewer_screen.dart';
 
 enum LibraryKind {
@@ -41,112 +43,121 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   String get _owner => widget.kind.name;
 
+  List<SelectionAction> _actions() => mediaSelectionActions(
+    ref,
+    () => _items,
+    onViewAlbum: (String name) async {
+      final List<Album> albums = await ref.read(albumsProvider.future);
+      final Album? a = albums.where((Album x) => x.name == name).firstOrNull;
+      if (!mounted) return;
+      context.go(a == null ? '/albums' : '/albums/folder/${a.id}');
+    },
+  );
+
   @override
   Widget build(BuildContext context) {
-    final bool selecting = ref.watch(
-      selectionProvider.select((SelectionState s) => s.isActiveFor(_owner)),
-    );
+    final SelectionState sel = ref.watch(selectionProvider);
+    final bool selecting = sel.isActiveFor(_owner);
+    final SelectionNotifier selection = ref.read(selectionProvider.notifier);
+    final List<AssetEntity>? loaded = ref
+        .watch(libraryProvider(widget.kind.media))
+        .value;
+    final int? count = loaded?.length;
+    final bool photos = widget.kind == LibraryKind.photos;
+    final int n = sel.ids.length;
     return PopScope(
       canPop: !selecting,
       onPopInvokedWithResult: (bool didPop, _) {
-        if (!didPop) ref.read(selectionProvider.notifier).clear();
+        if (!didPop) selection.clear();
       },
-      child: Scaffold(
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  AppSpacing.xs,
-                  AppSpacing.xs,
+      child: LargeTitleScaffold(
+        title: widget.kind.title,
+        // Always present, so the title block keeps its height while loading.
+        subtitle: count == null
+            ? ''
+            : Fmt.count(count, photos ? 'photo' : 'video'),
+        barTitle: selecting ? (n == 0 ? 'Select items' : '$n selected') : null,
+        leading: selecting
+            ? BarButton.text(
+                label: 'Select all',
+                onPressed: () => selection.setIds(
+                  _items.map((AssetEntity e) => e.id).toSet(),
                 ),
-                child: SizedBox(
-                  height: 48,
-                  child: AnimatedSwitcher(
-                    duration: AppMotion.short,
-                    child: selecting
-                        ? SelectionHeader(
-                            allIds: () =>
-                                _items.map((AssetEntity e) => e.id).toSet(),
-                          )
-                        : Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: Text(
-                                  widget.kind.title,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineMedium
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              _LevelMenu(
-                                level: _level,
-                                onChanged: (GridLevel l) =>
-                                    setState(() => _level = l),
-                              ),
-                            ],
-                          ),
-                  ),
+              )
+            : null,
+        trailing: selecting
+            ? <Widget>[
+                BarButton.text(
+                  label: 'Done',
+                  prominent: true,
+                  onPressed: selection.clear,
                 ),
-              ),
-              Expanded(child: MediaAccessGate(child: _body())),
-            ],
-          ),
-        ),
+              ]
+            : <Widget>[
+                BarButton.text(
+                  label: 'Select',
+                  onPressed: (loaded?.isEmpty ?? true)
+                      ? null
+                      : () => selection.start(_owner, _actions()),
+                ),
+                _LevelMenu(
+                  level: _level,
+                  onChanged: (GridLevel l) => setState(() => _level = l),
+                ),
+              ],
+        body: (BuildContext context, Widget header) =>
+            MediaAccessGate(header: header, builder: _body),
       ),
     );
   }
 
-  Widget _body() {
+  Widget _body(Widget header) {
     final AsyncValue<List<AssetEntity>> items = ref.watch(
       libraryProvider(widget.kind.media),
     );
+    Widget headed(Widget state) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        header,
+        Expanded(child: state),
+      ],
+    );
     return items.when(
       skipLoadingOnRefresh: true,
-      loading: () => GridSkeleton(level: _level),
-      error: (_, _) => EmptyState(
-        icon: CupertinoIcons.exclamationmark_circle,
-        title: 'Couldn\'t load your ${widget.kind.title.toLowerCase()}',
-        message: 'Something went wrong reading the photo library.',
-        actionLabel: 'Try again',
-        onAction: () => ref.invalidate(libraryProvider(widget.kind.media)),
+      loading: () => headed(GridSkeleton(level: _level)),
+      error: (_, _) => headed(
+        EmptyState(
+          icon: CupertinoIcons.exclamationmark_circle,
+          title: 'Couldn\'t load your ${widget.kind.title.toLowerCase()}',
+          message: 'Something went wrong reading the photo library.',
+          actionLabel: 'Try again',
+          onAction: () => ref.invalidate(libraryProvider(widget.kind.media)),
+        ),
       ),
       data: (List<AssetEntity> list) {
         if (list.isEmpty) {
           final bool photos = widget.kind == LibraryKind.photos;
-          return EmptyState(
-            icon: photos
-                ? CupertinoIcons.photo_on_rectangle
-                : CupertinoIcons.play_rectangle,
-            title: photos ? 'No photos yet' : 'No videos yet',
-            message: photos
-                ? 'Photos you take or import appear here.'
-                : 'Videos you record or import appear here.',
+          return headed(
+            EmptyState(
+              icon: photos
+                  ? CupertinoIcons.photo_on_rectangle
+                  : CupertinoIcons.play_rectangle,
+              title: photos ? 'No photos yet' : 'No videos yet',
+              message: photos
+                  ? 'Photos you take or import appear here.'
+                  : 'Videos you record or import appear here.',
+            ),
           );
         }
         _items = list;
         return MediaGrid(
           items: list,
           level: _level,
+          header: header,
+          overlayTop: MediaQuery.paddingOf(context).top + kBarHeight,
           heroPrefix: widget.kind.name,
           selectionOwner: _owner,
-          selectionActions: () => mediaSelectionActions(
-            ref,
-            () => _items,
-            onViewAlbum: (String name) async {
-              final List<Album> albums = await ref.read(albumsProvider.future);
-              final Album? a = albums
-                  .where((Album x) => x.name == name)
-                  .firstOrNull;
-              if (!mounted) return;
-              context.go(a == null ? '/albums' : '/albums/folder/${a.id}');
-            },
-          ),
+          selectionActions: _actions,
           onLevelChanged: (GridLevel l) => setState(() => _level = l),
           onOpen: (int index) => context.push(
             '/viewer',
@@ -171,19 +182,23 @@ class _LevelMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<GridLevel>(
-      tooltip: 'Grid size',
-      icon: const Icon(CupertinoIcons.square_grid_2x2),
-      initialValue: level,
-      onSelected: onChanged,
-      itemBuilder: (_) => <PopupMenuEntry<GridLevel>>[
+    return CupertinoMenuAnchor(
+      menuChildren: <Widget>[
         for (final GridLevel l in GridLevel.values)
-          CheckedPopupMenuItem<GridLevel>(
-            value: l,
-            checked: l == level,
+          CupertinoMenuItem(
+            onPressed: () => onChanged(l),
+            trailing: l == level
+                ? const Icon(CupertinoIcons.checkmark, size: 18)
+                : null,
             child: Text(l.label),
           ),
       ],
+      builder: (BuildContext context, MenuController menu, Widget? child) =>
+          BarButton.icon(
+            icon: CupertinoIcons.square_grid_2x2,
+            tooltip: 'Grid size',
+            onPressed: () => menu.isOpen ? menu.close() : menu.open(),
+          ),
     );
   }
 }

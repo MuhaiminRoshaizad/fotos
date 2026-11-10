@@ -15,61 +15,42 @@ import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/inset_group.dart';
+import '../../../core/widgets/large_title_scaffold.dart';
 import '../data/album_prefs.dart';
 import 'album_sheets.dart';
 import 'albums_providers.dart';
 import 'new_album.dart';
 
 /// The Albums tab: pinned albums first, then every folder holding media, then
-/// Favourites and Recently deleted.
+/// Favourites, Recently deleted and the Takeout import as grouped rows.
 class AlbumsScreen extends ConsumerWidget {
   const AlbumsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.xs,
-                AppSpacing.xs,
-              ),
-              child: SizedBox(
-                height: 48,
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Albums',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'New album',
-                      onPressed: () => createAlbum(context, ref),
-                      icon: const Icon(CupertinoIcons.plus),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const Expanded(child: MediaAccessGate(child: _AlbumsBody())),
-          ],
+    return LargeTitleScaffold(
+      title: 'Albums',
+      grouped: true,
+      trailing: <Widget>[
+        BarButton.icon(
+          icon: CupertinoIcons.plus,
+          tooltip: 'New album',
+          onPressed: () => createAlbum(context, ref),
         ),
+      ],
+      body: (BuildContext context, Widget header) => MediaAccessGate(
+        header: header,
+        builder: (Widget h) => _AlbumsBody(header: h),
       ),
     );
   }
 }
 
 class _AlbumsBody extends ConsumerWidget {
-  const _AlbumsBody();
+  const _AlbumsBody({required this.header});
+
+  final Widget header;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -81,15 +62,24 @@ class _AlbumsBody extends ConsumerWidget {
     final double bottom = AppNavMetrics.clearance(
       MediaQuery.paddingOf(context).bottom,
     );
+    Widget headed(Widget state) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        header,
+        Expanded(child: state),
+      ],
+    );
     return albums.when(
       skipLoadingOnRefresh: true,
-      loading: () => const _AlbumsSkeleton(),
-      error: (_, _) => EmptyState(
-        icon: CupertinoIcons.exclamationmark_circle,
-        title: 'Couldn\'t load your albums',
-        message: 'Something went wrong reading the photo library.',
-        actionLabel: 'Try again',
-        onAction: () => ref.invalidate(albumsProvider),
+      loading: () => headed(const _AlbumsSkeleton()),
+      error: (_, _) => headed(
+        EmptyState(
+          icon: CupertinoIcons.exclamationmark_circle,
+          title: 'Couldn\'t load your albums',
+          message: 'Something went wrong reading the photo library.',
+          actionLabel: 'Try again',
+          onAction: () => ref.invalidate(albumsProvider),
+        ),
       ),
       data: (List<Album> list) {
         final List<Album> pinned = <Album>[
@@ -111,13 +101,16 @@ class _AlbumsBody extends ConsumerWidget {
             }
           });
         }
+        final int favourites = ref.watch(favouritesProvider).value?.length ?? 0;
+        final int trashed = ref.watch(trashProvider).value?.length ?? 0;
         return CustomScrollView(
           slivers: <Widget>[
+            SliverToBoxAdapter(child: header),
             if (pinned.isNotEmpty) ...<Widget>[
-              const _Section(title: 'Pinned', icon: CupertinoIcons.pin),
+              const SliverToBoxAdapter(child: GroupHeading('Pinned')),
               _AlbumGrid(albums: pinned, prefs: prefs),
             ],
-            const _Section(title: 'On this phone'),
+            const SliverToBoxAdapter(child: GroupHeading('On this phone')),
             if (list.isEmpty && pending.isEmpty)
               const SliverToBoxAdapter(
                 child: Padding(
@@ -127,27 +120,39 @@ class _AlbumsBody extends ConsumerWidget {
               )
             else
               _AlbumGrid(albums: rest, prefs: prefs, empty: pending),
-            const _Section(title: 'More'),
-            SliverList.list(
-              children: <Widget>[
-                _MoreRow(
-                  icon: CupertinoIcons.heart,
-                  label: 'Favourites',
-                  count: ref.watch(favouritesProvider).value?.length,
-                  onTap: () => context.push('/albums/favourites'),
-                ),
-                _MoreRow(
-                  icon: CupertinoIcons.trash,
-                  label: 'Recently deleted',
-                  count: ref.watch(trashProvider).value?.length,
-                  onTap: () => context.push('/albums/trash'),
-                ),
-                _MoreRow(
-                  icon: CupertinoIcons.arrow_down_circle,
-                  label: 'Import from Google Takeout',
-                  onTap: () => context.push('/albums/takeout'),
-                ),
-              ],
+            SliverToBoxAdapter(
+              child: InsetGroup(
+                header: 'Library',
+                children: <Widget>[
+                  GroupRow(
+                    leading: const Icon(CupertinoIcons.heart),
+                    title: 'Favourites',
+                    value: favourites == 0 ? null : '$favourites',
+                    onTap: () => context.push('/albums/favourites'),
+                  ),
+                  GroupRow(
+                    leading: const Icon(CupertinoIcons.trash),
+                    title: 'Recently deleted',
+                    value: trashed == 0 ? null : '$trashed',
+                    onTap: () => context.push('/albums/trash'),
+                  ),
+                ],
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: InsetGroup(
+                header: 'Bring photos home',
+                footer:
+                    'Pick the ZIPs from your Takeout export. Locked Folder '
+                    'items are skipped and counted.',
+                children: <Widget>[
+                  GroupRow(
+                    leading: const Icon(CupertinoIcons.arrow_down_circle),
+                    title: 'Import from Google Takeout',
+                    onTap: () => context.push('/albums/takeout'),
+                  ),
+                ],
+              ),
             ),
             SliverToBoxAdapter(child: SizedBox(height: bottom)),
           ],
@@ -157,51 +162,11 @@ class _AlbumsBody extends ConsumerWidget {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, this.icon});
-  final String title;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.md,
-        ),
-        child: Row(
-          children: <Widget>[
-            if (icon != null) ...<Widget>[
-              Icon(
-                icon,
-                size: AppIconSize.badge,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: AppSpacing.xs),
-            ],
-            Flexible(
-              child: Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Columns of album tiles at this screen width: three on phones, more on
+/// Columns of album tiles at this screen width: two on phones, more on
 /// tablets so covers stay a sensible size.
 int _albumColumns(BuildContext context) {
   final double width = MediaQuery.sizeOf(context).width;
-  return width >= 900 ? 6 : (width >= 600 ? 4 : 3);
+  return width >= 900 ? 5 : (width >= 600 ? 4 : 2);
 }
 
 /// Height of one album tile: the square cover plus two lines of text at the
@@ -417,39 +382,6 @@ class _EmptyAlbumTile extends ConsumerWidget {
   }
 }
 
-class _MoreRow extends StatelessWidget {
-  const _MoreRow({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.count,
-  });
-
-  final IconData icon;
-  final String label;
-  final int? count;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(label),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (count != null && count! > 0)
-            Text('$count', style: TextStyle(color: cs.onSurfaceVariant)),
-          const SizedBox(width: AppSpacing.xs),
-          Icon(CupertinoIcons.chevron_right, color: cs.onSurfaceVariant),
-        ],
-      ),
-      onTap: onTap,
-    );
-  }
-}
-
 class _AlbumsSkeleton extends StatelessWidget {
   const _AlbumsSkeleton();
 
@@ -461,7 +393,8 @@ class _AlbumsSkeleton extends StatelessWidget {
       child: GridView.builder(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg,
-          AppSpacing.xxl + AppSpacing.lg,
+          // Where the grid starts under the "On this phone" heading.
+          AppSpacing.xl + 24 + AppSpacing.sm,
           AppSpacing.lg,
           0,
         ),
