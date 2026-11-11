@@ -50,7 +50,17 @@ class AlbumScreen extends ConsumerWidget {
               BarButton.icon(
                 icon: CupertinoIcons.ellipsis,
                 tooltip: 'Album options',
-                onPressed: () => showAlbumOptions(context, ref, album),
+                onPressed: () async {
+                  final Album? renamed = await showAlbumOptions(
+                    context,
+                    ref,
+                    album,
+                  );
+                  // A renamed folder has a new id, so this page follows it.
+                  if (renamed != null && context.mounted) {
+                    context.replace('/albums/folder/${renamed.id}');
+                  }
+                },
               ),
             ],
     );

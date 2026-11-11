@@ -33,3 +33,16 @@ final emptyAlbumsProvider =
 
 /// Where an album's files live; new albums go under Pictures.
 String albumFolder(String name) => 'Pictures/$name/';
+
+/// The folder beside [relativePath] (as MediaStore writes it, ending in /)
+/// that is called [name]: Pictures/Trip/ renamed to Holiday is
+/// Pictures/Holiday/.
+String renamedFolder(String relativePath, String name) {
+  final List<String> parts = relativePath
+      .split('/')
+      .where((String p) => p.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return '$name/';
+  parts[parts.length - 1] = name;
+  return '${parts.join('/')}/';
+}

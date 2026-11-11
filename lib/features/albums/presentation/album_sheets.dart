@@ -9,7 +9,10 @@ import '../../../core/format/formatters.dart';
 import '../../../core/media/media_actions.dart';
 import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
+import '../../../core/media/empty_albums.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/validation/validators.dart';
+import '../../../core/widgets/batch_progress.dart';
 import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/dialogs.dart';
@@ -19,6 +22,7 @@ import '../data/album_prefs.dart';
 /// What can be done to an album from its menu.
 enum AlbumOption {
   pin('Pin to top', CupertinoIcons.pin),
+  rename('Rename', CupertinoIcons.pencil),
   cover('Change cover', CupertinoIcons.photo),
   sort('Sort', CupertinoIcons.arrow_up_arrow_down),
   delete('Delete album', CupertinoIcons.trash);
@@ -33,13 +37,26 @@ enum AlbumOption {
       this == AlbumOption.pin && pinned ? 'Unpin' : label;
 }
 
+/// Camera and Screenshots keep their folder names: the camera app and
+/// Android's screenshot tool write to those folders by name.
+bool albumCanBeRenamed(Album album) =>
+    !<String>{'camera', 'screenshots'}.contains(album.name.toLowerCase());
+
+/// The options [album]'s menu offers.
+List<AlbumOption> albumOptionsFor(Album album) => <AlbumOption>[
+  for (final AlbumOption o in AlbumOption.values)
+    if (o != AlbumOption.rename || albumCanBeRenamed(album)) o,
+];
+
 bool albumIsPinned(WidgetRef ref, Album album) =>
     (ref.read(albumPrefsProvider).value ?? const AlbumPrefs()).pinned.contains(
       album.id,
     );
 
 /// The album's menu as an action sheet, for the button inside an album.
-Future<void> showAlbumOptions(
+/// Returns the album under its new name when it was renamed, since that
+/// gives it a new id.
+Future<Album?> showAlbumOptions(
   BuildContext context,
   WidgetRef ref,
   Album album,
@@ -49,7 +66,7 @@ Future<void> showAlbumOptions(
     context,
     title: album.name,
     choices: <SheetChoice<AlbumOption>>[
-      for (final AlbumOption o in AlbumOption.values)
+      for (final AlbumOption o in albumOptionsFor(album))
         SheetChoice<AlbumOption>(
           o,
           o.labelFor(pinned: pinned),
@@ -57,11 +74,12 @@ Future<void> showAlbumOptions(
         ),
     ],
   );
-  if (choice == null || !context.mounted) return;
-  await runAlbumOption(context, ref, album, choice);
+  if (choice == null || !context.mounted) return null;
+  return runAlbumOption(context, ref, album, choice);
 }
 
-Future<void> runAlbumOption(
+/// Runs [option] on [album]. Returns the renamed album after a rename.
+Future<Album?> runAlbumOption(
   BuildContext context,
   WidgetRef ref,
   Album album,
@@ -77,6 +95,8 @@ Future<void> runAlbumOption(
           pinned ? 'Unpinned ${album.name}' : 'Pinned ${album.name}',
         );
       }
+    case AlbumOption.rename:
+      return renameAlbum(context, ref, album);
     case AlbumOption.cover:
       await pickAlbumCover(context, ref, album);
     case AlbumOption.sort:
@@ -84,6 +104,72 @@ Future<void> runAlbumOption(
     case AlbumOption.delete:
       await deleteAlbum(context, ref, album);
   }
+  return null;
+}
+
+/// Renames [album] by moving its items into a folder of the new name beside
+/// the old one, so other apps see the new name too. Its pin, cover and sort
+/// follow it to the new folder's id. Returns the album under its new name.
+Future<Album?> renameAlbum(
+  BuildContext context,
+  WidgetRef ref,
+  Album album,
+) async {
+  final List<Album> albums = await ref.read(albumsProvider.future);
+  if (!context.mounted) return null;
+  final String? name = await promptName(
+    context,
+    title: 'Rename album',
+    label: 'Album name',
+    hint: 'e.g. Holiday 2026',
+    confirmLabel: 'Rename',
+    initial: album.name,
+    validate: (String v) => validateFolderName(v, <String>[
+      for (final Album a in albums)
+        if (a.id != album.id) a.name,
+    ]),
+  );
+  if (name == null || name == album.name || !context.mounted) return null;
+
+  final String? from = await album.path.relativePathAsync;
+  if (from == null || !context.mounted) return null;
+  final String target = renamedFolder(from, name);
+  final MediaRepository repo = ref.read(mediaRepositoryProvider);
+  final List<AssetEntity> items = await repo.albumItems(album);
+  if (!context.mounted) return null;
+  // Android moves the whole set in one request, so the bar runs until it
+  // answers.
+  final int failed = await runBatch<List<AssetEntity>>(
+    context,
+    verb: 'Renaming',
+    doneVerb: 'Renamed',
+    what: album.name,
+    items: <List<AssetEntity>>[items],
+    each: (List<AssetEntity> all) async {
+      if (!await repo.moveTo(all, target)) throw Exception('not moved');
+    },
+  );
+  ref.invalidate(libraryProvider);
+  ref.invalidate(albumsProvider);
+  if (failed > 0) {
+    if (context.mounted) {
+      showToast(context, 'Couldn\'t rename ${album.name}.', failed: true);
+    }
+    return null;
+  }
+  final List<Album> after = await ref.read(albumsProvider.future);
+  Album? renamed;
+  for (final Album a in after) {
+    if (a.name == name && await a.path.relativePathAsync == target) {
+      renamed = a;
+      break;
+    }
+  }
+  if (renamed != null) {
+    await ref.read(albumPrefsProvider.notifier).rekey(album.id, renamed.id);
+  }
+  if (context.mounted) showToast(context, 'Renamed to $name');
+  return renamed;
 }
 
 Future<void> pickAlbumCover(

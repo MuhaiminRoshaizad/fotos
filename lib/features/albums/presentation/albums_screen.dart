@@ -334,7 +334,7 @@ class _AlbumTile extends ConsumerWidget {
                 ),
         ),
         actions: <LiftAction<AlbumOption>>[
-          for (final AlbumOption o in AlbumOption.values)
+          for (final AlbumOption o in albumOptionsFor(album))
             LiftAction<AlbumOption>(
               o,
               o.labelFor(pinned: pinned),
