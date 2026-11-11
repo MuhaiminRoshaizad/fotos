@@ -93,23 +93,26 @@ class _SplashPluckState extends ConsumerState<SplashPluck>
 
   @override
   Widget build(BuildContext context) {
-    if (_done) return widget.child;
     final ColorScheme cs = Theme.of(context).colorScheme;
+    // The app keeps its place in the tree when the flower goes. Returning
+    // the child on its own instead would rebuild the whole app beneath, and
+    // a photo opened from another app during launch lost which photo it was.
     return Stack(
       fit: StackFit.expand,
       children: <Widget>[
         widget.child,
-        IgnorePointer(
-          child: ExcludeSemantics(
-            child: CustomPaint(
-              painter: _FlowerPainter(
-                progress: _c,
-                background: cs.surface,
-                core: cs.onSurface,
+        if (!_done)
+          IgnorePointer(
+            child: ExcludeSemantics(
+              child: CustomPaint(
+                painter: _FlowerPainter(
+                  progress: _c,
+                  background: cs.surface,
+                  core: cs.onSurface,
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }

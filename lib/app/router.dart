@@ -31,6 +31,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: '/viewer',
         parentNavigatorKey: rootNavigatorKey,
+        // The viewer is only ever pushed with its items; rebuilt from its
+        // address alone it has nothing to show, so go to Photos instead.
+        redirect: (_, GoRouterState state) =>
+            state.extra is ViewerArgs ? null : '/photos',
         pageBuilder: (BuildContext context, GoRouterState state) =>
             CustomTransitionPage<void>(
               key: state.pageKey,
