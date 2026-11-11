@@ -25,6 +25,19 @@ final isMotionPhotoProvider = FutureProvider.family<bool, AssetEntity>((
   return ref.watch(nativeChannelProvider).isMotionPhoto(file.path);
 });
 
+/// The id of the Motion Photo whose video is on screen now, for its badge
+/// to show.
+class MotionPlaying extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? id) => state = id;
+}
+
+final motionPlayingProvider = NotifierProvider<MotionPlaying, String?>(
+  MotionPlaying.new,
+);
+
 /// A photo in the viewer that plays its motion while it is held, as iOS
 /// plays a Live Photo: press and hold, the video fades in over the still
 /// and plays; let go and the still returns. A plain photo is drawn as it
@@ -70,12 +83,14 @@ class _MotionPhotoState extends ConsumerState<MotionPhoto> {
       _c = c;
       _showing = true;
     });
+    ref.read(motionPlayingProvider.notifier).set(widget.asset.id);
     await c.play();
   }
 
   void _stop() {
     _held = false;
     if (_c == null) return;
+    ref.read(motionPlayingProvider.notifier).set(null);
     // Fade back to the still, then let the player go.
     setState(() => _showing = false);
     final VideoPlayerController c = _c!;
@@ -129,7 +144,9 @@ class _MotionPhotoState extends ConsumerState<MotionPhoto> {
   }
 }
 
-/// The mark on a Motion Photo in the viewer, under the top bar.
+/// The mark on a Motion Photo in the viewer, under the top bar. While the
+/// photo's video plays, rings spread from the glyph, the way ripples leave
+/// a point: the picture is moving.
 class MotionBadge extends ConsumerWidget {
   const MotionBadge({super.key, required this.asset});
 
@@ -139,23 +156,22 @@ class MotionBadge extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bool motion = ref.watch(isMotionPhotoProvider(asset)).value ?? false;
     if (!motion) return const SizedBox.shrink();
+    final bool playing = ref.watch(motionPlayingProvider) == asset.id;
     return Semantics(
-      label: 'Motion Photo. Press and hold the photo to play it.',
+      label: playing
+          ? 'Motion Photo, playing.'
+          : 'Motion Photo. Press and hold the photo to play it.',
       excludeSemantics: true,
-      child: const ViewerGlass(
-        shape: StadiumBorder(),
+      child: ViewerGlass(
+        shape: const StadiumBorder(),
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(
-                CupertinoIcons.smallcircle_circle,
-                size: 16,
-                color: Colors.white,
-              ),
-              SizedBox(width: 6),
-              Text(
+              _Ripple(active: playing),
+              const SizedBox(width: 6),
+              const Text(
                 'MOTION',
                 style: TextStyle(
                   color: Colors.white,
@@ -170,4 +186,91 @@ class MotionBadge extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The badge's glyph, with two rings that grow and fade in turn while
+/// [active]. Still when animations are turned off.
+class _Ripple extends StatefulWidget {
+  const _Ripple({required this.active});
+  final bool active;
+
+  @override
+  State<_Ripple> createState() => _RippleState();
+}
+
+class _RippleState extends State<_Ripple> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(_Ripple old) {
+    super.didUpdateWidget(old);
+    _sync();
+  }
+
+  void _sync() {
+    final bool run = widget.active && !MediaQuery.disableAnimationsOf(context);
+    if (run && !_c.isAnimating) {
+      _c.repeat();
+    } else if (!run && _c.isAnimating) {
+      _c
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 16,
+    height: 16,
+    child: AnimatedBuilder(
+      animation: _c,
+      builder: (BuildContext context, Widget? glyph) => Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: <Widget>[
+          if (_c.isAnimating)
+            for (final double phase in const <double>[0, 0.5])
+              _ring((_c.value + phase) % 1),
+          glyph!,
+        ],
+      ),
+      child: Icon(
+        widget.active
+            ? CupertinoIcons.smallcircle_fill_circle
+            : CupertinoIcons.smallcircle_circle,
+        size: 16,
+        color: Colors.white,
+      ),
+    ),
+  );
+
+  Widget _ring(double t) => Transform.scale(
+    scale: 1 + 0.9 * t,
+    child: Container(
+      width: 16,
+      height: 16,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.7 * (1 - t)),
+          width: 1.2,
+        ),
+      ),
+    ),
+  );
 }

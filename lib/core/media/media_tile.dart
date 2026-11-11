@@ -1,3 +1,4 @@
+import 'motion_name.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -120,6 +121,20 @@ class MediaTile extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                if (!video && !selecting && looksLikeMotionPhoto(asset.title))
+                  const Positioned(
+                    right: 5,
+                    top: 5,
+                    child: Icon(
+                      CupertinoIcons.smallcircle_circle,
+                      size: AppIconSize.badge,
+                      color: Colors.white,
+                      semanticLabel: 'Motion Photo',
+                      shadows: <Shadow>[
+                        Shadow(blurRadius: 3, color: Colors.black87),
+                      ],
                     ),
                   ),
                 if (asset.isFavorite)
