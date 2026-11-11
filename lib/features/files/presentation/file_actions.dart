@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart'
-    show CupertinoAlertDialog, showCupertinoDialog;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +14,7 @@ import '../../../core/platform/native_channel.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/validation/validators.dart';
 import '../../../core/widgets/app_sheet.dart';
+import '../../../core/widgets/batch_progress.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
@@ -247,106 +246,6 @@ Future<bool> shareEntries(BuildContext context, List<FileEntry> entries) async {
   return true;
 }
 
-/// Runs [each] over [entries] behind a progress dialog that can't be
-/// dismissed, so the user sees how far a long move has got and can't walk
-/// away from it half done. Returns how many failed.
-Future<int> _runBatch(
-  BuildContext context, {
-  required String verb,
-  required List<FileEntry> entries,
-  required bool show,
-  required Future<void> Function(FileEntry entry) each,
-}) async {
-  final ValueNotifier<int> done = ValueNotifier<int>(0);
-  final NavigatorState navigator = Navigator.of(context, rootNavigator: true);
-  if (show) {
-    unawaited(
-      showCupertinoDialog<void>(
-        context: context,
-        useRootNavigator: true,
-        builder: (BuildContext ctx) => PopScope(
-          canPop: false,
-          child: _BatchProgress(verb: verb, entries: entries, done: done),
-        ),
-      ),
-    );
-  }
-  int failed = 0;
-  for (final FileEntry e in entries) {
-    try {
-      await each(e);
-    } on FileSystemException {
-      failed++;
-    }
-    done.value++;
-  }
-  if (show) {
-    // Long enough to see the bar reach the end.
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    navigator.pop();
-  }
-  done.dispose();
-  return failed;
-}
-
-class _BatchProgress extends StatelessWidget {
-  const _BatchProgress({
-    required this.verb,
-    required this.entries,
-    required this.done,
-  });
-
-  final String verb;
-  final List<FileEntry> entries;
-  final ValueNotifier<int> done;
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    final int total = entries.length;
-    return CupertinoAlertDialog(
-      title: Text('$verb ${describeEntries(entries)}'),
-      content: ValueListenableBuilder<int>(
-        valueListenable: done,
-        builder: (BuildContext context, int n, _) => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const SizedBox(height: AppSpacing.md),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadii.pill),
-              // The bar glides to each new count instead of jumping.
-              child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(end: total == 0 ? 1 : n / total),
-                duration: AppMotion.medium,
-                curve: Curves.easeOut,
-                builder: (_, double v, _) => LinearProgressIndicator(
-                  value: v,
-                  minHeight: 6,
-                  backgroundColor: cs.onSurface.withValues(alpha: 0.12),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              n >= total ? 'Finishing…' : '${n + 1} of $total',
-              style: const TextStyle(
-                fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
-              ),
-            ),
-            if (n < total)
-              Text(
-                entries[n].name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Asks for a folder once, then moves or copies every entry into it.
 /// Returns whether anything was attempted.
 Future<bool> transferEntries(
@@ -375,18 +274,23 @@ Future<bool> transferEntries(
   final repo = ref.read(filesRepositoryProvider);
   final Set<String> taken = await repo.namesIn(dir);
   if (!context.mounted) return false;
-  final int failed = await _runBatch(
+  // One file moves at once; a copy of any size is worth showing.
+  final bool shown = entries.length > 1 || !move;
+  final int failed = await runBatch<FileEntry>(
     context,
     verb: move ? 'Moving' : 'Copying',
-    entries: entries,
-    // One file moves at once; a copy of any size is worth showing.
-    show: entries.length > 1 || !move,
+    doneVerb: move ? 'Moved' : 'Copied',
+    what: describeEntries(entries),
+    items: entries,
+    nameOf: (FileEntry e) => e.name,
+    show: shown,
     each: (FileEntry e) => move
         ? repo.moveTo(e, dir, taken: taken)
         : repo.copyTo(e, dir, taken: taken),
   );
   _refresh(ref);
-  failed == 0 ? AppHaptics.success() : AppHaptics.error();
+  // The dialog gives its own tick and buzz when it is shown.
+  if (!shown) failed == 0 ? AppHaptics.success() : AppHaptics.error();
   if (context.mounted) {
     final String what = describeEntries(entries);
     showToast(
@@ -434,15 +338,18 @@ Future<bool> deleteEntries(
   );
   if (!ok || !context.mounted) return false;
   final repo = ref.read(filesRepositoryProvider);
-  final int failed = await _runBatch(
+  final int failed = await runBatch<FileEntry>(
     context,
     verb: 'Deleting',
-    entries: entries,
+    doneVerb: 'Deleted',
+    what: describeEntries(entries),
+    items: entries,
+    nameOf: (FileEntry e) => e.name,
     show: entries.length > 1,
     each: repo.delete,
   );
   _refresh(ref);
-  if (failed > 0) AppHaptics.error();
+  if (failed > 0 && entries.length == 1) AppHaptics.error();
   if (context.mounted) {
     showToast(
       context,

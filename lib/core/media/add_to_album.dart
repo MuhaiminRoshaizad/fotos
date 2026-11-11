@@ -6,10 +6,10 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../format/formatters.dart';
-import '../haptics/app_haptics.dart';
 import '../theme/app_tokens.dart';
 import '../validation/validators.dart';
 import '../widgets/app_sheet.dart';
+import '../widgets/batch_progress.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/inset_group.dart';
 import '../widgets/toast.dart';
@@ -61,15 +61,45 @@ Future<void> addToAlbum(
     name = n;
     relativePath = albumFolder(n);
   }
-  if (relativePath == null) return;
+  if (relativePath == null || !context.mounted) return;
+  // A local the closures below can rely on being set.
+  final String target = relativePath;
 
   final MediaRepository repo = ref.read(mediaRepositoryProvider);
   final bool move = choice.move;
+  final String what = Fmt.count(items.length, 'item');
   int done;
   if (move) {
-    done = await repo.moveTo(items, relativePath) ? items.length : 0;
+    // Android moves the whole set in one request, so there is nothing to
+    // count: the bar runs until it answers.
+    final int failed = await runBatch<List<AssetEntity>>(
+      context,
+      verb: 'Moving',
+      doneVerb: 'Moved',
+      what: what,
+      items: <List<AssetEntity>>[items],
+      each: (List<AssetEntity> all) async {
+        if (!await repo.moveTo(all, target)) {
+          throw Exception('not moved');
+        }
+      },
+    );
+    done = failed == 0 ? items.length : 0;
   } else {
-    done = await repo.copyTo(items, relativePath);
+    final int failed = await runBatch<AssetEntity>(
+      context,
+      verb: 'Copying',
+      doneVerb: 'Copied',
+      what: what,
+      items: items,
+      nameOf: (AssetEntity e) => e.title ?? '',
+      each: (AssetEntity e) async {
+        if (await repo.copyTo(<AssetEntity>[e], target) == 0) {
+          throw Exception('not copied');
+        }
+      },
+    );
+    done = items.length - failed;
   }
   ref.invalidate(libraryProvider);
   ref.invalidate(albumsProvider);
@@ -85,7 +115,6 @@ Future<void> addToAlbum(
     );
     return;
   }
-  AppHaptics.success();
   showToast(
     context,
     '${move ? 'Moved' : 'Copied'} ${Fmt.count(done, 'item')} to $name',
