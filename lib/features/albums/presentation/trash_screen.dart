@@ -8,10 +8,12 @@ import 'package:photo_manager/photo_manager.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/media/grid_skeleton.dart';
 import '../../../core/media/grouping.dart';
+import '../../../core/media/media_actions.dart';
 import '../../../core/media/media_providers.dart';
 import '../../../core/platform/native_channel.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
+import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
@@ -35,11 +37,17 @@ class TrashScreen extends ConsumerWidget {
       subtitle: trash.hasValue ? Fmt.count(loaded.length, 'item') : '',
       leading: const BackBarButton(label: 'Albums'),
       trailing: <Widget>[
-        if (loaded.isNotEmpty)
+        if (loaded.isNotEmpty) ...<Widget>[
           BarButton.text(
             label: 'Restore all',
             onPressed: () => _restore(context, ref, loaded),
           ),
+          BarButton.icon(
+            icon: CupertinoIcons.trash,
+            tooltip: 'Delete all',
+            onPressed: () => _purge(context, ref, loaded),
+          ),
+        ],
       ],
       body: (BuildContext context, Widget header) {
         Widget headed(Widget state) => Column(
@@ -161,13 +169,46 @@ class TrashScreen extends ConsumerWidget {
       await _restore(context, ref, <TrashedItem>[item]);
       return;
     }
-    // Android shows its own "can't be undone" confirmation for this.
+    await _purge(context, ref, <TrashedItem>[item]);
+  }
+
+  /// Deletes [items] for good. Emptying the whole trash always asks first;
+  /// one item asks when Android will not (see MediaActions).
+  Future<void> _purge(
+    BuildContext context,
+    WidgetRef ref,
+    List<TrashedItem> items,
+  ) async {
+    final bool one = items.length == 1;
+    if (!one || await ref.read(mediaActionsProvider).mustConfirmDeletes()) {
+      if (!context.mounted) return;
+      final bool ok = await confirmAction(
+        context,
+        title: one
+            ? 'Delete this for good?'
+            : 'Delete all ${Fmt.count(items.length, 'item')} for good?',
+        message: one
+            ? 'It can\'t be restored after this.'
+            : 'Everything in Recently deleted is removed from the phone. '
+                  'None of it can be restored after this.',
+        confirmLabel: one ? 'Delete' : 'Delete all',
+      );
+      if (!ok) return;
+    }
     final bool gone = await ref
         .read(nativeChannelProvider)
-        .deleteForever(<String>[item.id], <bool>[item.video]);
+        .deleteForever(
+          <String>[for (final TrashedItem t in items) t.id],
+          <bool>[for (final TrashedItem t in items) t.video],
+        );
     ref.invalidate(trashProvider);
     if (context.mounted && gone) {
-      showToast(context, 'Deleted for good');
+      showToast(
+        context,
+        one
+            ? 'Deleted for good'
+            : 'Deleted ${Fmt.count(items.length, 'item')} for good',
+      );
     }
   }
 

@@ -119,9 +119,12 @@ class _ReviewCardState extends ConsumerState<_ReviewCard> {
     final AssetEntity? phone = await _phone;
     if (removePhone && phone != null) {
       if (!mounted) return;
+      // "Keep Takeout's" on a card showing both copies is the question
+      // already answered.
       final Set<String> gone = await ref.read(mediaActionsProvider).trash(
         context,
         <AssetEntity>[phone],
+        confirm: false,
       );
       if (gone.isEmpty) {
         // The user refused Android's confirmation: change nothing.

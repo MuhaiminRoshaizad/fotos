@@ -334,7 +334,7 @@ Future<bool> deleteAlbum(
   if (!context.mounted) return false;
   final Set<String> gone = await ref
       .read(mediaActionsProvider)
-      .trash(context, items);
+      .trash(context, items, confirm: false);
   ref.invalidate(albumsProvider);
   return gone.isNotEmpty;
 }

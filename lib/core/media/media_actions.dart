@@ -7,7 +7,10 @@ import 'package:share_plus/share_plus.dart';
 
 import '../format/formatters.dart';
 import '../haptics/app_haptics.dart';
+import '../widgets/dialogs.dart';
 import '../widgets/toast.dart';
+import '../../features/albums/presentation/albums_providers.dart'
+    show nativeChannelProvider;
 import 'media_providers.dart';
 
 /// The edits offered both in the viewer and on the selection bar, so each
@@ -61,12 +64,38 @@ class MediaActions {
     return ok;
   }
 
-  /// Moves [items] to Android's trash after its own confirmation, and offers
-  /// Undo. Returns the ids that were trashed.
+  /// Whether fotos must ask before deleting, because Android will not.
+  ///
+  /// Android confirms a trash or delete request itself, except for an app
+  /// holding All files access, whose requests it carries out silently. The
+  /// Files tab asks for that access, so once it is granted a photo could be
+  /// deleted with no question at all. Asking only then avoids two dialogs
+  /// in a row on a phone where Android still asks.
+  Future<bool> mustConfirmDeletes() =>
+      _ref.read(nativeChannelProvider).hasAllFilesAccess();
+
+  /// Moves [items] to Android's trash after a confirmation, and offers
+  /// Undo. Returns the ids that were trashed. Pass [confirm] false when
+  /// the caller has already asked.
   Future<Set<String>> trash(
     BuildContext context,
-    List<AssetEntity> items,
-  ) async {
+    List<AssetEntity> items, {
+    bool confirm = true,
+  }) async {
+    if (items.isEmpty) return <String>{};
+    if (confirm && await mustConfirmDeletes()) {
+      if (!context.mounted) return <String>{};
+      final bool ok = await confirmAction(
+        context,
+        title: 'Delete ${Fmt.count(items.length, 'item')}?',
+        message:
+            '${items.length == 1 ? 'It moves' : 'They move'} to Recently '
+            'deleted, where you can restore '
+            '${items.length == 1 ? 'it' : 'them'} for 30 days.',
+        confirmLabel: 'Delete',
+      );
+      if (!ok) return <String>{};
+    }
     final List<String> ids = await _ref
         .read(mediaRepositoryProvider)
         .moveToTrash(items);
