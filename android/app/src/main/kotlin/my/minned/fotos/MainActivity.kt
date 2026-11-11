@@ -16,12 +16,21 @@ class MainActivity : FlutterActivity() {
     private var splashGone = true
     private var onSplashGone: (() -> Unit)? = null
 
+    /**
+     * Started to show one photo or video (from the widget, the camera or
+     * another app). The flower is then skipped: the photo is what was asked
+     * for, and waiting out an animation first only delays it.
+     */
+    var openedToView = false
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        openedToView = viewUri(intent) != null
         // Android takes its launch screen down as soon as Flutter has drawn a
         // frame, which can be midway through the flower's pull-in. Hold it
         // until that animation has run, then hand over to Flutter, which
         // draws the same flower in the same place and plucks it apart.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && savedInstanceState == null) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && savedInstanceState == null && !openedToView) {
             splashGone = false
             splashScreen.setOnExitAnimationListener { view ->
                 val start = view.iconAnimationStart

@@ -50,7 +50,9 @@ class NativeChannel(
             ) { ok -> result.success(ok) }
             "awaitSplash" -> {
                 val main = activity as? MainActivity
-                if (main == null) result.success(null) else main.whenSplashGone { result.success(null) }
+                // Answers whether to skip the flower: true when fotos was
+                // opened to show one photo.
+                if (main == null) result.success(false) else main.whenSplashGone { result.success(main.openedToView) }
             }
             "launchUri" -> {
                 // Handed out once, so a later resume doesn't reopen it.

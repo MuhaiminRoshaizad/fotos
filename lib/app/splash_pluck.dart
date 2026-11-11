@@ -59,7 +59,7 @@ class _SplashPluckState extends ConsumerState<SplashPluck>
         .read(nativeChannelProvider)
         .awaitSplash()
         .then(
-          (_) => _pluck(),
+          (bool skip) => skip ? _skip() : _pluck(),
           onError: (Object e) {
             if (e is MissingPluginException) {
               // Widget tests have no Android side and no launch screen.
@@ -71,6 +71,15 @@ class _SplashPluckState extends ConsumerState<SplashPluck>
             }
           },
         );
+  }
+
+  /// Opened to show one photo: the flower goes at once, without its
+  /// animation, so the photo is the first thing seen.
+  void _skip() {
+    _limit?.cancel();
+    if (_started || !mounted) return;
+    _started = true;
+    setState(() => _done = true);
   }
 
   void _pluck() {

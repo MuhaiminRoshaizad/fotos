@@ -55,4 +55,31 @@ void main() {
     // Created once: rebuilding it lost a photo opened from another app.
     expect(_Probe.created, 1);
   });
+
+  testWidgets('opened to show a photo, the flower goes at once', (
+    WidgetTester tester,
+  ) async {
+    // Android answers that fotos was started to show one photo.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('my.minned.fotos/native'),
+          (MethodCall call) async => call.method == 'awaitSplash' ? true : null,
+        );
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(home: SplashPluck(child: _Probe())),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    // Gone within two frames, with no plucking animation left to run.
+    expect(
+      find.descendant(
+        of: find.byType(SplashPluck),
+        matching: find.byType(CustomPaint),
+      ),
+      findsNothing,
+    );
+    expect(tester.hasRunningAnimations, isFalse);
+  });
 }

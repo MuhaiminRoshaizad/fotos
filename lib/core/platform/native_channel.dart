@@ -251,8 +251,11 @@ class NativeChannel {
     }
   }
 
-  /// Completes when Android's own launch screen has finished and gone.
-  Future<void> awaitSplash() => _channel.invokeMethod<void>('awaitSplash');
+  /// Completes when Android's own launch screen has finished and gone, with
+  /// true when fotos was opened to show one photo and the flower should be
+  /// skipped.
+  Future<bool> awaitSplash() async =>
+      await _channel.invokeMethod<bool>('awaitSplash') ?? false;
 
   /// Whether the image at [path] is a Motion Photo (a still with a short
   /// video appended to the same file).
