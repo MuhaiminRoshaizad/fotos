@@ -1,10 +1,11 @@
-import '../core/widgets/stable_insets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
+import '../core/widgets/stable_insets.dart';
 import '../features/viewer/presentation/view_intent_handler.dart';
 import 'router.dart';
+import 'splash_pluck.dart';
 
 class FotosApp extends ConsumerWidget {
   const FotosApp({super.key});
@@ -19,7 +20,9 @@ class FotosApp extends ConsumerWidget {
       darkTheme: buildAppTheme(Brightness.dark),
       routerConfig: ref.watch(routerProvider),
       builder: (BuildContext context, Widget? child) => StableInsets(
-        child: ViewIntentHandler(child: child ?? const SizedBox.shrink()),
+        child: SplashPluck(
+          child: ViewIntentHandler(child: child ?? const SizedBox.shrink()),
+        ),
       ),
     );
   }

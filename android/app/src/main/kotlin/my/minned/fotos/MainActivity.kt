@@ -1,12 +1,57 @@
 package my.minned.fotos
 
 import android.content.Intent
+import android.os.Build
+import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.time.Duration
+import java.time.Instant
 
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
+
+    /** False while Android's launch screen is still up. */
+    private var splashGone = true
+    private var onSplashGone: (() -> Unit)? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Android takes its launch screen down as soon as Flutter has drawn a
+        // frame, which can be midway through the flower's pull-in. Hold it
+        // until that animation has run, then hand over to Flutter, which
+        // draws the same flower in the same place and plucks it apart.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && savedInstanceState == null) {
+            splashGone = false
+            splashScreen.setOnExitAnimationListener { view ->
+                val start = view.iconAnimationStart
+                val length = view.iconAnimationDuration
+                val left = if (start == null || length == null) {
+                    0L
+                } else {
+                    Duration.between(Instant.now(), start.plus(length)).toMillis()
+                }
+                view.postDelayed({
+                    // Flutter's flower is already drawn beneath; show it
+                    // before this one goes, so there is no empty frame.
+                    finishSplash()
+                    view.remove()
+                }, left.coerceIn(0L, 1200L))
+            }
+        }
+        super.onCreate(savedInstanceState)
+    }
+
+    private fun finishSplash() {
+        splashGone = true
+        onSplashGone?.invoke()
+        onSplashGone = null
+    }
+
+    /** Calls [done] once Android's launch screen has gone; at once if it has. */
+    fun whenSplashGone(done: () -> Unit) {
+        if (splashGone) done() else onSplashGone = done
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

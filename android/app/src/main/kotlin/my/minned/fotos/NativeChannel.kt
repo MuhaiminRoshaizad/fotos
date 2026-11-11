@@ -48,6 +48,10 @@ class NativeChannel(
                 call.argument<List<String>>("ids")!!,
                 call.argument<List<Boolean>>("videos")!!,
             ) { ok -> result.success(ok) }
+            "awaitSplash" -> {
+                val main = activity as? MainActivity
+                if (main == null) result.success(null) else main.whenSplashGone { result.success(null) }
+            }
             "launchUri" -> {
                 // Handed out once, so a later resume doesn't reopen it.
                 val uri = MainActivity.viewUri(activity.intent)

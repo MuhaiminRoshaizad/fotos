@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12 and later draw the launch screen themselves: the surface
+         colour, with the flower's petals pulled in to the centre. The
+         duration tells Android how long that animation runs, so
+         MainActivity can keep the screen up until it has finished. -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/launch_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_flower</item>
+        <item name="android:windowSplashScreenAnimationDuration">950</item>
+    </style>
+</resources>

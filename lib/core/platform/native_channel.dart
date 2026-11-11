@@ -251,6 +251,9 @@ class NativeChannel {
     }
   }
 
+  /// Completes when Android's own launch screen has finished and gone.
+  Future<void> awaitSplash() => _channel.invokeMethod<void>('awaitSplash');
+
   /// Whether the image at [path] is a Motion Photo (a still with a short
   /// video appended to the same file).
   Future<bool> isMotionPhoto(String path) async =>

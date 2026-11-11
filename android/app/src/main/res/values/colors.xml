@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The theme's cyanotype blue, as in lib/core/theme/app_theme.dart. -->
-    <color name="ic_launcher_background">#1D5BBF</color>
-    <!-- The app's surface colour, so the launch window matches the first frame. -->
-    <color name="launch_background">#FAFBFD</color>
+    <!-- The app's dark surface, in both themes: the icon is one picture. -->
+    <color name="ic_launcher_background">#111113</color>
+    <!-- The launch screen matches the page that follows it, so the hand-over
+         from Android to Flutter shows no change of colour. -->
+    <color name="launch_background">#FFFFFF</color>
+    <color name="splash_core">#111113</color>
 </resources>
