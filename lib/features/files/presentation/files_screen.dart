@@ -2,11 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart'
-    show
-        CupertinoButton,
-        CupertinoIcons,
-        CupertinoSearchTextField,
-        CupertinoSliverRefreshControl;
+    show CupertinoIcons, CupertinoSliverRefreshControl;
 import 'package:flutter/gestures.dart'
     show HitTestEntry, HitTestResult, HitTestTarget;
 import 'package:flutter/material.dart';
@@ -27,6 +23,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
+import '../../../core/widgets/search_field.dart';
 import '../../../core/widgets/swipe_actions.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
@@ -495,7 +492,8 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
               ),
               if (entries.isNotEmpty)
                 SliverToBoxAdapter(
-                  child: _SearchField(
+                  child: SearchField(
+                    placeholder: 'Search this folder',
                     controller: _query,
                     focus: _focus,
                     active: _focus.hasFocus || _query.text.isNotEmpty,
@@ -699,66 +697,6 @@ class _RowTag {
   final String path;
 }
 
-/// iOS's search field, with Cancel sliding in beside it while it is in use.
-class _SearchField extends StatelessWidget {
-  const _SearchField({
-    required this.controller,
-    required this.focus,
-    required this.active,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focus;
-  final bool active;
-
-  static const double height = 36;
-  static const EdgeInsets padding = EdgeInsets.fromLTRB(
-    AppSpacing.lg,
-    AppSpacing.xs,
-    AppSpacing.lg,
-    AppSpacing.sm,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: padding,
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: height),
-              child: CupertinoSearchTextField(
-                controller: controller,
-                focusNode: focus,
-                placeholder: 'Search this folder',
-                style: TextStyle(fontSize: 16, color: cs.onSurface),
-              ),
-            ),
-          ),
-          AnimatedSize(
-            duration: AppMotion.medium,
-            curve: AppMotion.decelerate,
-            alignment: Alignment.centerLeft,
-            child: active
-                ? CupertinoButton(
-                    padding: const EdgeInsets.only(left: AppSpacing.md),
-                    minimumSize: const Size(44, 44),
-                    onPressed: () {
-                      controller.clear();
-                      focus.unfocus();
-                    },
-                    child: const Text('Cancel'),
-                  )
-                : const SizedBox(height: 44),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _RowsSkeleton extends StatelessWidget {
   const _RowsSkeleton({required this.header, this.preface});
   final Widget header;
@@ -773,12 +711,12 @@ class _RowsSkeleton extends StatelessWidget {
         header,
         // Stands in for the search field, so nothing moves when it arrives.
         Padding(
-          padding: _SearchField.padding,
+          padding: SearchField.padding,
           child: Container(
             height: 44,
             alignment: Alignment.center,
             child: Container(
-              height: _SearchField.height,
+              height: SearchField.height,
               decoration: BoxDecoration(
                 color: cs.onSurface.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(9),
