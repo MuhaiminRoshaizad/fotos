@@ -10,7 +10,7 @@ import 'package:flutter/cupertino.dart'
 import 'package:flutter/gestures.dart'
     show HitTestEntry, HitTestResult, HitTestTarget;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderMetaData;
+import 'package:flutter/rendering.dart' show RenderMetaData, SliverConstraints;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
@@ -33,6 +33,7 @@ import '../../albums/presentation/albums_providers.dart';
 import '../domain/file_entry.dart';
 import 'file_actions.dart';
 import 'file_row.dart';
+import 'file_tile.dart';
 import 'files_providers.dart';
 import 'files_selection.dart';
 
@@ -448,6 +449,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
     final AsyncValue<List<FileEntry>> list = ref.watch(folderProvider(dir));
     final SelectionState sel = ref.watch(selectionProvider);
     final bool selecting = sel.isActiveFor(_owner);
+    final bool grid = ref.watch(filesGridProvider).value ?? false;
     // The page does not resize for the keyboard, so the list makes room for
     // it itself and the last match can scroll clear.
     final double bottom =
@@ -525,6 +527,54 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
+                  ),
+                )
+              else if (grid)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
+                  sliver: SliverLayoutBuilder(
+                    builder: (BuildContext context, SliverConstraints c) {
+                      // Three across on a phone, more as the page widens.
+                      final int columns = (c.crossAxisExtent / 118)
+                          .floor()
+                          .clamp(3, 8);
+                      final double width =
+                          (c.crossAxisExtent - AppSpacing.md * (columns - 1)) /
+                          columns;
+                      return SliverGrid.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          crossAxisSpacing: AppSpacing.md,
+                          mainAxisSpacing: AppSpacing.md,
+                          mainAxisExtent:
+                              width / FileTile.coverAspect +
+                              FileTile.labelHeight(context),
+                        ),
+                        itemCount: shown.length,
+                        itemBuilder: (BuildContext context, int i) {
+                          final FileEntry e = shown[i];
+                          final Widget tile = FileTile(
+                            key: ValueKey<String>(e.path),
+                            entry: e,
+                            selected: selecting
+                                ? sel.ids.contains(e.path)
+                                : null,
+                            onTap: selecting
+                                ? () => ref
+                                      .read(selectionProvider.notifier)
+                                      .toggle(e.path)
+                                : () => openEntry(context, ref, e, entries),
+                            onLongPress: () => _startSelecting(e.path),
+                            onMore: () => showEntryActions(context, ref, e),
+                          );
+                          return widget.animateIn
+                              ? SlideUpIn(index: i ~/ columns, child: tile)
+                              : tile;
+                        },
+                      );
+                    },
                   ),
                 )
               else

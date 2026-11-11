@@ -85,6 +85,7 @@ FolderBar folderBar(WidgetRef ref, String dir, {Widget? leading}) {
       barTitle: null,
       leading: leading,
       trailing: <Widget>[
+        const FilesViewButton(),
         BarButton.text(
           label: 'Select',
           onPressed: entries.isEmpty
@@ -121,4 +122,20 @@ FolderBar folderBar(WidgetRef ref, String dir, {Widget? leading}) {
       ),
     ],
   );
+}
+
+/// Switches every folder between rows and a grid of pictures. Shows the
+/// view it would switch to.
+class FilesViewButton extends ConsumerWidget {
+  const FilesViewButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool grid = ref.watch(filesGridProvider).value ?? false;
+    return BarButton.icon(
+      icon: grid ? CupertinoIcons.list_bullet : CupertinoIcons.square_grid_2x2,
+      tooltip: grid ? 'Show as list' : 'Show as grid',
+      onPressed: () => ref.read(filesGridProvider.notifier).toggle(),
+    );
+  }
 }

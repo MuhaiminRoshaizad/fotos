@@ -46,7 +46,8 @@ final folderProvider = FutureProvider.autoDispose
 /// replaced file is read again.
 final zipCoverProvider = FutureProvider.family<Uint8List?, (String, int)>(
   (Ref ref, (String, int) zip) =>
-      ref.watch(nativeChannelProvider).zipCover(zip.$1, 160),
+      // Large enough for the grid view; the list draws it small.
+      ref.watch(nativeChannelProvider).zipCover(zip.$1, 400),
 );
 
 /// Folders the user pinned to the top of the Files tab, newest pin first.
@@ -90,3 +91,30 @@ class FolderQuery extends Notifier<String> {
 
 final folderQueryProvider = NotifierProvider.autoDispose
     .family<FolderQuery, String, String>(FolderQuery.new);
+
+/// A frame from a video file, for its tile in the grid view. Kept for the
+/// session, keyed like [zipCoverProvider].
+final videoFrameProvider = FutureProvider.family<Uint8List?, (String, int)>(
+  (Ref ref, (String, int) video) =>
+      ref.watch(nativeChannelProvider).videoFrame(video.$1, 400),
+);
+
+/// Whether folders are shown as a grid of pictures instead of a list of
+/// rows. One choice for every folder, remembered between sessions.
+class FilesGridNotifier extends AsyncNotifier<bool> {
+  static const String _key = 'files.grid';
+
+  @override
+  Future<bool> build() async =>
+      await ref.watch(preferencesProvider).getBool(_key) ?? false;
+
+  Future<void> toggle() async {
+    final bool next = !(state.value ?? false);
+    state = AsyncData<bool>(next);
+    await ref.read(preferencesProvider).setBool(_key, next);
+  }
+}
+
+final filesGridProvider = AsyncNotifierProvider<FilesGridNotifier, bool>(
+  FilesGridNotifier.new,
+);
