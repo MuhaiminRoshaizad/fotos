@@ -314,7 +314,10 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
     _focus.addListener(_changed);
   }
 
-  void _changed() => setState(() {});
+  void _changed() {
+    ref.read(folderQueryProvider(widget.dir).notifier).set(_query.text);
+    setState(() {});
+  }
 
   String get _owner => filesSelectionOwner(widget.dir);
 
@@ -421,12 +424,8 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
         ),
       ),
       data: (List<FileEntry> entries) {
-        final String q = _query.text.trim().toLowerCase();
-        final List<FileEntry> shown = q.isEmpty
-            ? entries
-            : entries
-                  .where((FileEntry e) => e.name.toLowerCase().contains(q))
-                  .toList();
+        final String q = _query.text.trim();
+        final List<FileEntry> shown = filterByName(entries, q);
         _shown = <String>[for (final FileEntry e in shown) e.path];
         return EntranceScope(
           child: CustomScrollView(

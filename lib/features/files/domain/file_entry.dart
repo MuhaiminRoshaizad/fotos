@@ -67,3 +67,15 @@ String uniqueName(String wanted, Set<String> taken) {
     if (!lower.contains(candidate.toLowerCase())) return candidate;
   }
 }
+
+/// The entries whose name contains [query], ignoring case; all of them for
+/// an empty query. What a folder's search field shows, and so what its
+/// Select all selects.
+List<FileEntry> filterByName(List<FileEntry> entries, String query) {
+  final String q = query.trim().toLowerCase();
+  if (q.isEmpty) return entries;
+  return <FileEntry>[
+    for (final FileEntry e in entries)
+      if (e.name.toLowerCase().contains(q)) e,
+  ];
+}

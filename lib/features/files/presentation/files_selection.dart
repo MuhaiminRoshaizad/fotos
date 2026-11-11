@@ -73,8 +73,11 @@ class FolderBar {
 FolderBar folderBar(WidgetRef ref, String dir, {Widget? leading}) {
   final String owner = filesSelectionOwner(dir);
   final SelectionState sel = ref.watch(selectionProvider);
-  final List<FileEntry> entries =
-      ref.watch(folderProvider(dir)).value ?? const <FileEntry>[];
+  // What the page is showing: the folder, narrowed by its search field.
+  final List<FileEntry> entries = filterByName(
+    ref.watch(folderProvider(dir)).value ?? const <FileEntry>[],
+    ref.watch(folderQueryProvider(dir)),
+  );
   final SelectionNotifier selection = ref.read(selectionProvider.notifier);
   if (!sel.isActiveFor(owner)) {
     return FolderBar(
@@ -93,15 +96,22 @@ FolderBar folderBar(WidgetRef ref, String dir, {Widget? leading}) {
     );
   }
   final int n = sel.ids.length;
-  final bool all = entries.isNotEmpty && n == entries.length;
+  final bool all =
+      entries.isNotEmpty &&
+      entries.every((FileEntry e) => sel.ids.contains(e.path));
   return FolderBar(
     selecting: true,
     barTitle: n == 0 ? 'Select items' : '$n selected',
     leading: BarButton.text(
       label: all ? 'Deselect all' : 'Select all',
-      onPressed: () => selection.setIds(
-        all ? const <String>{} : entries.map((FileEntry e) => e.path).toSet(),
-      ),
+      // Adds or removes what is shown, keeping anything picked before
+      // the search was typed.
+      onPressed: () {
+        final Set<String> shown = entries.map((FileEntry e) => e.path).toSet();
+        selection.setIds(
+          all ? sel.ids.difference(shown) : sel.ids.union(shown),
+        );
+      },
     ),
     trailing: <Widget>[
       BarButton.text(

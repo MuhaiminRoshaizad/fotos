@@ -74,3 +74,19 @@ final pinnedFoldersProvider =
     AsyncNotifierProvider<PinnedFoldersNotifier, List<String>>(
       PinnedFoldersNotifier.new,
     );
+
+/// What is typed in a folder's search field, by folder path. Held here, not
+/// in the field's widget, because the bar above the list needs it too:
+/// Select all must select what the search is showing.
+class FolderQuery extends Notifier<String> {
+  FolderQuery(this.dir);
+  final String dir;
+
+  @override
+  String build() => '';
+
+  void set(String query) => state = query;
+}
+
+final folderQueryProvider = NotifierProvider.autoDispose
+    .family<FolderQuery, String, String>(FolderQuery.new);

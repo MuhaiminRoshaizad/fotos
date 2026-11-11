@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoSearchTextField;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -128,6 +129,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(picked(c), <String>{'/root/a.pdf', '/root/b.pdf', '/root/c.csv'});
+  });
+
+  testWidgets('Select all under a search selects only what the search shows', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer c = await open(tester);
+    await tester.enterText(find.byType(CupertinoSearchTextField), 'PDF');
+    await tester.pumpAndSettle();
+    expect(find.text('c.csv'), findsNothing);
+
+    await tester.tap(find.text('Select'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Select all'));
+    await tester.pumpAndSettle();
+
+    expect(picked(c), <String>{'/root/a.pdf', '/root/b.pdf'});
+    expect(find.text('2 selected'), findsOneWidget);
+    // Everything shown is selected, so the button now offers the reverse.
+    expect(find.text('Deselect all'), findsOneWidget);
   });
 
   test('one entry is named, several are counted', () {
