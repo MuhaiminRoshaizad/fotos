@@ -35,8 +35,14 @@ class FilesRepository {
     return out;
   }
 
-  Future<Set<String>> namesIn(String dir) async =>
-      (await list(dir)).map((FileEntry e) => e.name).toSet();
+  /// The names in [dir], hidden ones included, without reading each
+  /// entry's size and date as [list] does.
+  Future<Set<String>> namesIn(String dir) async => <String>{
+    await for (final FileSystemEntity e in Directory(
+      dir,
+    ).list(followLinks: false))
+      p.basename(e.path),
+  };
 
   Future<String> createFolder(String parent, String name) async {
     final Directory d = await Directory(p.join(parent, name)).create();
@@ -64,8 +70,17 @@ class FilesRepository {
     await _native.scan(media);
   }
 
-  Future<String> copyTo(FileEntry e, String targetDir) async {
-    final String name = uniqueName(e.name, await namesIn(targetDir));
+  /// [taken] is the names already in [targetDir], for a caller placing
+  /// many entries: it is read once and kept up to date here, where reading
+  /// the folder again for every entry made a large move crawl.
+  Future<String> copyTo(
+    FileEntry e,
+    String targetDir, {
+    Set<String>? taken,
+  }) async {
+    final Set<String> names = taken ?? await namesIn(targetDir);
+    final String name = uniqueName(e.name, names);
+    names.add(name);
     final String target = p.join(targetDir, name);
     if (e.isFolder) {
       await _copyDir(Directory(e.path), Directory(target));
@@ -76,8 +91,14 @@ class FilesRepository {
     return target;
   }
 
-  Future<String> moveTo(FileEntry e, String targetDir) async {
-    final String name = uniqueName(e.name, await namesIn(targetDir));
+  Future<String> moveTo(
+    FileEntry e,
+    String targetDir, {
+    Set<String>? taken,
+  }) async {
+    final Set<String> names = taken ?? await namesIn(targetDir);
+    final String name = uniqueName(e.name, names);
+    names.add(name);
     final String target = p.join(targetDir, name);
     final List<String> before = await _mediaUnder(e);
     // Same volume, so a rename moves without copying the bytes.
