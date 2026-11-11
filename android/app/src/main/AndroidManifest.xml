@@ -32,6 +32,14 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- A View request carries a content:// address for fotos' own
+                 handler (MainActivity.viewUri). Left on, Flutter also hands
+                 that address to the router as a page to open, which has no
+                 such page and showed "Page Not Found". -->
+            <meta-data
+              android:name="flutter_deeplinking_enabled"
+              android:value="false"
+              />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
