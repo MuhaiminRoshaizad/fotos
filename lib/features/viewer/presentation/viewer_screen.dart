@@ -261,13 +261,14 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               ScaleEndDetails? details,
             }) {
               _passedThreshold = false;
-              if (offset.dy < -80) {
-                _details();
-                return false;
-              }
-              if (offset.dy > 110) return true;
-              return false;
+              return offset.dy > 110;
             },
+        // Only a downward drag moves the page. An upward one used to lift
+        // and shrink it like a dismissal and then open Details on release,
+        // which read as a cancelled swipe doing something unasked.
+        slideOffsetHandler:
+            (Offset offset, {ExtendedImageSlidePageState? state}) =>
+                offset.dy < 0 ? Offset(offset.dx, 0) : null,
         child: Stack(
           children: <Widget>[
             Positioned.fill(
