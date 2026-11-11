@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart'
 import 'package:flutter/material.dart';
 
 import '../theme/app_tokens.dart';
+import 'hold_to_move_cursor.dart';
 
 /// iOS's search field, with Cancel sliding in beside it while it is in use.
 class SearchField extends StatelessWidget {
@@ -37,11 +38,13 @@ class SearchField extends StatelessWidget {
           Expanded(
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: height),
-              child: CupertinoSearchTextField(
-                controller: controller,
-                focusNode: focus,
-                placeholder: placeholder,
-                style: TextStyle(fontSize: 16, color: cs.onSurface),
+              child: HoldToMoveCursor(
+                child: CupertinoSearchTextField(
+                  controller: controller,
+                  focusNode: focus,
+                  placeholder: placeholder,
+                  style: TextStyle(fontSize: 16, color: cs.onSurface),
+                ),
               ),
             ),
           ),
