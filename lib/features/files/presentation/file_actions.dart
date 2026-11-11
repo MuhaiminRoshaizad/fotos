@@ -157,14 +157,14 @@ Future<void> showEntryActions(
         );
       }
     case 'share':
-      await SharePlus.instance.share(
-        ShareParams(files: <XFile>[XFile(entry.path)]),
-      );
+      await shareEntries(context, <FileEntry>[entry]);
     case 'rename':
       await _rename(context, ref, entry);
     case 'move':
     case 'copy':
-      await _transfer(context, ref, entry, move: choice == 'move');
+      await transferEntries(context, ref, <FileEntry>[
+        entry,
+      ], move: choice == 'move');
     case 'delete':
       await deleteEntry(context, ref, entry);
   }
@@ -202,45 +202,80 @@ Future<void> _rename(
   }
 }
 
-Future<void> _transfer(
+/// "report.pdf" for one entry, "5 items" for several.
+String describeEntries(List<FileEntry> entries) => entries.length == 1
+    ? entries.single.name
+    : Fmt.count(entries.length, 'item');
+
+/// Shares files through Android's sheet. Folders can't be shared; returns
+/// false, having said so, when one is among [entries].
+Future<bool> shareEntries(BuildContext context, List<FileEntry> entries) async {
+  if (entries.isEmpty) return false;
+  if (entries.any((FileEntry e) => e.isFolder)) {
+    showToast(
+      context,
+      'Folders can\'t be shared. Deselect them first.',
+      failed: true,
+    );
+    return false;
+  }
+  await SharePlus.instance.share(
+    ShareParams(
+      files: <XFile>[for (final FileEntry e in entries) XFile(e.path)],
+    ),
+  );
+  return true;
+}
+
+/// Asks for a folder once, then moves or copies every entry into it.
+/// Returns whether anything was attempted.
+Future<bool> transferEntries(
   BuildContext context,
   WidgetRef ref,
-  FileEntry entry, {
+  List<FileEntry> entries, {
   required bool move,
 }) async {
+  if (entries.isEmpty) return false;
+  final String from = p.dirname(entries.first.path);
   final String root = await ref.read(storageRootProvider.future);
-  if (!context.mounted) return;
+  if (!context.mounted) return false;
   final String? dir = await pickFolder(
     context,
     ref,
-    start: p.dirname(entry.path),
+    start: from,
     root: root,
     action: move ? 'Move here' : 'Copy here',
-    exclude: entry.isFolder ? entry.path : null,
+    exclude: <String>{
+      for (final FileEntry e in entries)
+        if (e.isFolder) e.path,
+    },
   );
-  if (dir == null || !context.mounted) return;
-  if (move && dir == p.dirname(entry.path)) return;
-  try {
-    final repo = ref.read(filesRepositoryProvider);
-    move ? await repo.moveTo(entry, dir) : await repo.copyTo(entry, dir);
-    _refresh(ref);
-    AppHaptics.success();
-    if (context.mounted) {
-      showToast(
-        context,
-        '${move ? 'Moved' : 'Copied'} ${entry.name} to ${p.basename(dir)}',
-      );
-    }
-  } on FileSystemException {
-    AppHaptics.error();
-    if (context.mounted) {
-      showToast(
-        context,
-        'Couldn\'t ${move ? 'move' : 'copy'} ${entry.name}.',
-        failed: true,
-      );
+  if (dir == null || !context.mounted) return false;
+  if (move && dir == from) return false;
+  final repo = ref.read(filesRepositoryProvider);
+  int failed = 0;
+  for (final FileEntry e in entries) {
+    try {
+      move ? await repo.moveTo(e, dir) : await repo.copyTo(e, dir);
+    } on FileSystemException {
+      failed++;
     }
   }
+  _refresh(ref);
+  failed == 0 ? AppHaptics.success() : AppHaptics.error();
+  if (context.mounted) {
+    final String what = describeEntries(entries);
+    showToast(
+      context,
+      failed == 0
+          ? '${move ? 'Moved' : 'Copied'} $what to ${p.basename(dir)}'
+          : entries.length == 1
+          ? 'Couldn\'t ${move ? 'move' : 'copy'} $what.'
+          : 'Couldn\'t ${move ? 'move' : 'copy'} $failed of $what.',
+      failed: failed > 0,
+    );
+  }
+  return true;
 }
 
 /// Asks, then deletes [entry] for good (files have no system trash).
@@ -248,26 +283,55 @@ Future<void> deleteEntry(
   BuildContext context,
   WidgetRef ref,
   FileEntry entry,
+) => deleteEntries(context, ref, <FileEntry>[entry]);
+
+/// Asks once, then deletes every entry for good. Returns whether the user
+/// confirmed.
+Future<bool> deleteEntries(
+  BuildContext context,
+  WidgetRef ref,
+  List<FileEntry> entries,
 ) async {
+  if (entries.isEmpty) return false;
+  final bool one = entries.length == 1;
+  final bool folders = entries.any((FileEntry e) => e.isFolder);
+  final String what = describeEntries(entries);
   final bool ok = await confirmAction(
     context,
-    title: 'Delete ${entry.name}?',
-    message: entry.isFolder
-        ? 'The folder and everything in it are deleted for good. They don\'t go to Recently deleted.'
-        : 'This file is deleted for good. It doesn\'t go to Recently deleted.',
+    title: 'Delete $what?',
+    message: one
+        ? (folders
+              ? 'The folder and everything in it are deleted for good. They don\'t go to Recently deleted.'
+              : 'This file is deleted for good. It doesn\'t go to Recently deleted.')
+        : (folders
+              ? 'These items, and everything inside the folders, are deleted for good. They don\'t go to Recently deleted.'
+              : 'These files are deleted for good. They don\'t go to Recently deleted.'),
     confirmLabel: 'Delete',
   );
-  if (!ok || !context.mounted) return;
-  try {
-    await ref.read(filesRepositoryProvider).delete(entry);
-    _refresh(ref);
-    if (context.mounted) showToast(context, 'Deleted ${entry.name}');
-  } on FileSystemException {
-    AppHaptics.error();
-    if (context.mounted) {
-      showToast(context, 'Couldn\'t delete ${entry.name}.', failed: true);
+  if (!ok || !context.mounted) return false;
+  final repo = ref.read(filesRepositoryProvider);
+  int failed = 0;
+  for (final FileEntry e in entries) {
+    try {
+      await repo.delete(e);
+    } on FileSystemException {
+      failed++;
     }
   }
+  _refresh(ref);
+  if (failed > 0) AppHaptics.error();
+  if (context.mounted) {
+    showToast(
+      context,
+      failed == 0
+          ? 'Deleted $what'
+          : one
+          ? 'Couldn\'t delete $what.'
+          : 'Couldn\'t delete $failed of $what.',
+      failed: failed > 0,
+    );
+  }
+  return true;
 }
 
 /// Extracts into a new folder named after the ZIP, inside [parent]. Photos

@@ -4,13 +4,18 @@ import 'package:flutter/cupertino.dart'
         CupertinoIcons,
         CupertinoSearchTextField,
         CupertinoSliverRefreshControl;
+import 'package:flutter/gestures.dart'
+    show HitTestEntry, HitTestResult, HitTestTarget;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderMetaData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/format/formatters.dart';
+import '../../../core/haptics/app_haptics.dart';
 import '../../../core/platform/native_channel.dart';
+import '../../../core/selection/selection.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/validation/validators.dart';
 import '../../../core/widgets/dialogs.dart';
@@ -24,6 +29,7 @@ import '../domain/file_entry.dart';
 import 'file_actions.dart';
 import 'file_row.dart';
 import 'files_providers.dart';
+import 'files_selection.dart';
 
 /// The Files tab root: asks for All files access in context, then shows
 /// storage use and the top-level folders.
@@ -59,60 +65,69 @@ class _FilesScreenState extends ConsumerState<FilesScreen> {
   Widget build(BuildContext context) {
     final AsyncValue<bool> access = ref.watch(filesAccessProvider);
     final AsyncValue<String> root = ref.watch(storageRootProvider);
-    return LargeTitleScaffold(
-      title: 'Files',
-      grouped: true,
-      trailing: <Widget>[
-        if (access.value == true && root.hasValue)
-          NewFolderButton(dir: root.value!),
-      ],
-      body: (BuildContext context, Widget header) {
-        Widget headed(Widget state) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            header,
-            Expanded(child: state),
-          ],
-        );
-        return switch ((access, root)) {
-          (AsyncData<bool>(value: true), AsyncData<String>(:final value)) =>
-            FolderBody(
-              dir: value,
-              header: header,
-              preface: const Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[_StorageGroup(), GroupHeading('Folders')],
+    final FolderBar? bar = access.value == true && root.hasValue
+        ? folderBar(ref, root.value!)
+        : null;
+    return PopScope(
+      canPop: !(bar?.selecting ?? false),
+      onPopInvokedWithResult: (bool didPop, _) {
+        if (!didPop) ref.read(selectionProvider.notifier).clear();
+      },
+      child: LargeTitleScaffold(
+        title: 'Files',
+        grouped: true,
+        barTitle: bar?.barTitle,
+        leading: bar?.leading,
+        trailing: bar?.trailing ?? const <Widget>[],
+        body: (BuildContext context, Widget header) {
+          Widget headed(Widget state) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              header,
+              Expanded(child: state),
+            ],
+          );
+          return switch ((access, root)) {
+            (AsyncData<bool>(value: true), AsyncData<String>(:final value)) =>
+              FolderBody(
+                dir: value,
+                header: header,
+                preface: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[_StorageGroup(), GroupHeading('Folders')],
+                ),
+              ),
+            (AsyncData<bool>(value: false), _) => headed(
+              EmptyState(
+                icon: CupertinoIcons.folder_open,
+                title: 'See every file on your phone',
+                message:
+                    'Files shows all your folders, including PDFs and ZIPs. '
+                    'Android asks you to turn on All files access for fotos '
+                    'first. Photos, Videos and Albums work without it.',
+                actionLabel: 'Open settings',
+                onAction: () => ref
+                    .read(nativeChannelProvider)
+                    .openAllFilesAccessSettings(),
               ),
             ),
-          (AsyncData<bool>(value: false), _) => headed(
-            EmptyState(
-              icon: CupertinoIcons.folder_open,
-              title: 'See every file on your phone',
-              message:
-                  'Files shows all your folders, including PDFs and ZIPs. '
-                  'Android asks you to turn on All files access for fotos '
-                  'first. Photos, Videos and Albums work without it.',
-              actionLabel: 'Open settings',
-              onAction: () =>
-                  ref.read(nativeChannelProvider).openAllFilesAccessSettings(),
+            (AsyncError<bool>(), _) || (_, AsyncError<String>()) => headed(
+              EmptyState(
+                icon: CupertinoIcons.exclamationmark_circle,
+                title: 'Couldn\'t open Files',
+                message: 'Android didn\'t answer. Try again.',
+                actionLabel: 'Try again',
+                onAction: () {
+                  ref.invalidate(filesAccessProvider);
+                  ref.invalidate(storageRootProvider);
+                },
+              ),
             ),
-          ),
-          (AsyncError<bool>(), _) || (_, AsyncError<String>()) => headed(
-            EmptyState(
-              icon: CupertinoIcons.exclamationmark_circle,
-              title: 'Couldn\'t open Files',
-              message: 'Android didn\'t answer. Try again.',
-              actionLabel: 'Try again',
-              onAction: () {
-                ref.invalidate(filesAccessProvider);
-                ref.invalidate(storageRootProvider);
-              },
-            ),
-          ),
-          _ => headed(const SizedBox.shrink()),
-        };
-      },
+            _ => headed(const SizedBox.shrink()),
+          };
+        },
+      ),
     );
   }
 }
@@ -236,6 +251,69 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
 
   void _changed() => setState(() {});
 
+  String get _owner => filesSelectionOwner(widget.dir);
+
+  /// What a sweep is setting the rows it passes to: the opposite of the
+  /// row it started on.
+  bool? _sweepTo;
+  String? _sweepFrom;
+
+  /// The paths on screen, in order, for the sweep to fill between.
+  List<String> _shown = const <String>[];
+
+  void _startSelecting(String path) {
+    AppHaptics.longPress();
+    ref
+        .read(selectionProvider.notifier)
+        .start(
+          _owner,
+          filesSelectionActions(ref, widget.dir),
+          initial: <String>{path},
+        );
+  }
+
+  void _set(String path, bool on) {
+    final Set<String> ids = ref.read(selectionProvider).ids;
+    if (ids.contains(path) == on) return;
+    ref.read(selectionProvider.notifier).toggle(path);
+    AppHaptics.tick();
+  }
+
+  String? _pathAt(Offset global) {
+    final HitTestResult result = HitTestResult();
+    WidgetsBinding.instance.hitTestInView(
+      result,
+      global,
+      View.of(context).viewId,
+    );
+    for (final HitTestEntry<HitTestTarget> e in result.path) {
+      final HitTestTarget t = e.target;
+      if (t is RenderMetaData && t.metaData is _RowTag) {
+        return (t.metaData as _RowTag).path;
+      }
+    }
+    return null;
+  }
+
+  void _sweepStart(String path) {
+    _sweepFrom = path;
+    _sweepTo = !ref.read(selectionProvider).ids.contains(path);
+    _set(path, _sweepTo!);
+  }
+
+  /// Sets every row between the one the sweep began on and the one under
+  /// the finger, so a fast drag cannot skip the rows it jumped over.
+  void _sweepUpdate(Offset global) {
+    final String? path = _pathAt(global);
+    if (path == null || _sweepTo == null) return;
+    final int from = _shown.indexOf(_sweepFrom!);
+    final int to = _shown.indexOf(path);
+    if (from < 0 || to < 0) return;
+    for (int i = from < to ? from : to; i <= (from < to ? to : from); i++) {
+      _set(_shown[i], _sweepTo!);
+    }
+  }
+
   @override
   void dispose() {
     _query.dispose();
@@ -248,6 +326,8 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
     final String dir = widget.dir;
     final Widget header = widget.header;
     final AsyncValue<List<FileEntry>> list = ref.watch(folderProvider(dir));
+    final SelectionState sel = ref.watch(selectionProvider);
+    final bool selecting = sel.isActiveFor(_owner);
     // The page does not resize for the keyboard, so the list makes room for
     // it itself and the last match can scroll clear.
     final double bottom =
@@ -282,6 +362,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
             : entries
                   .where((FileEntry e) => e.name.toLowerCase().contains(q))
                   .toList();
+        _shown = <String>[for (final FileEntry e in shown) e.path];
         return EntranceScope(
           child: CustomScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -337,12 +418,23 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                     final Widget row = InsetGroupItem(
                       first: i == 0,
                       last: i == shown.length - 1,
-                      child: FileRow(
-                        key: ValueKey<String>(e.path),
-                        entry: e,
-                        onTap: () => openEntry(context, ref, e, entries),
-                        onMore: () => showEntryActions(context, ref, e),
-                        onDelete: () => deleteEntry(context, ref, e),
+                      child: MetaData(
+                        metaData: _RowTag(e.path),
+                        child: FileRow(
+                          key: ValueKey<String>(e.path),
+                          entry: e,
+                          selected: selecting ? sel.ids.contains(e.path) : null,
+                          onTap: selecting
+                              ? () => ref
+                                    .read(selectionProvider.notifier)
+                                    .toggle(e.path)
+                              : () => openEntry(context, ref, e, entries),
+                          onLongPress: () => _startSelecting(e.path),
+                          onSweepStart: (_) => _sweepStart(e.path),
+                          onSweepUpdate: _sweepUpdate,
+                          onMore: () => showEntryActions(context, ref, e),
+                          onDelete: () => deleteEntry(context, ref, e),
+                        ),
                       ),
                     );
                     return widget.animateIn
@@ -357,6 +449,12 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
       },
     );
   }
+}
+
+/// Marks a row for the sweep's hit test.
+class _RowTag {
+  const _RowTag(this.path);
+  final String path;
 }
 
 /// iOS's search field, with Cancel sliding in beside it while it is in use.

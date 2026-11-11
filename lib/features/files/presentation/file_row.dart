@@ -5,34 +5,114 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 
 import '../../../core/format/formatters.dart';
-import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/swipe_actions.dart';
 import '../domain/file_entry.dart';
 
 /// One line in a folder: icon (or thumbnail), name, size and date. Swipe
-/// left for More and Delete, or long-press for every action.
+/// left for More and Delete; press and hold to start selecting.
+///
+/// While the folder is selecting, [selected] is non-null: the row shows a
+/// tick, a tap toggles it, and a drag that starts on the tick sweeps the
+/// rows it passes over.
 class FileRow extends StatelessWidget {
   const FileRow({
     super.key,
     required this.entry,
     required this.onTap,
+    required this.onLongPress,
     required this.onMore,
     required this.onDelete,
+    this.selected,
+    this.onSweepStart,
+    this.onSweepUpdate,
   });
 
   final FileEntry entry;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
   final VoidCallback onMore;
   final VoidCallback onDelete;
+
+  /// Null when the folder is not selecting.
+  final bool? selected;
+  final ValueChanged<Offset>? onSweepStart;
+  final ValueChanged<Offset>? onSweepUpdate;
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
+    final bool selecting = selected != null;
+    final bool on = selected ?? false;
     final String meta = entry.isFolder
         ? Fmt.date(entry.modified)
         : '${Fmt.size(entry.size)} · ${Fmt.date(entry.modified)}';
+    final Widget row = Material(
+      color: on
+          ? Color.alphaBlend(cs.primary.withValues(alpha: 0.12), cs.groupedRow)
+          : cs.groupedRow,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: selecting ? null : onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: <Widget>[
+              _Tick(
+                shown: selecting,
+                on: on,
+                onSweepStart: onSweepStart,
+                onSweepUpdate: onSweepUpdate,
+              ),
+              FileIcon(entry: entry, size: 36),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      entry.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 16, color: cs.onSurface),
+                    ),
+                    Text(
+                      meta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (entry.isFolder && !selecting)
+                Padding(
+                  padding: const EdgeInsets.only(left: AppSpacing.sm),
+                  child: Icon(
+                    CupertinoIcons.chevron_right,
+                    size: 16,
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selecting) {
+      return Semantics(
+        checked: on,
+        inMutuallyExclusiveGroup: false,
+        child: row,
+      );
+    }
     return SwipeActions(
       actions: <SwipeAction>[
         SwipeAction(
@@ -49,63 +129,68 @@ class FileRow extends StatelessWidget {
       ],
       child: Semantics(
         customSemanticsActions: <CustomSemanticsAction, VoidCallback>{
+          const CustomSemanticsAction(label: 'Select'): onLongPress,
           const CustomSemanticsAction(label: 'More options'): onMore,
           const CustomSemanticsAction(label: 'Delete'): onDelete,
         },
-        child: Material(
-          color: cs.groupedRow,
-          child: InkWell(
-            onTap: onTap,
-            onLongPress: () {
-              AppHaptics.longPress();
-              onMore();
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: Row(
-                children: <Widget>[
-                  FileIcon(entry: entry, size: 36),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          entry.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 16, color: cs.onSurface),
-                        ),
-                        Text(
-                          meta,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
+        child: row,
+      ),
+    );
+  }
+}
+
+/// The selection tick, which slides in ahead of the icon. A vertical drag
+/// begun on it belongs to the sweep, not to the list's scrolling: the inner
+/// recognizer sees each move first and so claims the gesture.
+class _Tick extends StatelessWidget {
+  const _Tick({
+    required this.shown,
+    required this.on,
+    this.onSweepStart,
+    this.onSweepUpdate,
+  });
+
+  final bool shown;
+  final bool on;
+  final ValueChanged<Offset>? onSweepStart;
+  final ValueChanged<Offset>? onSweepUpdate;
+
+  static const double _size = 24;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      duration: AppMotion.medium,
+      curve: AppMotion.decelerate,
+      width: shown ? _size + AppSpacing.md : 0,
+      height: 36,
+      alignment: Alignment.centerLeft,
+      clipBehavior: Clip.hardEdge,
+      decoration: const BoxDecoration(),
+      child: !shown
+          ? null
+          : GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragStart: (DragStartDetails d) =>
+                  onSweepStart?.call(d.globalPosition),
+              onVerticalDragUpdate: (DragUpdateDetails d) =>
+                  onSweepUpdate?.call(d.globalPosition),
+              child: SizedBox(
+                width: _size + AppSpacing.md,
+                height: 36,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Icon(
+                    on
+                        ? CupertinoIcons.checkmark_circle_fill
+                        : CupertinoIcons.circle,
+                    size: _size,
+                    color: on ? cs.primary : cs.onSurfaceVariant,
                   ),
-                  if (entry.isFolder)
-                    Padding(
-                      padding: const EdgeInsets.only(left: AppSpacing.sm),
-                      child: Icon(
-                        CupertinoIcons.chevron_right,
-                        size: 16,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-                      ),
-                    ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

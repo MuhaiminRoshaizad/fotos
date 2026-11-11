@@ -13,14 +13,14 @@ import '../domain/file_entry.dart';
 import 'files_providers.dart';
 
 /// Lets the user walk folders and confirm one. Returns its path.
-/// [exclude] keeps a folder from being moved into itself.
+/// [exclude] keeps folders from being moved into themselves.
 Future<String?> pickFolder(
   BuildContext context,
   WidgetRef ref, {
   required String start,
   required String root,
   required String action,
-  String? exclude,
+  Set<String> exclude = const <String>{},
 }) {
   return showAppSheet<String>(
     context,
@@ -39,13 +39,13 @@ class _FolderPicker extends ConsumerStatefulWidget {
     required this.start,
     required this.root,
     required this.action,
-    this.exclude,
+    this.exclude = const <String>{},
   });
 
   final String start;
   final String root;
   final String action;
-  final String? exclude;
+  final Set<String> exclude;
 
   @override
   ConsumerState<_FolderPicker> createState() => _FolderPickerState();
@@ -82,7 +82,7 @@ class _FolderPickerState extends ConsumerState<_FolderPicker> {
   Widget build(BuildContext context) {
     final AsyncValue<List<FileEntry>> list = ref.watch(folderProvider(_dir));
     final List<FileEntry> folders = (list.value ?? const <FileEntry>[])
-        .where((FileEntry e) => e.isFolder && e.path != widget.exclude)
+        .where((FileEntry e) => e.isFolder && !widget.exclude.contains(e.path))
         .toList();
     return DraggableScrollableSheet(
       expand: false,
