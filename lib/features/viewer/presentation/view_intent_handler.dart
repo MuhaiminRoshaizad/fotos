@@ -83,20 +83,18 @@ class _ViewIntentHandlerState extends ConsumerState<ViewIntentHandler> {
       }
       return;
     }
-    // Page through the rest of the library from there, as the camera's
-    // own gallery does.
-    final List<AssetEntity> all = await ref.read(
-      libraryProvider(MediaKind.all).future,
-    );
-    final int i = all.indexWhere((AssetEntity e) => e.id == id);
+    // Open on this one at once; the library (about half a second for a
+    // thousand items) follows, so it can be paged through from there, as
+    // the camera's own gallery does.
     ref
         .read(routerProvider)
         .push(
           '/viewer',
           extra: ViewerArgs(
-            items: i < 0 ? <AssetEntity>[asset] : all,
-            index: i < 0 ? 0 : i,
+            items: <AssetEntity>[asset],
+            index: 0,
             heroPrefix: 'intent',
+            library: ref.read(libraryProvider(MediaKind.all).future),
           ),
         );
   }

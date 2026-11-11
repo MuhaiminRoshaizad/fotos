@@ -26,11 +26,18 @@ class ViewerArgs {
     required this.items,
     required this.index,
     required this.heroPrefix,
+    this.library,
   });
 
   final List<AssetEntity> items;
   final int index;
   final String heroPrefix;
+
+  /// The whole list to page through, still loading. The viewer shows
+  /// [items] at once and takes this in when it lands, staying on the same
+  /// photo: opening one photo from the widget or the camera need not wait
+  /// for the library.
+  final Future<List<AssetEntity>>? library;
 }
 
 /// Full-screen photo and video viewer. Swipe sideways to page, down to close,
@@ -49,10 +56,14 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       GlobalKey<ExtendedImageSlidePageState>();
   late final List<AssetEntity> _items = List<AssetEntity>.of(widget.args.items);
   late int _index = widget.args.index;
-  late final ExtendedPageController _pages = ExtendedPageController(
-    initialPage: _index,
-    pageSpacing: 16,
-  );
+  late ExtendedPageController _pages = _pagesAt(_index);
+
+  /// Bumped when the list is swapped, so the pages are built afresh at the
+  /// new position instead of showing the new list's first item for a frame.
+  int _generation = 0;
+
+  static ExtendedPageController _pagesAt(int i) =>
+      ExtendedPageController(initialPage: i, pageSpacing: 16);
   final ScrollController _strip = ScrollController();
   bool _chrome = true;
   bool _passedThreshold = false;
@@ -69,6 +80,32 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _centreStrip(false));
+    widget.args.library?.then(
+      _takeLibrary,
+      onError: (Object _) {
+        // Paging stays limited to what the viewer opened with.
+      },
+    );
+  }
+
+  void _takeLibrary(List<AssetEntity> all) {
+    if (!mounted) return;
+    final String id = _current.id;
+    final int at = all.indexWhere((AssetEntity e) => e.id == id);
+    if (at < 0) return;
+    final ExtendedPageController old = _pages;
+    setState(() {
+      _items
+        ..clear()
+        ..addAll(all);
+      _index = at;
+      _pages = _pagesAt(at);
+      _generation++;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      old.dispose();
+      if (mounted) _centreStrip(false);
+    });
   }
 
   @override
@@ -278,6 +315,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               child: Material(
                 type: MaterialType.transparency,
                 child: ExtendedImageGesturePageView.builder(
+                  key: ValueKey<int>(_generation),
                   controller: _pages,
                   itemCount: _items.length,
                   onPageChanged: (int i) {
