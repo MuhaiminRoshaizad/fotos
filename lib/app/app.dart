@@ -1,3 +1,4 @@
+import '../core/widgets/stable_insets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -17,8 +18,9 @@ class FotosApp extends ConsumerWidget {
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
       routerConfig: ref.watch(routerProvider),
-      builder: (BuildContext context, Widget? child) =>
-          ViewIntentHandler(child: child ?? const SizedBox.shrink()),
+      builder: (BuildContext context, Widget? child) => StableInsets(
+        child: ViewIntentHandler(child: child ?? const SizedBox.shrink()),
+      ),
     );
   }
 }
