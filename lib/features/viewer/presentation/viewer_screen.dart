@@ -12,6 +12,7 @@ import '../../../core/haptics/app_haptics.dart';
 import '../../../core/media/media_actions.dart';
 import '../../../core/media/media_flight.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/app_sheet.dart';
 import 'details_sheet.dart';
 import 'video_page.dart';
@@ -528,17 +529,12 @@ class _Actions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget action(IconData icon, String label, VoidCallback onTap) {
-      return Tooltip(
-        message: label,
-        child: CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(56, 48),
-          onPressed: onTap,
-          child: Icon(icon, color: Colors.white, semanticLabel: label),
-        ),
-      );
-    }
+    Widget action(IconData icon, String label, VoidCallback onTap) => Pressable(
+      label: label,
+      minSize: const Size(56, 48),
+      onTap: onTap,
+      child: Icon(icon, color: Colors.white),
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -555,10 +551,20 @@ class _Actions extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: <Widget>[
               action(CupertinoIcons.square_arrow_up, 'Share', onShare),
-              action(
-                favourite ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                favourite ? 'Remove from Favourites' : 'Favourite',
-                onFavourite,
+              // The heart fills in place and swells once as it does.
+              Pressable(
+                label: favourite ? 'Remove from Favourites' : 'Favourite',
+                minSize: const Size(56, 48),
+                onTap: onFavourite,
+                child: Pop(
+                  on: favourite,
+                  child: GlyphSwap(
+                    icon: favourite
+                        ? CupertinoIcons.heart_fill
+                        : CupertinoIcons.heart,
+                    color: Colors.white,
+                  ),
+                ),
               ),
               action(CupertinoIcons.info_circle, 'Details', onDetails),
               action(CupertinoIcons.trash, 'Delete', onDelete),

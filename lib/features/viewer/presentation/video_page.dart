@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -11,6 +11,7 @@ import 'package:video_player/video_player.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/motion.dart';
 import '../data/viewer_settings.dart';
 import 'video_session.dart';
 import 'viewer_glass.dart';
@@ -260,23 +261,42 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                 ),
               ),
             ),
-            if (c != null && !c.value.isPlaying && !_scrubbing && widget.chrome)
-              Center(
-                child: ViewerGlass(
-                  shape: const CircleBorder(),
-                  child: CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(72, 72),
-                    onPressed: _togglePlay,
-                    child: const Icon(
-                      CupertinoIcons.play_fill,
-                      size: 32,
-                      color: Colors.white,
-                      semanticLabel: 'Play',
+            Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                reverseDuration: const Duration(milliseconds: 140),
+                switchInCurve: Curves.easeOutBack,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (Widget child, Animation<double> a) =>
+                    FadeTransition(
+                      opacity: a,
+                      child: ScaleTransition(
+                        scale: Tween<double>(begin: 0.7, end: 1).animate(a),
+                        child: child,
+                      ),
                     ),
-                  ),
-                ),
+                child:
+                    c != null &&
+                        !c.value.isPlaying &&
+                        !_scrubbing &&
+                        widget.chrome
+                    ? ViewerGlass(
+                        key: const ValueKey<String>('play'),
+                        shape: const CircleBorder(),
+                        child: Pressable(
+                          label: 'Play',
+                          minSize: const Size(72, 72),
+                          onTap: _togglePlay,
+                          child: const Icon(
+                            CupertinoIcons.play_fill,
+                            size: 32,
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
+            ),
             if (c != null)
               Positioned(
                 left: 0,
@@ -433,25 +453,7 @@ class _Controls extends ConsumerWidget {
     final ViewerSettings s =
         ref.watch(viewerSettingsProvider).value ?? const ViewerSettings();
     const Color fg = Colors.white;
-    Widget button(
-      IconData icon,
-      String label,
-      VoidCallback onTap, {
-      bool dim = false,
-    }) => Tooltip(
-      message: label,
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(48, 44),
-        onPressed: onTap,
-        child: Icon(
-          icon,
-          size: AppIconSize.dense + 2,
-          color: dim ? Colors.white54 : fg,
-          semanticLabel: label,
-        ),
-      ),
-    );
+    const double glyph = AppIconSize.dense + 2;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.lg,
@@ -467,12 +469,16 @@ class _Controls extends ConsumerWidget {
             shape: const StadiumBorder(),
             child: Row(
               children: <Widget>[
-                button(
-                  v.isPlaying
-                      ? CupertinoIcons.pause_fill
-                      : CupertinoIcons.play_fill,
-                  v.isPlaying ? 'Pause' : 'Play',
-                  onPlayPause,
+                Pressable(
+                  label: v.isPlaying ? 'Pause' : 'Play',
+                  onTap: onPlayPause,
+                  child: GlyphSwap(
+                    icon: v.isPlaying
+                        ? CupertinoIcons.pause_fill
+                        : CupertinoIcons.play_fill,
+                    size: glyph,
+                    color: fg,
+                  ),
                 ),
                 Expanded(
                   child: Text(
@@ -486,26 +492,36 @@ class _Controls extends ConsumerWidget {
                     ),
                   ),
                 ),
-                button(
-                  s.loop ? CupertinoIcons.repeat_1 : CupertinoIcons.repeat,
-                  s.loop ? 'Loop on' : 'Loop off',
-                  () {
+                // One glyph for both states: dim while off, bright while
+                // on, and it turns once as it comes on.
+                Pressable(
+                  label: s.loop ? 'Loop on' : 'Loop off',
+                  onTap: () {
+                    if (!s.loop) AppHaptics.light();
                     ref.read(viewerSettingsProvider.notifier).setLoop(!s.loop);
                     controller.setLooping(!s.loop);
                   },
-                  dim: !s.loop,
+                  child: TurnOnGlyph(
+                    icon: CupertinoIcons.repeat,
+                    on: s.loop,
+                    size: glyph,
+                  ),
                 ),
-                button(
-                  s.muted
-                      ? CupertinoIcons.speaker_slash
-                      : CupertinoIcons.speaker_2,
-                  s.muted ? 'Unmute' : 'Mute',
-                  () {
+                Pressable(
+                  label: s.muted ? 'Unmute' : 'Mute',
+                  onTap: () {
                     ref
                         .read(viewerSettingsProvider.notifier)
                         .setMuted(!s.muted);
                     controller.setVolume(s.muted ? 1 : 0);
                   },
+                  child: GlyphSwap(
+                    icon: s.muted
+                        ? CupertinoIcons.speaker_slash
+                        : CupertinoIcons.speaker_2,
+                    size: glyph,
+                    color: fg,
+                  ),
                 ),
               ],
             ),
