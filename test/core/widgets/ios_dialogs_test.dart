@@ -22,6 +22,7 @@ Future<BuildContext> _host(WidgetTester tester) async {
 }
 
 void main() {
+  _nameSheetTests();
   testWidgets('an action sheet returns the choice, and null on Cancel', (
     WidgetTester tester,
   ) async {
@@ -69,5 +70,60 @@ void main() {
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
     expect(await ok, isTrue);
+  });
+}
+
+void _nameSheetTests() {
+  testWidgets('a long file name wraps in the rename sheet and keeps its '
+      'ending', (WidgetTester tester) async {
+    final BuildContext ctx = await _host(tester);
+    const String long =
+        'Moonlit Harbor Chronicles Vol. 03 (2024) (Digital) (Kuro-Scans).cbz';
+    final Future<String?> result = promptName(
+      ctx,
+      title: 'Rename file',
+      label: 'File name',
+      hint: 'File name',
+      confirmLabel: 'Rename',
+      initial: long,
+      selectStem: true,
+      validate: (String v) => v.isEmpty ? 'Enter a name' : null,
+    );
+    await tester.pumpAndSettle();
+    final EditableText field = tester.widget(find.byType(EditableText));
+    // Only the name is edited; the ending sits after it, kept.
+    expect(field.controller.text, long.substring(0, long.length - 4));
+    expect(find.text('.cbz'), findsOneWidget);
+    // The whole name shows: it wraps instead of scrolling sideways.
+    expect(tester.getSize(find.byType(EditableText)).height, greaterThan(30));
+
+    await tester.enterText(find.byType(EditableText), 'Moonlit Vol. 03');
+    await tester.tap(find.text('Rename').last);
+    await tester.pumpAndSettle();
+    expect(await result, 'Moonlit Vol. 03.cbz');
+  });
+
+  testWidgets('a name sheet stays above the keyboard', (
+    WidgetTester tester,
+  ) async {
+    final BuildContext ctx = await _host(tester);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+    addTearDown(tester.view.resetViewInsets);
+    promptName(
+      ctx,
+      title: 'New album',
+      label: 'Album name',
+      hint: 'e.g. Holiday 2026',
+      confirmLabel: 'Create',
+      validate: (_) => null,
+    );
+    await tester.pumpAndSettle();
+    final double keyboardTop =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio -
+        900 / tester.view.devicePixelRatio;
+    expect(
+      tester.getBottomLeft(find.byType(EditableText)).dy,
+      lessThan(keyboardTop),
+    );
   });
 }
