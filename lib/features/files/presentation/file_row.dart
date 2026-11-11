@@ -29,6 +29,7 @@ class FileRow extends StatelessWidget {
     required this.onMore,
     required this.onDelete,
     this.selected,
+    this.pinned = false,
     this.onSweepStart,
     this.onSweepUpdate,
   });
@@ -41,6 +42,9 @@ class FileRow extends StatelessWidget {
 
   /// Null when the folder is not selecting.
   final bool? selected;
+
+  /// Pinned rows sit first in their folder and say so.
+  final bool pinned;
   final ValueChanged<Offset>? onSweepStart;
   final ValueChanged<Offset>? onSweepUpdate;
 
@@ -84,8 +88,23 @@ class FileRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 16, color: cs.onSurface),
                     ),
-                    Text(
-                      meta,
+                    Text.rich(
+                      TextSpan(
+                        children: <InlineSpan>[
+                          if (pinned) ...<InlineSpan>[
+                            WidgetSpan(
+                              alignment: PlaceholderAlignment.middle,
+                              child: Icon(
+                                CupertinoIcons.pin_fill,
+                                size: 12,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            const TextSpan(text: ' Pinned · '),
+                          ],
+                          TextSpan(text: meta),
+                        ],
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

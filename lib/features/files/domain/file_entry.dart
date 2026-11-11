@@ -54,6 +54,16 @@ int compareEntries(FileEntry a, FileEntry b) {
   return a.name.toLowerCase().compareTo(b.name.toLowerCase());
 }
 
+/// [entries] with the pinned ones moved to the top, each part keeping its
+/// order (folders first, then A to Z).
+List<FileEntry> pinnedFirst(List<FileEntry> entries, Set<String> pinned) {
+  if (pinned.isEmpty) return entries;
+  return <FileEntry>[
+    ...entries.where((FileEntry e) => pinned.contains(e.path)),
+    ...entries.where((FileEntry e) => !pinned.contains(e.path)),
+  ];
+}
+
 /// A free name for a copy or extraction: "holiday", then "holiday (2)" ...
 String uniqueName(String wanted, Set<String> taken) {
   final Set<String> lower = taken.map((String t) => t.toLowerCase()).toSet();

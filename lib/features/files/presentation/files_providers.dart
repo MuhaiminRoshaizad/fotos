@@ -50,10 +50,11 @@ final zipCoverProvider = FutureProvider.family<Uint8List?, (String, int)>(
       ref.watch(nativeChannelProvider).zipCover(zip.$1, 400),
 );
 
-/// Folders the user pinned to the top of the Files tab, newest pin first.
-/// Paths, kept in preferences; a pinned folder that has since been deleted
-/// or moved is left out by the page that shows them.
-class PinnedFoldersNotifier extends AsyncNotifier<List<String>> {
+/// Files and folders the user pinned, newest pin first. They are listed at
+/// the top of the Files tab and first in their own folder. Paths, kept in
+/// preferences under the key folder pins always used; one that has since
+/// been deleted or moved is left out by the pages that show them.
+class PinnedNotifier extends AsyncNotifier<List<String>> {
   static const String _key = 'files.pinned';
 
   @override
@@ -71,10 +72,9 @@ class PinnedFoldersNotifier extends AsyncNotifier<List<String>> {
   }
 }
 
-final pinnedFoldersProvider =
-    AsyncNotifierProvider<PinnedFoldersNotifier, List<String>>(
-      PinnedFoldersNotifier.new,
-    );
+final pinnedProvider = AsyncNotifierProvider<PinnedNotifier, List<String>>(
+  PinnedNotifier.new,
+);
 
 /// What is typed in a folder's search field, by folder path. Held here, not
 /// in the field's widget, because the bar above the list needs it too:

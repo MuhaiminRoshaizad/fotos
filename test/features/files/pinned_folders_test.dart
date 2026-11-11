@@ -13,32 +13,28 @@ void main() {
   test('pinning puts the newest first, and pinning again unpins', () async {
     final ProviderContainer c = ProviderContainer();
     addTearDown(c.dispose);
-    expect(await c.read(pinnedFoldersProvider.future), isEmpty);
+    expect(await c.read(pinnedProvider.future), isEmpty);
 
-    final PinnedFoldersNotifier pins = c.read(pinnedFoldersProvider.notifier);
+    final PinnedNotifier pins = c.read(pinnedProvider.notifier);
     await pins.toggle('/root/Download');
     await pins.toggle('/root/Download/Comics');
-    expect(c.read(pinnedFoldersProvider).value, <String>[
+    expect(c.read(pinnedProvider).value, <String>[
       '/root/Download/Comics',
       '/root/Download',
     ]);
 
     await pins.toggle('/root/Download');
-    expect(c.read(pinnedFoldersProvider).value, <String>[
-      '/root/Download/Comics',
-    ]);
+    expect(c.read(pinnedProvider).value, <String>['/root/Download/Comics']);
   });
 
   test('pins are still there the next time the app starts', () async {
     final ProviderContainer first = ProviderContainer();
-    await first.read(pinnedFoldersProvider.future);
-    await first.read(pinnedFoldersProvider.notifier).toggle('/root/Comics');
+    await first.read(pinnedProvider.future);
+    await first.read(pinnedProvider.notifier).toggle('/root/Comics');
     first.dispose();
 
     final ProviderContainer second = ProviderContainer();
     addTearDown(second.dispose);
-    expect(await second.read(pinnedFoldersProvider.future), <String>[
-      '/root/Comics',
-    ]);
+    expect(await second.read(pinnedProvider.future), <String>['/root/Comics']);
   });
 }

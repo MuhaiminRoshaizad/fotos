@@ -23,6 +23,7 @@ class FileTile extends ConsumerWidget {
     required this.onLongPress,
     required this.onMore,
     this.selected,
+    this.pinned = false,
   });
 
   final FileEntry entry;
@@ -32,6 +33,9 @@ class FileTile extends ConsumerWidget {
 
   /// Null when the folder is not selecting.
   final bool? selected;
+
+  /// Pinned tiles sit first in their folder, marked with a pin.
+  final bool pinned;
 
   /// Height of the name under the picture, at the user's text size.
   static double labelHeight(BuildContext context) =>
@@ -52,7 +56,7 @@ class FileTile extends ConsumerWidget {
     return Semantics(
       button: true,
       checked: selecting ? on : null,
-      label: entry.name,
+      label: pinned ? '${entry.name}, pinned' : entry.name,
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -78,6 +82,25 @@ class FileTile extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  if (pinned && !selecting)
+                    const Positioned(
+                      left: 6,
+                      top: 6,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0x8C000000),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(5),
+                          child: Icon(
+                            CupertinoIcons.pin_fill,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
                   if (selecting)
                     Positioned(
                       left: 6,

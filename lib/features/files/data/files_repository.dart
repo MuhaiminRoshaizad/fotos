@@ -35,6 +35,23 @@ class FilesRepository {
     return out;
   }
 
+  /// The file or folder at [path], or null once it has been moved or
+  /// deleted. Synchronous: it reads a handful of pins while the Files tab
+  /// builds.
+  FileEntry? entryAtSync(String path) {
+    final FileStat s = FileStat.statSync(path);
+    if (s.type == FileSystemEntityType.notFound) return null;
+    final bool isDir = s.type == FileSystemEntityType.directory;
+    final String name = p.basename(path);
+    return FileEntry(
+      path: path,
+      name: name,
+      kind: kindOf(name, isDirectory: isDir),
+      size: isDir ? 0 : s.size,
+      modified: s.modified,
+    );
+  }
+
   /// The names in [dir], hidden ones included, without reading each
   /// entry's size and date as [list] does.
   Future<Set<String>> namesIn(String dir) async => <String>{

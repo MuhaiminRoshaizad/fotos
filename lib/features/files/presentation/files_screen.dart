@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/cupertino.dart'
     show CupertinoIcons, CupertinoSliverRefreshControl;
@@ -27,6 +26,7 @@ import '../../../core/widgets/search_field.dart';
 import '../../../core/widgets/swipe_actions.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
+import '../data/files_repository.dart';
 import '../domain/file_entry.dart';
 import 'file_actions.dart';
 import 'file_row.dart';
@@ -139,8 +139,8 @@ class _FilesScreenState extends ConsumerState<FilesScreen> {
   }
 }
 
-/// Pinned folders, above everything else on the Files tab. Nothing is
-/// shown until a folder is pinned from its More sheet.
+/// Pinned folders and files, above everything else on the Files tab.
+/// Nothing is shown until something is pinned from its More sheet.
 class _PinnedGroup extends ConsumerWidget {
   const _PinnedGroup();
 
@@ -148,46 +148,51 @@ class _PinnedGroup extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ColorScheme cs = Theme.of(context).colorScheme;
     final String? root = ref.watch(storageRootProvider).value;
-    final List<String> pins = <String>[
+    final FilesRepository repo = ref.watch(filesRepositoryProvider);
+    final List<FileEntry> pins = <FileEntry>[
       for (final String path
-          in ref.watch(pinnedFoldersProvider).value ?? const <String>[])
-        // A folder deleted or renamed since it was pinned has gone.
-        if (Directory(path).existsSync()) path,
+          in ref.watch(pinnedProvider).value ?? const <String>[])
+        // One deleted, moved or renamed since it was pinned has gone.
+        ?repo.entryAtSync(path),
     ];
     if (pins.isEmpty) return const SizedBox.shrink();
+    String where(String path) {
+      if (root == null) return '';
+      final String rel = p.relative(p.dirname(path), from: root);
+      return rel == '.' ? 'Internal storage' : rel.replaceAll('/', ' › ');
+    }
+
     return InsetGroup(
       header: 'Pinned',
       children: <Widget>[
-        for (final String path in pins)
+        for (final FileEntry e in pins)
           SwipeActions(
-            key: ValueKey<String>(path),
+            key: ValueKey<String>(e.path),
             actions: <SwipeAction>[
               SwipeAction(
                 icon: CupertinoIcons.pin_slash,
                 label: 'Unpin',
-                onTap: () =>
-                    ref.read(pinnedFoldersProvider.notifier).toggle(path),
+                onTap: () => ref.read(pinnedProvider.notifier).toggle(e.path),
               ),
             ],
             // Opaque, or the Unpin action behind the row shows through.
             child: Material(
               color: cs.groupedRow,
               child: GroupRow(
-                leading: Icon(CupertinoIcons.folder_fill, color: cs.primary),
-                title: p.basename(path),
-                subtitle: root == null
-                    ? null
-                    : p.relative(p.dirname(path), from: root) == '.'
-                    ? 'Internal storage'
-                    : p
-                          .relative(p.dirname(path), from: root)
-                          .replaceAll('/', ' › '),
-                onTap: () => context.push(
-                  Uri(
-                    path: '/files/folder',
-                    queryParameters: <String, String>{'path': path},
-                  ).toString(),
-                ),
+                leading: e.isFolder
+                    ? Icon(CupertinoIcons.folder_fill, color: cs.primary)
+                    : FileIcon(entry: e, size: 32),
+                title: e.name,
+                subtitle: root == null ? null : where(e.path),
+                chevron: e.isFolder,
+                onTap: e.isFolder
+                    ? () => context.push(
+                        Uri(
+                          path: '/files/folder',
+                          queryParameters: <String, String>{'path': e.path},
+                        ).toString(),
+                      )
+                    : () => openEntry(context, ref, e, <FileEntry>[e]),
               ),
             ),
           ),
@@ -477,7 +482,11 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
       ),
       data: (List<FileEntry> entries) {
         final String q = _query.text.trim();
-        final List<FileEntry> shown = filterByName(entries, q);
+        final Set<String> pins = <String>{...?ref.watch(pinnedProvider).value};
+        final List<FileEntry> shown = pinnedFirst(
+          filterByName(entries, q),
+          pins,
+        );
         _shown = <String>[for (final FileEntry e in shown) e.path];
         final List<FileEntry> rows = _withLeaving(shown, q);
         return EntranceScope(
@@ -560,6 +569,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                             selected: selecting
                                 ? sel.ids.contains(e.path)
                                 : null,
+                            pinned: pins.contains(e.path),
                             onTap: selecting
                                 ? () => ref
                                       .read(selectionProvider.notifier)
@@ -590,6 +600,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                           key: ValueKey<String>(e.path),
                           entry: e,
                           selected: selecting ? sel.ids.contains(e.path) : null,
+                          pinned: pins.contains(e.path),
                           onTap: selecting
                               ? () => ref
                                     .read(selectionProvider.notifier)

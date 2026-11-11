@@ -97,11 +97,8 @@ Future<void> showEntryActions(
     }
     if (!context.mounted) return;
   }
-  final bool pinned =
-      entry.isFolder &&
-      (ref.read(pinnedFoldersProvider).value ?? const <String>[]).contains(
-        entry.path,
-      );
+  final bool pinned = (ref.read(pinnedProvider).value ?? const <String>[])
+      .contains(entry.path);
   final String? choice = await showActionSheet<String>(
     context,
     title: entry.name,
@@ -123,11 +120,7 @@ Future<void> showEntryActions(
         SheetChoice<String>('openWith', 'Open with another app'),
         SheetChoice<String>('share', 'Share'),
       ],
-      if (entry.isFolder)
-        SheetChoice<String>(
-          'pin',
-          pinned ? 'Unpin from Files' : 'Pin to Files',
-        ),
+      SheetChoice<String>('pin', pinned ? 'Unpin from Files' : 'Pin to Files'),
       const SheetChoice<String>('rename', 'Rename'),
       const SheetChoice<String>('move', 'Move to…'),
       const SheetChoice<String>('copy', 'Copy to…'),
@@ -170,7 +163,7 @@ Future<void> showEntryActions(
     case 'share':
       await shareEntries(context, <FileEntry>[entry]);
     case 'pin':
-      await ref.read(pinnedFoldersProvider.notifier).toggle(entry.path);
+      await ref.read(pinnedProvider.notifier).toggle(entry.path);
       if (context.mounted) {
         showToast(
           context,
