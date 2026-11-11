@@ -59,7 +59,10 @@ class FotosWidgetService : RemoteViewsService() {
             }
             views.setTextViewText(R.id.badge, badge)
             views.setViewVisibility(R.id.badge, if (badge.isEmpty()) View.GONE else View.VISIBLE)
-            views.setOnClickFillInIntent(R.id.item, Intent().setData(item.uri))
+            // On the picture, not the item's root: a fill-in on the root of a
+            // flipper's item is only stored as a tag, and the tap then opens
+            // fotos without saying which photo.
+            views.setOnClickFillInIntent(R.id.picture, Intent().setData(item.uri))
             return views
         }
 
