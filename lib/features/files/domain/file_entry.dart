@@ -81,6 +81,18 @@ String uniqueName(String wanted, Set<String> taken) {
   }
 }
 
+/// The image among [paths] that stands for a comic — its first page, by
+/// natural name order, the same page a ZIP shows as its cover. Null when none
+/// of [paths] is an image. Whole paths are compared, so pages nested in a
+/// folder (comic/001.jpg) still order before comic/010.jpg.
+String? firstImagePath(Iterable<String> paths) {
+  final List<String> images = <String>[
+    for (final String path in paths)
+      if (kindOf(path, isDirectory: false) == FileKind.image) path,
+  ]..sort(naturalCompare);
+  return images.isEmpty ? null : images.first;
+}
+
 /// The entries whose name contains [query], ignoring case; all of them for
 /// an empty query. What a folder's search field shows, and so what its
 /// Select all selects.

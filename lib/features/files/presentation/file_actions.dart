@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
+import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/format/formatters.dart';
+import '../../../core/format/natural_sort.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/media/media_providers.dart';
+import '../../../core/media/media_repository.dart';
 import '../../../core/platform/native_channel.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/validation/validators.dart';
@@ -17,6 +20,7 @@ import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/batch_progress.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/toast.dart';
+import '../../albums/data/album_prefs.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../domain/file_entry.dart';
 import 'files_providers.dart';
@@ -436,4 +440,72 @@ Future<void> _extract(
           : null,
     );
   }
+  // Best-effort, after the toast so feedback is immediate: point the new
+  // album's cover at the comic's first page.
+  if (written > 0) await _coverExtractedComic(ref, target);
 }
+
+/// Sets the cover of the album Android forms from a freshly extracted comic to
+/// its first page — the first image by natural name, the page the ZIP showed —
+/// unless the user has already chosen a cover for it. Best-effort: a comic
+/// Android has not finished indexing simply keeps its default cover.
+Future<void> _coverExtractedComic(WidgetRef ref, String target) async {
+  try {
+    // Every image under the extracted folder; a comic's pages may be flat or
+    // sit inside one folder.
+    final List<String> images = <String>[
+      await for (final FileSystemEntity e in Directory(
+        target,
+      ).list(recursive: true, followLinks: false))
+        if (e is File) e.path,
+    ];
+    final String? pageOne = firstImagePath(images);
+    if (pageOne == null) return;
+    final String folder = p.dirname(pageOne); // the album's folder on disk
+    final String name = p.basename(folder);
+    // Let MediaStore see the new pages so they form an album.
+    await ref.read(nativeChannelProvider).scan(images);
+    final String root = await ref.read(storageRootProvider.future);
+    final String rel = _trimSlashes(p.relative(folder, from: root));
+    // Android indexes in the background; give the album a few tries to appear.
+    Album? album;
+    for (int tries = 0; tries < 12 && album == null; tries++) {
+      if (tries > 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
+      ref.invalidate(albumsProvider);
+      for (final Album a in await ref.read(albumsProvider.future)) {
+        final String? r = await a.path.relativePathAsync;
+        if (a.name == name && r != null && _trimSlashes(r) == rel) {
+          album = a;
+          break;
+        }
+      }
+    }
+    if (album == null) return;
+    // Only fill an empty cover; never override one the user chose.
+    final AlbumPrefs prefs = await ref.read(albumPrefsProvider.future);
+    if (prefs.covers.containsKey(album.id)) return;
+    final List<AssetEntity> items = await ref
+        .read(mediaRepositoryProvider)
+        .albumItems(album);
+    if (items.isEmpty) return;
+    final String want = p.basename(pageOne);
+    final AssetEntity first = items.firstWhere(
+      (AssetEntity a) => (a.title ?? '') == want,
+      orElse: () =>
+          (List<AssetEntity>.of(items)..sort(
+                (AssetEntity a, AssetEntity b) =>
+                    naturalCompare(a.title ?? '', b.title ?? ''),
+              ))
+              .first,
+    );
+    await ref.read(albumPrefsProvider.notifier).setCover(album.id, first.id);
+  } on Object {
+    // A cover is a nicety; never let it break an extraction that worked.
+  }
+}
+
+/// A relative path without leading or trailing slashes, so a filesystem path
+/// and photo_manager's (which carries a trailing slash) compare equal.
+String _trimSlashes(String s) => s.replaceAll(RegExp(r'^/+|/+$'), '');

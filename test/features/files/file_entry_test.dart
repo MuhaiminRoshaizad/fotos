@@ -52,6 +52,30 @@ void main() {
     ]);
   });
 
+  test('firstImagePath picks the first page, ignoring non-images', () {
+    expect(
+      firstImagePath(<String>[
+        '/c/Comic/info.txt',
+        '/c/Comic/10.jpg',
+        '/c/Comic/2.jpg',
+        '/c/Comic/cover.png',
+        '/c/Comic/1.jpg',
+      ]),
+      '/c/Comic/1.jpg',
+    );
+  });
+
+  test('firstImagePath orders pages nested in a folder', () {
+    expect(
+      firstImagePath(<String>['/c/Comic/010.jpg', '/c/Comic/002.jpg']),
+      '/c/Comic/002.jpg',
+    );
+  });
+
+  test('firstImagePath is null when nothing is an image', () {
+    expect(firstImagePath(<String>['/c/a.txt', '/c/notes.pdf']), isNull);
+  });
+
   test('uniqueName numbers clashes and keeps the extension', () {
     expect(uniqueName('holiday', <String>{}), 'holiday');
     expect(uniqueName('holiday', <String>{'Holiday'}), 'holiday (2)');
