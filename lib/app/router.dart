@@ -6,6 +6,7 @@ import '../features/albums/presentation/album_screen.dart';
 import '../features/albums/presentation/albums_screen.dart';
 import '../features/albums/presentation/empty_album_screen.dart';
 import '../features/albums/presentation/trash_screen.dart';
+import '../features/albums/presentation/gallery_screen.dart';
 import '../features/files/domain/file_entry.dart';
 import '../features/files/presentation/file_media_viewer.dart';
 import '../features/files/presentation/files_screen.dart';
@@ -109,6 +110,11 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                     path: 'folder/:id',
                     builder: (_, GoRouterState s) =>
                         AlbumScreen(albumId: s.pathParameters['id']!),
+                  ),
+                  GoRoute(
+                    path: 'gallery/:id',
+                    builder: (_, GoRouterState s) =>
+                        GalleryScreen(galleryId: s.pathParameters['id']!),
                   ),
                   GoRoute(
                     path: 'empty',

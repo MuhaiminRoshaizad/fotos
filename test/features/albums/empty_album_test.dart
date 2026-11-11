@@ -54,7 +54,10 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Albums').last);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('New album'));
+    // ＋ offers a new album or a new gallery.
+    await tester.tap(find.byTooltip('New album or gallery'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New album'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(CupertinoTextField), 'Holiday 2026');
     await tester.tap(find.text('Create'));

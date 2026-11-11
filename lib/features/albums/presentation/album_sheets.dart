@@ -18,11 +18,14 @@ import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/toast.dart';
 import '../data/album_prefs.dart';
+import '../data/galleries.dart';
+import 'gallery_sheets.dart';
 
 /// What can be done to an album from its menu.
 enum AlbumOption {
   pin('Pin to top', CupertinoIcons.pin),
   rename('Rename', CupertinoIcons.pencil),
+  gallery('Add to gallery', CupertinoIcons.rectangle_stack_badge_plus),
   cover('Change cover', CupertinoIcons.photo),
   sort('Sort', CupertinoIcons.arrow_up_arrow_down),
   delete('Delete album', CupertinoIcons.trash);
@@ -32,9 +35,21 @@ enum AlbumOption {
   final String label;
   final IconData icon;
 
-  /// The label for an album that is [pinned] or not.
-  String labelFor({required bool pinned}) =>
-      this == AlbumOption.pin && pinned ? 'Unpin' : label;
+  /// The label for an album that is [pinned] or [inGallery], or not.
+  String labelFor({required bool pinned, bool inGallery = false}) =>
+      switch (this) {
+        AlbumOption.pin when pinned => 'Unpin',
+        AlbumOption.gallery when inGallery => 'Remove from gallery',
+        _ => label,
+      };
+
+  IconData iconFor({required bool pinned, bool inGallery = false}) =>
+      switch (this) {
+        AlbumOption.pin when pinned => CupertinoIcons.pin_slash,
+        AlbumOption.gallery when inGallery =>
+          CupertinoIcons.rectangle_stack_badge_minus,
+        _ => icon,
+      };
 }
 
 /// Camera and Screenshots keep their folder names: the camera app and
@@ -62,6 +77,12 @@ Future<Album?> showAlbumOptions(
   Album album,
 ) async {
   final bool pinned = albumIsPinned(ref, album);
+  final bool inGallery =
+      galleryOf(
+        ref.read(galleriesProvider).value ?? const <Gallery>[],
+        album.id,
+      ) !=
+      null;
   final AlbumOption? choice = await showActionSheet<AlbumOption>(
     context,
     title: album.name,
@@ -69,7 +90,7 @@ Future<Album?> showAlbumOptions(
       for (final AlbumOption o in albumOptionsFor(album))
         SheetChoice<AlbumOption>(
           o,
-          o.labelFor(pinned: pinned),
+          o.labelFor(pinned: pinned, inGallery: inGallery),
           destructive: o == AlbumOption.delete,
         ),
     ],
@@ -97,6 +118,20 @@ Future<Album?> runAlbumOption(
       }
     case AlbumOption.rename:
       return renameAlbum(context, ref, album);
+    case AlbumOption.gallery:
+      final Gallery? inside = galleryOf(
+        await ref.read(galleriesProvider.future),
+        album.id,
+      );
+      if (!context.mounted) return null;
+      if (inside == null) {
+        await addAlbumToGallery(context, ref, album);
+      } else {
+        await ref.read(galleriesProvider.notifier).remove(album.id);
+        if (context.mounted) {
+          showToast(context, 'Removed ${album.name} from ${inside.name}');
+        }
+      }
     case AlbumOption.cover:
       await pickAlbumCover(context, ref, album);
     case AlbumOption.sort:
@@ -167,6 +202,7 @@ Future<Album?> renameAlbum(
   }
   if (renamed != null) {
     await ref.read(albumPrefsProvider.notifier).rekey(album.id, renamed.id);
+    await ref.read(galleriesProvider.notifier).rekey(album.id, renamed.id);
   }
   if (context.mounted) showToast(context, 'Renamed to $name');
   return renamed;
@@ -276,6 +312,34 @@ Future<void> showAlbumsOrderSheet(BuildContext context, WidgetRef ref) async {
     await ref
         .read(albumPrefsProvider.notifier)
         .setOrder(
+          AlbumsOrder(AlbumsOrderBy.values[next.$1], reversed: next.$2),
+        );
+  }
+}
+
+/// Chooses the order of the albums inside [gallery].
+Future<void> showGalleryOrderSheet(
+  BuildContext context,
+  WidgetRef ref,
+  Gallery gallery,
+) async {
+  final (int, bool)? next = await _pickSort(
+    context,
+    title: 'Sort ${gallery.name}',
+    labels: <String>[
+      for (final AlbumsOrderBy b in AlbumsOrderBy.values) b.label,
+    ],
+    directions: <(String, String)>[
+      for (final AlbumsOrderBy b in AlbumsOrderBy.values) b.directions,
+    ],
+    by: gallery.order.by.index,
+    reversed: gallery.order.reversed,
+  );
+  if (next != null) {
+    await ref
+        .read(galleriesProvider.notifier)
+        .setOrder(
+          gallery.id,
           AlbumsOrder(AlbumsOrderBy.values[next.$1], reversed: next.$2),
         );
   }

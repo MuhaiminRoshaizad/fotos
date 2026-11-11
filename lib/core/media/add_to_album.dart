@@ -203,7 +203,7 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
             children: <Widget>[
               GroupRow(
                 leading: const Icon(CupertinoIcons.plus),
-                leadingWidth: _Thumb.size,
+                leadingWidth: AlbumThumb.size,
                 title: 'New album',
                 chevron: false,
                 onTap: () => Navigator.of(context).pop(_Choice(null, _move)),
@@ -213,14 +213,14 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
           if (widget.empty.isNotEmpty || widget.albums.isNotEmpty) ...<Widget>[
             const SizedBox(height: AppSpacing.lg),
             InsetGroup(
-              dividerIndent: 14 + _Thumb.size + AppSpacing.md,
+              dividerIndent: 14 + AlbumThumb.size + AppSpacing.md,
               children: <Widget>[
                 for (final String n in widget.empty)
                   GroupRow(
-                    leading: const _Thumb(
+                    leading: const AlbumThumb(
                       child: Icon(CupertinoIcons.rectangle_stack),
                     ),
-                    leadingWidth: _Thumb.size,
+                    leadingWidth: AlbumThumb.size,
                     title: n,
                     subtitle: 'Empty',
                     chevron: false,
@@ -230,7 +230,7 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
                   ),
                 for (final Album a in widget.albums)
                   GroupRow(
-                    leading: _Thumb(
+                    leading: AlbumThumb(
                       child: a.cover == null
                           ? const Icon(CupertinoIcons.rectangle_stack)
                           : Image(
@@ -242,7 +242,7 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
                               fit: BoxFit.cover,
                             ),
                     ),
-                    leadingWidth: _Thumb.size,
+                    leadingWidth: AlbumThumb.size,
                     title: a.name,
                     subtitle: Fmt.count(a.count, 'item'),
                     chevron: false,
@@ -258,8 +258,9 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
   }
 }
 
-class _Thumb extends StatelessWidget {
-  const _Thumb({required this.child});
+/// An album's small square picture in a list of albums.
+class AlbumThumb extends StatelessWidget {
+  const AlbumThumb({super.key, required this.child});
   final Widget child;
 
   static const double size = 44;
