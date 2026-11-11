@@ -51,8 +51,9 @@ enum ReviewReason {
   name('Same name as a photo already on the phone, but different bytes.'),
   time('Taken at the same moment as one already on the phone.'),
   motion(
-    'The short clip from a Pixel Motion Photo. Its still photo is handled '
-    'on its own. Import this to keep the clip as a video, or discard it.',
+    'The moving part of a Pixel Motion Photo, which Google exports a second '
+    'time on its own. The photo itself still has it inside, so discarding '
+    'this loses nothing. Import it only if you want it as a separate video.',
   );
 
   const ReviewReason(this.explanation);
