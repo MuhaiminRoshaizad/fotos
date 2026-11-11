@@ -251,6 +251,14 @@ class NativeChannel {
     }
   }
 
+  /// A picture from inside a ZIP as JPEG bytes about [px] across (the
+  /// first image by name), or null when it holds none.
+  Future<Uint8List?> zipCover(String path, int px) =>
+      _channel.invokeMethod<Uint8List>('zipCover', <String, Object>{
+        'path': path,
+        'px': px,
+      });
+
   /// A frame from a video file as JPEG bytes about [px] across, or null
   /// when Android cannot read one.
   Future<Uint8List?> videoFrame(String path, int px) =>

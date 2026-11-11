@@ -1,14 +1,17 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/swipe_actions.dart';
 import '../domain/file_entry.dart';
+import 'files_providers.dart';
 
 /// One line in a folder: icon (or thumbnail), name, size and date. Swipe
 /// left for More and Delete; press and hold to start selecting.
@@ -195,15 +198,37 @@ class _Tick extends StatelessWidget {
   }
 }
 
-class FileIcon extends StatelessWidget {
+class FileIcon extends ConsumerWidget {
   const FileIcon({super.key, required this.entry, this.size = 40});
 
   final FileEntry entry;
   final double size;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ColorScheme cs = Theme.of(context).colorScheme;
+    if (entry.kind == FileKind.zip) {
+      // A comic or photo archive shows one of its own pictures. The box
+      // is the icon's size either way, so the picture arriving moves
+      // nothing.
+      final Uint8List? cover = ref
+          .watch(zipCoverProvider((entry.path, entry.size)))
+          .value;
+      if (cover != null) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          child: Image.memory(
+            cover,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) =>
+                _box(cs, CupertinoIcons.archivebox, null),
+          ),
+        );
+      }
+    }
     if (entry.kind == FileKind.image) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(AppRadii.sm),

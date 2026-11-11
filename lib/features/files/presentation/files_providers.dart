@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/platform/native_channel.dart';
@@ -36,3 +38,12 @@ final folderProvider = FutureProvider.autoDispose
     .family<List<FileEntry>, String>(
       (Ref ref, String path) => ref.read(filesRepositoryProvider).list(path),
     );
+
+/// A picture from inside a ZIP, to show in place of the archive icon.
+/// Kept for the session: reading it means opening the archive, and the
+/// rows that ask scroll in and out of view. Keyed by path and size so a
+/// replaced file is read again.
+final zipCoverProvider = FutureProvider.family<Uint8List?, (String, int)>(
+  (Ref ref, (String, int) zip) =>
+      ref.watch(nativeChannelProvider).zipCover(zip.$1, 160),
+);

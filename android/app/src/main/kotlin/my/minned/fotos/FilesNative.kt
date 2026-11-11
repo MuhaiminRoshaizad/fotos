@@ -3,6 +3,7 @@ package my.minned.fotos
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
@@ -84,6 +85,36 @@ object FilesNative {
             }
             return mapOf("files" to files, "bytes" to bytes, "takeout" to takeout)
         }
+    }
+
+    /**
+     * A picture from inside the ZIP at [path], as a JPEG about [px] across,
+     * to stand for the archive in a list: the first image by name, which for
+     * a comic is its cover or first page. Null when the ZIP holds no image
+     * Android can decode.
+     */
+    fun zipCover(path: String, px: Int): ByteArray? = try {
+        ZipFile(path).use { zip ->
+            val images = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "avif")
+            val entry = zip.entries().asSequence()
+                .filter { !it.isDirectory && it.name.substringAfterLast('.', "").lowercase() in images }
+                // Skips macOS resource forks and anything too large to be a page.
+                .filter { !it.name.startsWith("__MACOSX/") && it.size in 1..40_000_000 }
+                .minByOrNull { it.name.lowercase() }
+                ?: return@use null
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@use null
+            // Decode at a fraction of the page's size: a cover is drawn small.
+            var sample = 1
+            while (minOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= px) sample *= 2
+            val options = BitmapFactory.Options().apply { inSampleSize = sample }
+            val bitmap = zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, options) }
+                ?: return@use null
+            ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 80, it) }.toByteArray()
+        }
+    } catch (_: Exception) {
+        null
     }
 
     /**

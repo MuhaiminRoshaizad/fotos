@@ -85,6 +85,9 @@ class NativeChannel(
             "pdfPageCount" -> background(result) {
                 FilesNative.pdfPageCount(call.argument<String>("path")!!)
             }
+            "zipCover" -> background(result) {
+                FilesNative.zipCover(call.argument<String>("path")!!, call.argument<Int>("px")!!)
+            }
             "videoFrame" -> background(result) {
                 FilesNative.videoFrame(call.argument<String>("path")!!, call.argument<Int>("px")!!)
             }
