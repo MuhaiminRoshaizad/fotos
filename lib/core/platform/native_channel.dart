@@ -251,6 +251,14 @@ class NativeChannel {
     }
   }
 
+  /// A frame from a video file as JPEG bytes about [px] across, or null
+  /// when Android cannot read one.
+  Future<Uint8List?> videoFrame(String path, int px) =>
+      _channel.invokeMethod<Uint8List>('videoFrame', <String, Object>{
+        'path': path,
+        'px': px,
+      });
+
   Future<int> pdfPageCount(String path) async => (await _channel
       .invokeMethod<int>('pdfPageCount', <String, Object>{'path': path}))!;
 

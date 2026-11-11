@@ -1,19 +1,23 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/media/media_actions.dart';
 import '../../../core/media/media_providers.dart';
+import '../../albums/presentation/albums_providers.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/toast.dart';
+import '../../files/domain/file_entry.dart';
 import '../data/takeout_repository.dart';
 import '../domain/takeout_models.dart';
 
@@ -283,16 +287,92 @@ class _TakeoutSide extends StatelessWidget {
     return _Side(
       label: 'From Takeout',
       image: item.video
-          ? const ColoredBox(
-              color: Colors.black,
-              child: Icon(CupertinoIcons.film, color: Colors.white, size: 40),
-            )
+          ? _StagedVideo(item: item)
           : Image.file(File(item.path), fit: BoxFit.cover, cacheWidth: 384),
       lines: <String>[
         if (item.taken != null)
           '${Fmt.date(item.taken!)} ${Fmt.time(item.taken!)}',
         Fmt.size(item.size),
       ],
+    );
+  }
+}
+
+/// A frame from the staged video with a play badge; tap to watch it. The
+/// box is sized by its parent, so the frame arriving moves nothing.
+class _StagedVideo extends ConsumerStatefulWidget {
+  const _StagedVideo({required this.item});
+  final ReviewItem item;
+
+  @override
+  ConsumerState<_StagedVideo> createState() => _StagedVideoState();
+}
+
+class _StagedVideoState extends ConsumerState<_StagedVideo> {
+  late final Future<Uint8List?> _frame = ref
+      .read(nativeChannelProvider)
+      .videoFrame(widget.item.path, 512);
+
+  void _play() {
+    final ReviewItem item = widget.item;
+    context.push(
+      '/files/media',
+      extra: (
+        <FileEntry>[
+          FileEntry(
+            path: item.path,
+            name: item.name,
+            kind: FileKind.video,
+            size: item.size,
+            modified: item.taken ?? DateTime.now(),
+          ),
+        ],
+        0,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Play ${widget.item.name}',
+      child: GestureDetector(
+        onTap: _play,
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            const ColoredBox(color: Colors.black),
+            FutureBuilder<Uint8List?>(
+              future: _frame,
+              builder: (BuildContext context, AsyncSnapshot<Uint8List?> s) =>
+                  s.data == null
+                  ? const SizedBox.shrink()
+                  : Image.memory(
+                      s.data!,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    ),
+            ),
+            const Center(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(AppSpacing.md),
+                  child: Icon(
+                    CupertinoIcons.play_fill,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

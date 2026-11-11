@@ -50,7 +50,10 @@ class TakeoutCounts {
 enum ReviewReason {
   name('Same name as a photo already on the phone, but different bytes.'),
   time('Taken at the same moment as one already on the phone.'),
-  motion('A Pixel Motion Photo video part (.MP).');
+  motion(
+    'The short clip from a Pixel Motion Photo. Its still photo is handled '
+    'on its own. Import this to keep the clip as a video, or discard it.',
+  );
 
   const ReviewReason(this.explanation);
   final String explanation;

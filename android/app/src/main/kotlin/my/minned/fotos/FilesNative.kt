@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
+import android.media.MediaMetadataRetriever
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Environment
@@ -117,6 +118,22 @@ object FilesNative {
             }
         }
         return written
+    }
+
+    /** A frame from the video at [path] as a JPEG about [px] across, or null. */
+    fun videoFrame(path: String, px: Int): ByteArray? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(path)
+            val frame = retriever.getScaledFrameAtTime(
+                -1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, px, px,
+            ) ?: return null
+            ByteArrayOutputStream().also { frame.compress(Bitmap.CompressFormat.JPEG, 80, it) }.toByteArray()
+        } catch (_: Exception) {
+            null
+        } finally {
+            retriever.release()
+        }
     }
 
     fun pdfPageCount(path: String): Int =
