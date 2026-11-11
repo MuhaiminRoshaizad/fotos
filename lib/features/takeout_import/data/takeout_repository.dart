@@ -35,6 +35,15 @@ class TakeoutRepository {
 
   Future<void> cancel() => _native.invoke<void>('takeoutCancel');
 
+  /// Dates imported items Android left undated, from Google's sidecars seen
+  /// so far, else the file's own EXIF, else its name. Returns how many were
+  /// dated and how many have no date anywhere.
+  Future<({int fixed, int left})> repairDates() async {
+    final Map<Object?, Object?>? m = await _native
+        .invoke<Map<Object?, Object?>>('takeoutRepairDates');
+    return (fixed: (m?['fixed'] as int?) ?? 0, left: (m?['left'] as int?) ?? 0);
+  }
+
   Future<List<ReviewItem>> reviews() async {
     final List<Object?>? rows = await _native.invoke<List<Object?>>(
       'takeoutReviews',

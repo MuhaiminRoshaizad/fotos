@@ -8,11 +8,13 @@ import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../core/format/formatters.dart';
+import '../../../core/media/media_providers.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
+import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../../files/presentation/files_providers.dart';
 import '../data/takeout_repository.dart';
@@ -151,6 +153,14 @@ class _Body extends ConsumerWidget {
                 ),
               ),
               const InsetGroup(
+                header: 'Dates',
+                footer:
+                    'An export comes in several ZIPs, and a photo\'s date is '
+                    'often in a different one. Dates are filled in as each ZIP '
+                    'is imported; this does it now from what is already here.',
+                children: <Widget>[_RepairDatesRow()],
+              ),
+              const InsetGroup(
                 header: 'How it works',
                 footer:
                     'Nothing is deleted from Google. You decide that yourself, '
@@ -229,4 +239,50 @@ class _Step extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Dates the imported photos Android left undated, and says how many.
+class _RepairDatesRow extends ConsumerStatefulWidget {
+  const _RepairDatesRow();
+
+  @override
+  ConsumerState<_RepairDatesRow> createState() => _RepairDatesRowState();
+}
+
+class _RepairDatesRowState extends ConsumerState<_RepairDatesRow> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    setState(() => _busy = true);
+    try {
+      final ({int fixed, int left}) r = await ref
+          .read(takeoutRepositoryProvider)
+          .repairDates();
+      ref.invalidate(libraryProvider);
+      ref.invalidate(albumsProvider);
+      if (!mounted) return;
+      final String without = r.left == 0
+          ? ''
+          : ' ${Fmt.count(r.left, 'item')} have no date anywhere.';
+      showToast(
+        context,
+        r.fixed == 0 && r.left == 0
+            ? 'Every imported item already has its date'
+            : 'Dated ${Fmt.count(r.fixed, 'item')}.$without',
+      );
+    } on Exception {
+      if (mounted) showToast(context, 'Couldn\'t fix the dates', failed: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => GroupRow(
+    leading: const Icon(CupertinoIcons.calendar),
+    title: 'Fix dates on imported photos',
+    subtitle: _busy ? 'Working…' : 'For imports showing today\'s date.',
+    chevron: false,
+    onTap: _busy ? null : _run,
+  );
 }

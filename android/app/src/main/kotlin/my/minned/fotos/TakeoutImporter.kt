@@ -2,7 +2,6 @@ package my.minned.fotos
 
 import android.content.ContentValues
 import android.content.Context
-import android.media.ExifInterface
 import android.net.Uri
 import android.os.StatFs
 import android.provider.MediaStore
@@ -12,9 +11,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
@@ -25,8 +22,10 @@ import java.util.zip.ZipFile
  *
  * Two passes over the archive, because a sidecar JSON is not guaranteed to
  * sit next to its media: the first reads only the small sidecars, the second
- * streams each media file. Finished entries are recorded, so a crash or a
- * killed app resumes where it stopped.
+ * streams each media file. Nor is it guaranteed to be in the same ZIP, so
+ * sidecar dates are remembered across runs and [TakeoutDates] dates what a
+ * run leaves undated. Finished entries are recorded, so a crash or a killed
+ * app resumes where it stopped.
  */
 class TakeoutImporter(
     private val context: Context,
@@ -52,7 +51,7 @@ class TakeoutImporter(
 
         ZipFile(zipFile).use { zip ->
             val entries = zip.entries().toList().filter { !it.isDirectory }
-            val sidecars = readSidecars(zip, entries)
+            val sidecars = TakeoutDates.remember(context, readSidecars(zip, entries))
             val media = entries.filter { isMedia(it.name) }
             val remaining = media.filter { it.name !in done }
 
@@ -74,6 +73,7 @@ class TakeoutImporter(
                 doneFile.appendText(entry.name + "\n")
                 saveCounts(key)
             }
+            TakeoutDates.repair(context)
             return summary(key, media.size, media.size, cancelled = false)
         }
     }
@@ -118,12 +118,13 @@ class TakeoutImporter(
         val dir = entry.name.substringBeforeLast('/')
         val rawName = entry.name.substringAfterLast('/')
         val name = normaliseName(rawName)
-        val taken = sidecars["$dir/$rawName"] ?: sidecars["$dir/$name"]
         val mime = mimeOf(name)
         val isVideo = mime.startsWith("video/") || name.endsWith(".MP", ignoreCase = true)
 
         val temp = File(context.cacheDir, "takeout-current")
         val hash = zip.getInputStream(entry).use { copyHashing(it, temp) }
+        // Google's date first; without a sidecar, the file's own.
+        val taken = sidecars["$dir/$rawName"] ?: sidecars["$dir/$name"] ?: TakeoutDates.dateFor(temp, name)
 
         try {
             // Pixel Motion Photo video halves: unconfirmed, so the user decides.
@@ -139,7 +140,7 @@ class TakeoutImporter(
                     return "review"
                 }
             }
-            if (taken != null && !isVideo && (mime == "image/jpeg")) writeExifDate(temp, taken)
+            if (taken != null && !isVideo) TakeoutDates.writeExifDate(temp, taken)
             insert(temp, name, mime, isVideo, taken, yearFolder(taken, dir))
             return "imported"
         } finally {
@@ -247,20 +248,6 @@ class TakeoutImporter(
             throw e
         }
         return uri
-    }
-
-    /** Only when the photo has no capture date of its own. */
-    private fun writeExifDate(file: File, taken: Long) {
-        try {
-            val exif = ExifInterface(file.path)
-            if (exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) != null) return
-            val stamp = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(taken)
-            exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, stamp)
-            exif.setAttribute(ExifInterface.TAG_DATETIME, stamp)
-            exif.saveAttributes()
-        } catch (_: Exception) {
-            // DATE_TAKEN in MediaStore still carries the date.
-        }
     }
 
     // ---- review staging ---------------------------------------------------
@@ -383,6 +370,7 @@ class TakeoutImporter(
                 taken,
                 importer.yearFolder(taken, ""),
             )
+            TakeoutDates.repair(context)
         }
 
         /** Removes a review item and its staged file. */

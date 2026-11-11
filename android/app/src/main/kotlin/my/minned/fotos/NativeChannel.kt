@@ -103,6 +103,7 @@ class NativeChannel(
                     takeout = null
                 }
             }
+            "takeoutRepairDates" -> background(result) { TakeoutDates.repair(activity) }
             "takeoutCancel" -> {
                 takeout?.cancelled = true
                 result.success(null)
