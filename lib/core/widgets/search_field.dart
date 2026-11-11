@@ -66,3 +66,27 @@ class SearchField extends StatelessWidget {
     );
   }
 }
+
+/// Holds the search field's place while a page loads, so nothing moves
+/// when the field arrives.
+class SearchFieldPlaceholder extends StatelessWidget {
+  const SearchFieldPlaceholder({super.key});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: SearchField.padding,
+    child: Container(
+      height: 44,
+      alignment: Alignment.center,
+      child: Container(
+        height: SearchField.height,
+        decoration: BoxDecoration(
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(9),
+        ),
+      ),
+    ),
+  );
+}

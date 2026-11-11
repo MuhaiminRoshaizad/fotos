@@ -461,7 +461,8 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
     );
     return list.when(
       skipLoadingOnRefresh: true,
-      loading: () => _RowsSkeleton(header: header, preface: widget.preface),
+      loading: () =>
+          _RowsSkeleton(header: header, grid: grid, preface: widget.preface),
       error: (_, _) => headed(
         EmptyState(
           icon: CupertinoIcons.folder_badge_minus,
@@ -698,8 +699,9 @@ class _RowTag {
 }
 
 class _RowsSkeleton extends StatelessWidget {
-  const _RowsSkeleton({required this.header, this.preface});
+  const _RowsSkeleton({required this.header, required this.grid, this.preface});
   final Widget header;
+  final bool grid;
   final Widget? preface;
 
   @override
@@ -709,70 +711,105 @@ class _RowsSkeleton extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       children: <Widget>[
         header,
-        // Stands in for the search field, so nothing moves when it arrives.
-        Padding(
-          padding: SearchField.padding,
-          child: Container(
-            height: 44,
-            alignment: Alignment.center,
-            child: Container(
-              height: SearchField.height,
-              decoration: BoxDecoration(
-                color: cs.onSurface.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(9),
-              ),
-            ),
-          ),
-        ),
+        const SearchFieldPlaceholder(),
         ?preface,
-        Skeletonizer(
-          enabled: true,
-          child: Column(
-            children: <Widget>[
-              for (int i = 0; i < 8; i++)
-                InsetGroupItem(
-                  first: i == 0,
-                  last: i == 7,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(AppRadii.sm),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        const Expanded(
+        if (grid)
+          // The grid view loads as a grid: same columns, same tile shape.
+          Skeletonizer(
+            enabled: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints c) {
+                  final int columns = (c.maxWidth / 118).floor().clamp(3, 8);
+                  final double width =
+                      (c.maxWidth - AppSpacing.md * (columns - 1)) / columns;
+                  return Wrap(
+                    spacing: AppSpacing.md,
+                    runSpacing: AppSpacing.md,
+                    children: <Widget>[
+                      for (int i = 0; i < columns * 3; i++)
+                        SizedBox(
+                          width: width,
+                          height:
+                              width / FileTile.coverAspect +
+                              FileTile.labelHeight(context),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              Text(
-                                'Folder name here',
-                                maxLines: 1,
-                                style: TextStyle(fontSize: 16),
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: cs.surfaceContainerHigh,
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadii.md,
+                                    ),
+                                  ),
+                                ),
                               ),
-                              Text(
-                                '09/11/2026',
+                              const SizedBox(height: AppSpacing.xs),
+                              const Text(
+                                'File name',
                                 maxLines: 1,
                                 style: TextStyle(fontSize: 13),
                               ),
                             ],
                           ),
                         ),
-                      ],
+                    ],
+                  );
+                },
+              ),
+            ),
+          )
+        else
+          Skeletonizer(
+            enabled: true,
+            child: Column(
+              children: <Widget>[
+                for (int i = 0; i < 8; i++)
+                  InsetGroupItem(
+                    first: i == 0,
+                    last: i == 7,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(AppRadii.sm),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Folder name here',
+                                  maxLines: 1,
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                                Text(
+                                  '09/11/2026',
+                                  maxLines: 1,
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
       ],
     );
   }

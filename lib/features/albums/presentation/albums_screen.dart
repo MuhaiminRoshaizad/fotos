@@ -496,6 +496,16 @@ class _AlbumsSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const SearchFieldPlaceholder(),
+        Expanded(child: _grid(context, cs)),
+      ],
+    );
+  }
+
+  Widget _grid(BuildContext context, ColorScheme cs) {
     return Skeletonizer(
       enabled: true,
       child: GridView.builder(

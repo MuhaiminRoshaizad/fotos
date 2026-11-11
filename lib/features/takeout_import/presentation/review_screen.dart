@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/media/media_actions.dart';
@@ -46,7 +47,7 @@ class ReviewScreen extends ConsumerWidget {
           ],
         );
         return items.when(
-          loading: () => Align(alignment: Alignment.topCenter, child: header),
+          loading: () => headed(const _ReviewSkeleton()),
           error: (_, _) => headed(
             EmptyState(
               icon: CupertinoIcons.exclamationmark_circle,
@@ -92,6 +93,67 @@ class ReviewScreen extends ConsumerWidget {
                 ),
         );
       },
+    );
+  }
+}
+
+/// Two cards' worth of placeholder in the shape of a real review card:
+/// name, reason, the square picture, a size line and the two buttons.
+class _ReviewSkeleton extends StatelessWidget {
+  const _ReviewSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return Skeletonizer(
+      enabled: true,
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        children: <Widget>[
+          for (int i = 0; i < 2; i++)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      const Text(
+                        'PXL_20251206_045644648.MP',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Why this item was set aside for you to decide.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      AspectRatio(
+                        aspectRatio: 1,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(AppRadii.sm),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      const Text('2.2 MB', style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
