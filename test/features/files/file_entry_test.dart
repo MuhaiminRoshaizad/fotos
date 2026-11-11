@@ -37,6 +37,21 @@ void main() {
     ]);
   });
 
+  test('files sort in natural number order, folders still first', () {
+    final List<FileEntry> list = <FileEntry>[
+      _e('10.jpg'),
+      _e('2.jpg'),
+      _e('scans', dir: true),
+      _e('1.jpg'),
+    ]..sort(compareEntries);
+    expect(list.map((FileEntry e) => e.name), <String>[
+      'scans',
+      '1.jpg',
+      '2.jpg',
+      '10.jpg',
+    ]);
+  });
+
   test('uniqueName numbers clashes and keeps the extension', () {
     expect(uniqueName('holiday', <String>{}), 'holiday');
     expect(uniqueName('holiday', <String>{'Holiday'}), 'holiday (2)');

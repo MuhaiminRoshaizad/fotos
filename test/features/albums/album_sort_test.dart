@@ -34,6 +34,19 @@ void main() {
     expect(ids(const AlbumSort(AlbumSortBy.name)), <String>['2', '1', '3']);
   });
 
+  test('name sorts page numbers naturally, not as text', () {
+    final List<AssetEntity> pages = <AssetEntity>[
+      _a('p10', '10.jpg', 1),
+      _a('p2', '2.jpg', 1),
+      _a('p1', '1.jpg', 1),
+    ];
+    final List<String> order = const AlbumSort(AlbumSortBy.name)
+        .apply(pages)
+        .map((AssetEntity e) => e.id)
+        .toList();
+    expect(order, <String>['p1', 'p2', 'p10']);
+  });
+
   test('length sorts longest first by default', () {
     expect(ids(const AlbumSort(AlbumSortBy.length)), <String>['2', '1', '3']);
   });

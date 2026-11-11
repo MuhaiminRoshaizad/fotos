@@ -1,3 +1,5 @@
+import '../../../core/format/natural_sort.dart';
+
 /// How the Files tab treats a file when it is tapped.
 enum FileKind { folder, image, video, pdf, zip, text, other }
 
@@ -48,10 +50,11 @@ class FileEntry {
   bool get isMedia => kind == FileKind.image || kind == FileKind.video;
 }
 
-/// Folders first, then files, each A to Z ignoring case.
+/// Folders first, then files, each in natural name order (page 2 before
+/// page 10).
 int compareEntries(FileEntry a, FileEntry b) {
   if (a.isFolder != b.isFolder) return a.isFolder ? -1 : 1;
-  return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  return naturalCompare(a.name, b.name);
 }
 
 /// [entries] with the pinned ones moved to the top, each part keeping its

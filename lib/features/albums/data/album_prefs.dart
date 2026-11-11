@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import '../../../core/format/natural_sort.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/storage/preferences.dart';
 
@@ -53,9 +54,8 @@ class AlbumSort {
         break;
       case AlbumSortBy.name:
         out.sort(
-          (AssetEntity a, AssetEntity b) => (a.title ?? '')
-              .toLowerCase()
-              .compareTo((b.title ?? '').toLowerCase()),
+          (AssetEntity a, AssetEntity b) =>
+              naturalCompare(a.title ?? '', b.title ?? ''),
         );
       case AlbumSortBy.length:
         out.sort(
@@ -109,8 +109,7 @@ class AlbumsOrder {
     // An album's newest item is the one the repository hands over as its
     // cover; an album without one sorts as the oldest.
     int taken(Album a) => a.cover?.createDateTime.millisecondsSinceEpoch ?? 0;
-    int byName(Album a, Album b) =>
-        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    int byName(Album a, Album b) => naturalCompare(a.name, b.name);
     final List<Album> out = List<Album>.of(albums);
     switch (by) {
       case AlbumsOrderBy.recent:

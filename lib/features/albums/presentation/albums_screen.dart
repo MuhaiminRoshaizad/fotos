@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/format/natural_sort.dart';
 import '../../../core/media/add_to_album.dart';
 import '../../../core/media/empty_albums.dart';
 import '../../../core/media/media_access_gate.dart';
@@ -145,10 +146,7 @@ class _AlbumsBodyState extends ConsumerState<_AlbumsBody> {
                       !prefs.pinned.contains(g.id) && matches(g.name),
                 )
                 .toList()
-              ..sort(
-                (Gallery a, Gallery b) =>
-                    a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-              );
+              ..sort((Gallery a, Gallery b) => naturalCompare(a.name, b.name));
         final List<Album> rest = prefs.order.apply(
           list
               .where(
