@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_tokens.dart';
 import 'inset_group.dart';
+import 'motion.dart';
 
 /// Height of the bar under the status bar.
 const double kBarHeight = 44;
@@ -185,6 +186,36 @@ class FrostedBar extends StatelessWidget {
   final Widget? leading;
   final List<Widget> trailing;
 
+  /// Fades [child] in over whatever it replaces, the new one rising a
+  /// little as it arrives. Held to [alignment] so a part that changes
+  /// width stays against its edge of the bar.
+  static Widget _swap(BuildContext context, Alignment alignment, Widget child) {
+    final bool still = MediaQuery.disableAnimationsOf(context);
+    return AnimatedSwitcher(
+      duration: still ? Duration.zero : const Duration(milliseconds: 200),
+      reverseDuration: still
+          ? Duration.zero
+          : const Duration(milliseconds: 110),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      layoutBuilder: (Widget? current, List<Widget> previous) => Stack(
+        alignment: alignment,
+        children: <Widget>[...previous, ?current],
+      ),
+      transitionBuilder: (Widget child, Animation<double> a) => FadeTransition(
+        opacity: a,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.25),
+            end: Offset.zero,
+          ).animate(a),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
@@ -194,25 +225,57 @@ class FrostedBar extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.fromLTRB(AppSpacing.sm, top, AppSpacing.sm, 0),
         child: NavigationToolbar(
-          leading: leading,
+          // The bar changes with the page's mode (Select, then Select all
+          // and Done). Each part fades to its next state where it stands
+          // instead of being swapped in one frame.
+          leading: _swap(
+            context,
+            Alignment.centerLeft,
+            KeyedSubtree(
+              key: ValueKey<Type?>(leading?.runtimeType),
+              child: leading ?? const SizedBox.shrink(),
+            ),
+          ),
           middle: AnimatedOpacity(
             opacity: solid ? 1 : 0,
             duration: AppMotion.short,
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textScaler: MediaQuery.textScalerOf(
-                context,
-              ).clamp(maxScaleFactor: 1.3),
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface,
+            child: _swap(
+              context,
+              Alignment.center,
+              Text(
+                title,
+                key: ValueKey<String>(title),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textScaler: MediaQuery.textScalerOf(
+                  context,
+                ).clamp(maxScaleFactor: 1.3),
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                  fontFeatures: const <FontFeature>[
+                    FontFeature.tabularFigures(),
+                  ],
+                ),
               ),
             ),
           ),
-          trailing: Row(mainAxisSize: MainAxisSize.min, children: trailing),
+          trailing: _swap(
+            context,
+            Alignment.centerRight,
+            Row(
+              key: ValueKey<String>(
+                trailing.map((Widget w) => w.runtimeType).join('|') +
+                    trailing.length.toString() +
+                    (trailing.isNotEmpty && trailing.first is BarButton
+                        ? ((trailing.first as BarButton).label ?? '')
+                        : ''),
+              ),
+              mainAxisSize: MainAxisSize.min,
+              children: trailing,
+            ),
+          ),
           middleSpacing: AppSpacing.sm,
         ),
       ),
@@ -244,7 +307,7 @@ class FrostedBar extends StatelessWidget {
 }
 
 /// A button in a [FrostedBar]: a small capsule with a label or an icon.
-/// The tap area is 44 pt square or larger; pressing dims it.
+/// The tap area is 44 pt square or larger; it sinks while pressed.
 class BarButton extends StatelessWidget {
   const BarButton.text({
     super.key,
@@ -300,16 +363,15 @@ class BarButton extends StatelessWidget {
             : Icon(icon, size: AppIconSize.dense, color: cs.onSurface),
       ),
     );
-    final Widget button = CupertinoButton(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      minimumSize: const Size(44, 44),
-      pressedOpacity: 0.5,
-      onPressed: onPressed,
-      child: Opacity(opacity: onPressed == null ? 0.4 : 1, child: capsule),
+      child: Pressable(
+        label: tooltip ?? label!,
+        minSize: const Size(36, 44),
+        onTap: onPressed,
+        child: capsule,
+      ),
     );
-    return tooltip == null
-        ? Semantics(button: true, child: button)
-        : Tooltip(message: tooltip, child: button);
   }
 }
 

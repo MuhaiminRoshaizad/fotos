@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart'
@@ -329,6 +330,56 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
   /// The paths on screen, in order, for the sweep to fill between.
   List<String> _shown = const <String>[];
 
+  // Rows that have just gone (moved, deleted) stay for a moment to close
+  // up, and rows that have just come open out, so the list is seen to
+  // change instead of being replaced.
+  List<FileEntry>? _last;
+  String _lastQuery = '';
+  final Map<String, (int, FileEntry)> _leaving = <String, (int, FileEntry)>{};
+  final Set<String> _entering = <String>{};
+  Timer? _settle;
+
+  /// [shown] with the rows that are on their way out put back in place.
+  List<FileEntry> _withLeaving(List<FileEntry> shown, String query) {
+    final List<FileEntry>? last = _last;
+    // Typing in the search field filters at once; only a change to the
+    // folder itself is animated, and not a wholesale one.
+    if (last != null && query == _lastQuery && !identical(last, shown)) {
+      final Set<String> now = <String>{for (final FileEntry e in shown) e.path};
+      final Set<String> before = <String>{
+        for (final FileEntry e in last) e.path,
+      };
+      final int changed =
+          before.difference(now).length + now.difference(before).length;
+      if (changed > 0 && changed <= 40) {
+        for (int i = 0; i < last.length; i++) {
+          if (!now.contains(last[i].path)) {
+            _leaving[last[i].path] = (i, last[i]);
+          }
+        }
+        _entering.addAll(now.difference(before));
+        _settle?.cancel();
+        _settle = Timer(_RowPresence.duration, () {
+          if (!mounted) return;
+          setState(() {
+            _leaving.clear();
+            _entering.clear();
+          });
+        });
+      }
+    }
+    _last = shown;
+    _lastQuery = query;
+    if (_leaving.isEmpty) return shown;
+    final List<FileEntry> rows = List<FileEntry>.of(shown);
+    final List<(int, FileEntry)> gone = _leaving.values.toList()
+      ..sort(((int, FileEntry) a, (int, FileEntry) b) => a.$1.compareTo(b.$1));
+    for (final (int at, FileEntry e) in gone) {
+      rows.insert(at.clamp(0, rows.length), e);
+    }
+    return rows;
+  }
+
   void _startSelecting(String path) {
     AppHaptics.longPress();
     ref
@@ -384,6 +435,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
 
   @override
   void dispose() {
+    _settle?.cancel();
     _query.dispose();
     _focus.dispose();
     super.dispose();
@@ -427,6 +479,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
         final String q = _query.text.trim();
         final List<FileEntry> shown = filterByName(entries, q);
         _shown = <String>[for (final FileEntry e in shown) e.path];
+        final List<FileEntry> rows = _withLeaving(shown, q);
         return EntranceScope(
           child: CustomScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -476,12 +529,12 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                 )
               else
                 SliverList.builder(
-                  itemCount: shown.length,
+                  itemCount: rows.length,
                   itemBuilder: (BuildContext context, int i) {
-                    final FileEntry e = shown[i];
+                    final FileEntry e = rows[i];
                     final Widget row = InsetGroupItem(
                       first: i == 0,
-                      last: i == shown.length - 1,
+                      last: i == rows.length - 1,
                       child: MetaData(
                         metaData: _RowTag(e.path),
                         child: FileRow(
@@ -501,9 +554,15 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                         ),
                       ),
                     );
+                    final Widget present = _RowPresence(
+                      key: ValueKey<String>('row:${e.path}'),
+                      entering: _entering.contains(e.path),
+                      leaving: _leaving.containsKey(e.path),
+                      child: row,
+                    );
                     return widget.animateIn
-                        ? SlideUpIn(index: i, child: row)
-                        : row;
+                        ? SlideUpIn(index: i, child: present)
+                        : present;
                   },
                 ),
               SliverToBoxAdapter(child: SizedBox(height: bottom)),
@@ -511,6 +570,75 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Opens a row out as it arrives and closes it up as it leaves; a row that
+/// is simply there is drawn as it is.
+class _RowPresence extends StatefulWidget {
+  const _RowPresence({
+    super.key,
+    required this.entering,
+    required this.leaving,
+    required this.child,
+  });
+
+  final bool entering;
+  final bool leaving;
+  final Widget child;
+
+  static const Duration duration = Duration(milliseconds: 260);
+
+  @override
+  State<_RowPresence> createState() => _RowPresenceState();
+}
+
+class _RowPresenceState extends State<_RowPresence>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: _RowPresence.duration,
+    value: widget.entering ? 0 : 1,
+  );
+  late final Animation<double> _size = CurvedAnimation(
+    parent: _c,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.entering) _c.forward();
+    // Built already on its way out, when the list itself was rebuilt.
+    if (widget.leaving) _c.reverse();
+  }
+
+  @override
+  void didUpdateWidget(_RowPresence old) {
+    super.didUpdateWidget(old);
+    if (widget.leaving && !old.leaving) _c.reverse();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return widget.leaving ? const SizedBox.shrink() : widget.child;
+    }
+    return IgnorePointer(
+      ignoring: widget.leaving,
+      child: SizeTransition(
+        sizeFactor: _size,
+        alignment: Alignment.topCenter,
+        child: FadeTransition(opacity: _c, child: widget.child),
+      ),
     );
   }
 }

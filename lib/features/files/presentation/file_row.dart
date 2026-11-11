@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/inset_group.dart';
+import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/swipe_actions.dart';
 import '../domain/file_entry.dart';
 import 'files_providers.dart';
@@ -184,12 +185,16 @@ class _Tick extends StatelessWidget {
                 height: 36,
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Icon(
-                    on
-                        ? CupertinoIcons.checkmark_circle_fill
-                        : CupertinoIcons.circle,
-                    size: _size,
-                    color: on ? cs.primary : cs.onSurfaceVariant,
+                  // The tick fills in place and swells once as it does.
+                  child: Pop(
+                    on: on,
+                    child: GlyphSwap(
+                      icon: on
+                          ? CupertinoIcons.checkmark_circle_fill
+                          : CupertinoIcons.circle,
+                      size: _size,
+                      color: on ? cs.primary : cs.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
