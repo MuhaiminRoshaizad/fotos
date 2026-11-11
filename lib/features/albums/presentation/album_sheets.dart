@@ -19,6 +19,7 @@ import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/toast.dart';
 import '../data/album_prefs.dart';
 import '../data/galleries.dart';
+import 'albums_providers.dart';
 import 'gallery_sheets.dart';
 
 /// What can be done to an album from its menu.
@@ -203,6 +204,10 @@ Future<Album?> renameAlbum(
   if (renamed != null) {
     await ref.read(albumPrefsProvider.notifier).rekey(album.id, renamed.id);
     await ref.read(galleriesProvider.notifier).rekey(album.id, renamed.id);
+    // Home screen widgets set to this album follow it too.
+    await ref
+        .read(nativeChannelProvider)
+        .rekeyWidgetAlbum(album.id, renamed.id);
   }
   if (context.mounted) showToast(context, 'Renamed to $name');
   return renamed;

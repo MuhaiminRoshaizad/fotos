@@ -274,6 +274,15 @@ class NativeChannel {
 
   /// A picture from inside a ZIP as JPEG bytes about [px] across (the
   /// first image by name), or null when it holds none.
+  /// Points the home screen photo widgets that show or skip album [from]
+  /// at [to], its id after a rename. Returns how many widgets changed.
+  Future<int> rekeyWidgetAlbum(String from, String to) async =>
+      await _channel.invokeMethod<int>('rekeyWidgetAlbum', <String, String>{
+        'from': from,
+        'to': to,
+      }) ??
+      0;
+
   Future<Uint8List?> zipCover(String path, int px) =>
       _channel.invokeMethod<Uint8List>('zipCover', <String, Object>{
         'path': path,

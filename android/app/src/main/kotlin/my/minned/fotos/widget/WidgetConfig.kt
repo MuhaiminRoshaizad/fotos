@@ -78,6 +78,25 @@ data class WidgetConfig(
                 .putString("w$id", config.toJson()).apply()
         }
 
+        /**
+         * Points every widget that names album [from] at [to]: renaming an
+         * album moves it to a new folder, which has a new bucket id.
+         * Returns the widgets changed.
+         */
+        fun rekeyAlbum(context: Context, from: String, to: String): List<Int> {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val changed = mutableListOf<Int>()
+            for ((key, value) in prefs.all) {
+                val id = key.removePrefix("w").toIntOrNull() ?: continue
+                val config = (value as? String)?.let { runCatching { fromJson(it) }.getOrNull() } ?: continue
+                if (from !in config.albums && from !in config.leaveOut) continue
+                fun swap(ids: List<String>) = ids.map { if (it == from) to else it }
+                save(context, id, config.copy(albums = swap(config.albums), leaveOut = swap(config.leaveOut)))
+                changed += id
+            }
+            return changed
+        }
+
         fun delete(context: Context, id: Int) {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove("w$id").apply()
         }
