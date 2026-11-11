@@ -46,11 +46,7 @@ class AlbumScreen extends ConsumerWidget {
       actions: album == null
           ? const <Widget>[]
           : <Widget>[
-              BarButton.icon(
-                icon: CupertinoIcons.arrow_up_arrow_down,
-                tooltip: 'Sort',
-                onPressed: () => showSortSheet(context, ref, album),
-              ),
+              // Sort lives in this menu with the other album options.
               BarButton.icon(
                 icon: CupertinoIcons.ellipsis,
                 tooltip: 'Album options',
