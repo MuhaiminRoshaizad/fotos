@@ -252,7 +252,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             _passedThreshold = past;
             AppHaptics.tick();
           }
-          if (s.isSliding && _chrome) _setChrome(false);
+          // An upward drag is held at zero, so it must not hide the bars.
+          if (s.isSliding && s.offset.dy > 0 && _chrome) _setChrome(false);
         },
         slideEndHandler:
             (
