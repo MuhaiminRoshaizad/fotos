@@ -235,7 +235,6 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final AssetEntity e = _current;
-    final bool video = e.type == AssetType.video;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: ExtendedImageSlidePage(
@@ -335,7 +334,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          if (!video) _thumbStrip(),
+                          // Under a video too, below its own scrubber, so the
+                          // neighbours are one tap away as they are for photos.
+                          _thumbStrip(),
                           _Actions(
                             favourite: e.isFavorite,
                             onShare: () => ref.read(mediaActionsProvider).share(

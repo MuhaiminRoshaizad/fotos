@@ -451,7 +451,8 @@ class _Controls extends ConsumerWidget {
         AppSpacing.lg,
         0,
         AppSpacing.lg,
-        MediaQuery.paddingOf(context).bottom + 132,
+        // Clear of the viewer's thumbnail strip and action bar.
+        MediaQuery.paddingOf(context).bottom + 192,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
