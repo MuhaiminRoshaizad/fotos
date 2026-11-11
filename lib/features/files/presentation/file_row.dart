@@ -253,6 +253,24 @@ class FileIcon extends ConsumerWidget {
         );
       }
     }
+    if (entry.kind == FileKind.folder) {
+      // A folder of pictures (a comic, an album) previews its first one.
+      final String? cover = ref.watch(folderCoverProvider(entry.path)).value;
+      if (cover != null) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          child: Image.file(
+            File(cover),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+            errorBuilder: (_, _, _) =>
+                _box(cs, CupertinoIcons.folder_fill, cs.primary),
+          ),
+        );
+      }
+    }
     if (entry.kind == FileKind.image) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(AppRadii.sm),

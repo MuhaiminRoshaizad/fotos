@@ -193,6 +193,18 @@ class _Cover extends ConsumerWidget {
     final Widget glyph = Center(
       child: Icon(icon, size: 44, color: tint ?? cs.onSurfaceVariant),
     );
+    if (entry.kind == FileKind.folder) {
+      // A folder of pictures (a comic, an album) previews its first one.
+      final String? cover = ref.watch(folderCoverProvider(entry.path)).value;
+      return cover == null
+          ? glyph
+          : Image.file(
+              File(cover),
+              fit: BoxFit.cover,
+              cacheWidth: 400,
+              errorBuilder: (_, _, _) => glyph,
+            );
+    }
     if (entry.kind == FileKind.image) {
       return Image.file(
         File(entry.path),

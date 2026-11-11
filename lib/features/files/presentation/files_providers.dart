@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
+import '../../../core/format/natural_sort.dart';
 import '../../../core/platform/native_channel.dart';
 import '../../../core/storage/preferences.dart';
 import '../../albums/presentation/albums_providers.dart';
@@ -64,6 +67,58 @@ final zipPageThumbProvider = FutureProvider.autoDispose
       (Ref ref, (String, String) key) =>
           ref.read(nativeChannelProvider).zipPageThumb(key.$1, key.$2, 300),
     );
+
+/// The first image inside a folder, by natural order (its first page for a
+/// comic), to show as the folder's tile instead of a plain folder icon. Null
+/// when the folder holds no images. Looks into subfolders so a comic whose
+/// pages sit one level down still gets a cover.
+final folderCoverProvider = FutureProvider.autoDispose.family<String?, String>(
+  (Ref ref, String dir) => _firstImageUnder(dir),
+);
+
+/// The first image under [dir] by natural order, searching subfolders. Bounded
+/// — at most [budget] folders are opened and [maxDepth] deep — so a huge tree
+/// (DCIM, Android) can't stall the Files list; it just shows the folder icon.
+Future<String?> _firstImageUnder(
+  String dir, {
+  int maxDepth = 4,
+  int budget = 48,
+}) async {
+  Future<String?> walk(String d, int depth) async {
+    if (depth > maxDepth || budget <= 0) return null;
+    budget--;
+    final List<String> images = <String>[];
+    final List<String> subdirs = <String>[];
+    try {
+      await for (final FileSystemEntity e
+          in Directory(d).list(followLinks: false)) {
+        if (e is File) {
+          if (kindOf(p.basename(e.path), isDirectory: false) ==
+              FileKind.image) {
+            images.add(e.path);
+          }
+        } else if (e is Directory) {
+          subdirs.add(e.path);
+        }
+      }
+    } on FileSystemException {
+      return null;
+    }
+    if (images.isNotEmpty) {
+      images.sort(naturalCompare);
+      return images.first;
+    }
+    subdirs.sort(naturalCompare);
+    for (final String sub in subdirs) {
+      final String? found = await walk(sub, depth + 1);
+      if (found != null) return found;
+      if (budget <= 0) break;
+    }
+    return null;
+  }
+
+  return walk(dir, 0);
+}
 
 /// Files and folders the user pinned, newest pin first. They are listed at
 /// the top of the Files tab and first in their own folder. Paths, kept in
