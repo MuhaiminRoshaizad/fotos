@@ -52,10 +52,31 @@ class _VideoPageState extends ConsumerState<VideoPage> {
   int _streakCount = 0;
   DateTime _streakAt = DateTime(0);
   Timer? _seekBadge;
+  bool _opened = false;
+  Animation<double>? _routeIn;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_opened || _routeIn != null) return;
+    // While the viewer's route flies in, the Hero around this page drops
+    // the page and builds it again on landing. A player opened before then
+    // belongs to a page about to be thrown away, and opening one twice
+    // doubled the wait for the first frame.
+    final Animation<double>? route = ModalRoute.of(context)?.animation;
+    if (route == null || route.isCompleted) {
+      _opened = true;
+      _open();
+    } else {
+      _routeIn = route..addStatusListener(_onRouteIn);
+    }
+  }
+
+  void _onRouteIn(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    _routeIn?.removeStatusListener(_onRouteIn);
+    _routeIn = null;
+    _opened = true;
     _open();
   }
 
@@ -77,11 +98,16 @@ class _VideoPageState extends ConsumerState<VideoPage> {
     final VideoPlayerController c = VideoPlayerController.file(f);
     try {
       await c.initialize();
-      final ViewerSettings s =
-          ref.read(viewerSettingsProvider).value ?? const ViewerSettings();
-      await c.setLooping(s.loop);
-      await c.setVolume(s.muted ? 0 : 1);
-    } on Exception {
+      // The page may be gone by now, and ref with it. The session disposes
+      // a player handed to it after its own disposal, so only the settings
+      // are skipped; anything thrown here must not strand the player.
+      if (mounted) {
+        final ViewerSettings s =
+            ref.read(viewerSettingsProvider).value ?? const ViewerSettings();
+        await c.setLooping(s.loop);
+        await c.setVolume(s.muted ? 0 : 1);
+      }
+    } on Object {
       await c.dispose();
       rethrow;
     }
@@ -102,6 +128,7 @@ class _VideoPageState extends ConsumerState<VideoPage> {
   @override
   void dispose() {
     _seekBadge?.cancel();
+    _routeIn?.removeStatusListener(_onRouteIn);
     _session
       ..removeListener(_tick)
       ..dispose();

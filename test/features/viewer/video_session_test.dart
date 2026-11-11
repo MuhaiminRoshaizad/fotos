@@ -109,6 +109,27 @@ void main() {
     await close(tester);
   });
 
+  testWidgets('a session disposed while its player opens releases that '
+      'player', (WidgetTester tester) async {
+    final Completer<void> gate = Completer<void>();
+    final VideoSession slow = VideoSession(() async {
+      await gate.future;
+      return open();
+    });
+    final Future<void> starting = slow.start();
+    slow.dispose();
+    gate.complete();
+    await tester.runAsync(pumpEventQueue);
+    await settle(tester);
+    await starting;
+    await tester.runAsync(pumpEventQueue);
+    await settle(tester);
+
+    expect(platform.calls, contains('create 0'));
+    expect(platform.calls, contains('dispose 0'));
+    session.dispose();
+  });
+
   testWidgets('play after the end starts a new player from the beginning', (
     WidgetTester tester,
   ) async {
