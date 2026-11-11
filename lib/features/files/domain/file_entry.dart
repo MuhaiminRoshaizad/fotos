@@ -25,7 +25,8 @@ FileKind kindOf(String name, {required bool isDirectory}) {
   if (_image.contains(ext)) return FileKind.image;
   if (_video.contains(ext)) return FileKind.video;
   if (ext == 'pdf') return FileKind.pdf;
-  if (ext == 'zip') return FileKind.zip;
+  // .cbz is a comic archive — a ZIP by another name.
+  if (ext == 'zip' || ext == 'cbz') return FileKind.zip;
   if (_text.contains(ext)) return FileKind.text;
   return FileKind.other;
 }

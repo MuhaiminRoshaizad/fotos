@@ -50,6 +50,21 @@ final zipCoverProvider = FutureProvider.family<Uint8List?, (String, int)>(
       ref.watch(nativeChannelProvider).zipCover(zip.$1, 400),
 );
 
+/// The files inside a ZIP, for its contents screen. Invalidated after a
+/// delete so the grid reads the rewritten archive.
+final zipEntriesProvider = FutureProvider.autoDispose
+    .family<List<ZipEntry>, String>(
+      (Ref ref, String path) => ref.read(nativeChannelProvider).zipEntries(path),
+    );
+
+/// A page thumbnail from inside a ZIP, keyed by archive path and entry name.
+/// Kept for the session: decoding one means opening the archive.
+final zipPageThumbProvider = FutureProvider.autoDispose
+    .family<Uint8List?, (String, String)>(
+      (Ref ref, (String, String) key) =>
+          ref.read(nativeChannelProvider).zipPageThumb(key.$1, key.$2, 300),
+    );
+
 /// Files and folders the user pinned, newest pin first. They are listed at
 /// the top of the Files tab and first in their own folder. Paths, kept in
 /// preferences under the key folder pins always used; one that has since

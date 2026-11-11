@@ -15,11 +15,16 @@ import android.os.StatFs
 import android.provider.Settings
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
+import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
 /** File-manager work for the Files tab. Needs All files access. */
 object FilesNative {
@@ -149,6 +154,105 @@ object FilesNative {
             }
         }
         return written
+    }
+
+    /**
+     * The non-directory entries of the ZIP at [path]: each entry's name, its
+     * uncompressed size, and whether it is an image Android can likely show.
+     * Skips macOS resource forks, as [zipCover] does.
+     */
+    fun zipEntries(path: String): List<Map<String, Any>> {
+        val images = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "avif")
+        ZipFile(path).use { zip ->
+            return zip.entries().asSequence()
+                .filter { !it.isDirectory && !it.name.startsWith("__MACOSX/") }
+                .map { e ->
+                    mapOf(
+                        "name" to e.name,
+                        "size" to maxOf(e.size, 0L),
+                        "isImage" to (e.name.substringAfterLast('.', "").lowercase() in images),
+                    )
+                }
+                .toList()
+        }
+    }
+
+    /**
+     * A thumbnail for the entry [name] inside the ZIP at [path], a JPEG about
+     * [px] across, or null when it is not an image Android can decode. Decodes
+     * at a fraction of the page's size, like [zipCover].
+     */
+    fun zipPageThumb(path: String, name: String, px: Int): ByteArray? = try {
+        ZipFile(path).use { zip ->
+            val entry = zip.getEntry(name) ?: return@use null
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@use null
+            var sample = 1
+            while (minOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= px) sample *= 2
+            val options = BitmapFactory.Options().apply { inSampleSize = sample }
+            val bitmap = zip.getInputStream(entry).use {
+                BitmapFactory.decodeStream(it, null, options)
+            } ?: return@use null
+            ByteArrayOutputStream().also {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, it)
+            }.toByteArray()
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    /**
+     * Rewrites the ZIP at [path] without the entries named in [names], to a
+     * temp file in the same folder that then atomically replaces the original.
+     * An interrupted run leaves the archive untouched. Reports progress after
+     * each kept entry, and returns how many files remain inside. Throws with
+     * "not_enough_space:<bytes>" before writing anything when the disk is full.
+     */
+    fun zipRemove(
+        path: String,
+        names: Set<String>,
+        progress: (done: Int, total: Int) -> Unit,
+    ): Int {
+        val source = File(path)
+        val dir = source.parentFile ?: throw IllegalStateException("no_parent")
+        val tmp = File.createTempFile("ziprm", ".tmp", dir)
+        var files = 0
+        try {
+            ZipFile(path).use { zip ->
+                val keepers = zip.entries().toList().filter { it.name !in names }
+                val need = keepers.sumOf {
+                    if (it.compressedSize >= 0) it.compressedSize else maxOf(it.size, 0L)
+                }
+                if (need > StatFs(dir.path).availableBytes) {
+                    throw IllegalStateException("not_enough_space:$need")
+                }
+                ZipOutputStream(BufferedOutputStream(tmp.outputStream())).use { out ->
+                    keepers.forEachIndexed { i, e ->
+                        out.putNextEntry(ZipEntry(e.name).apply { time = e.time })
+                        if (!e.isDirectory) {
+                            zip.getInputStream(e).use { it.copyTo(out) }
+                            files++
+                        }
+                        out.closeEntry()
+                        progress(i + 1, keepers.size)
+                    }
+                }
+            }
+            try {
+                Files.move(
+                    tmp.toPath(), source.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE,
+                )
+            } catch (_: Exception) {
+                // Atomic move may be unsupported on some volumes; replace plainly.
+                Files.move(tmp.toPath(), source.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } catch (e: Exception) {
+            tmp.delete()
+            throw e
+        }
+        return files
     }
 
     /** A frame from the video at [path] as a JPEG about [px] across, or null. */

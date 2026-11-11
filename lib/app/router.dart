@@ -12,6 +12,7 @@ import '../features/files/presentation/file_media_viewer.dart';
 import '../features/files/presentation/files_screen.dart';
 import '../features/files/presentation/folder_screen.dart';
 import '../features/files/presentation/pdf_screen.dart';
+import '../features/files/presentation/zip_screen.dart';
 import '../features/files/presentation/text_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/takeout_import/presentation/review_screen.dart';
@@ -152,6 +153,11 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                     path: 'pdf',
                     builder: (_, GoRouterState s) =>
                         PdfScreen(path: s.uri.queryParameters['path']!),
+                  ),
+                  GoRoute(
+                    path: 'zip',
+                    builder: (_, GoRouterState s) =>
+                        ZipScreen(path: s.uri.queryParameters['path']!),
                   ),
                   GoRoute(
                     path: 'text',

@@ -289,6 +289,52 @@ class NativeChannel {
         'px': px,
       });
 
+  /// The files inside the ZIP at [path], in the order the archive lists them.
+  Future<List<ZipEntry>> zipEntries(String path) async {
+    final List<Object?> list = (await _channel.invokeMethod<List<Object?>>(
+      'zipEntries',
+      <String, Object>{'path': path},
+    ))!;
+    return <ZipEntry>[
+      for (final Object? e in list)
+        ZipEntry.fromMap((e! as Map<Object?, Object?>)),
+    ];
+  }
+
+  /// A thumbnail for the entry [name] inside the ZIP at [path], about [px]
+  /// across, or null when it is not an image Android can decode.
+  Future<Uint8List?> zipPageThumb(String path, String name, int px) =>
+      _channel.invokeMethod<Uint8List>('zipPageThumb', <String, Object>{
+        'path': path,
+        'name': name,
+        'px': px,
+      });
+
+  /// (done, total) while a ZIP is being rewritten.
+  Stream<(int, int)> get zipRemoveProgress =>
+      events('zipRemoveProgress').map((Object? a) {
+        final Map<Object?, Object?> m = a! as Map<Object?, Object?>;
+        return (m['done']! as int, m['total']! as int);
+      });
+
+  /// Removes [names] from the ZIP at [path], rewriting it in place, and returns
+  /// how many files remain inside. Throws [NotEnoughSpaceException] before
+  /// touching the archive when the phone lacks room for the rewrite.
+  Future<int> zipRemove(String path, List<String> names) async {
+    try {
+      return (await _channel.invokeMethod<int>('zipRemove', <String, Object>{
+        'path': path,
+        'names': names,
+      }))!;
+    } on PlatformException catch (e) {
+      final String msg = e.message ?? '';
+      if (msg.startsWith('not_enough_space:')) {
+        throw NotEnoughSpaceException(int.parse(msg.split(':').last));
+      }
+      rethrow;
+    }
+  }
+
   /// A frame from a video file as JPEG bytes about [px] across, or null
   /// when Android cannot read one.
   Future<Uint8List?> videoFrame(String path, int px) =>
@@ -332,6 +378,28 @@ class ZipInfo {
 
   /// Looks like a Google Takeout archive.
   final bool takeout;
+}
+
+/// One file inside a ZIP, as the contents screen lists it.
+class ZipEntry {
+  const ZipEntry({
+    required this.name,
+    required this.size,
+    required this.isImage,
+  });
+
+  /// The full entry name, which may include folders (e.g. "chapter 1/001.jpg").
+  final String name;
+  final int size;
+
+  /// Whether Android can likely decode it as a page thumbnail.
+  final bool isImage;
+
+  factory ZipEntry.fromMap(Map<Object?, Object?> m) => ZipEntry(
+    name: m['name']! as String,
+    size: (m['size']! as num).toInt(),
+    isImage: m['isImage']! as bool,
+  );
 }
 
 class NotEnoughSpaceException implements Exception {

@@ -111,6 +111,33 @@ class NativeChannel(
             "zipCover" -> background(result) {
                 FilesNative.zipCover(call.argument<String>("path")!!, call.argument<Int>("px")!!)
             }
+            "zipEntries" -> background(result) {
+                FilesNative.zipEntries(call.argument<String>("path")!!)
+            }
+            "zipPageThumb" -> background(result) {
+                FilesNative.zipPageThumb(
+                    call.argument<String>("path")!!,
+                    call.argument<String>("name")!!,
+                    call.argument<Int>("px")!!,
+                )
+            }
+            "zipRemove" -> background(result) {
+                val path = call.argument<String>("path")!!
+                val remaining = FilesNative.zipRemove(
+                    path,
+                    call.argument<List<String>>("names")!!.toSet(),
+                ) { done, total ->
+                    activity.runOnUiThread {
+                        channel.invokeMethod(
+                            "zipRemoveProgress",
+                            mapOf("done" to done, "total" to total),
+                        )
+                    }
+                }
+                // The archive's size changed; keep MediaStore in step.
+                FilesNative.scan(activity, listOf(path))
+                remaining
+            }
             "videoFrame" -> background(result) {
                 FilesNative.videoFrame(call.argument<String>("path")!!, call.argument<Int>("px")!!)
             }

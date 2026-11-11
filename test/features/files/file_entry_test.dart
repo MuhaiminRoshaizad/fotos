@@ -16,6 +16,7 @@ void main() {
     expect(kindOf('clip.MOV', isDirectory: false), FileKind.video);
     expect(kindOf('Offer letter.pdf', isDirectory: false), FileKind.pdf);
     expect(kindOf('takeout-1.zip', isDirectory: false), FileKind.zip);
+    expect(kindOf('One Piece v1.CBZ', isDirectory: false), FileKind.zip);
     expect(kindOf('notes.txt', isDirectory: false), FileKind.text);
     expect(kindOf('Tenancy.docx', isDirectory: false), FileKind.other);
     expect(kindOf('noext', isDirectory: false), FileKind.other);

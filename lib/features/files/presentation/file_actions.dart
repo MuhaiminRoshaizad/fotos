@@ -117,6 +117,7 @@ Future<void> showEntryActions(
       if (zip != null && zip.takeout)
         const SheetChoice<String>('takeout', 'Import from Google Takeout'),
       if (zip != null && !zip.takeout) ...const <SheetChoice<String>>[
+        SheetChoice<String>('viewContents', 'View contents'),
         SheetChoice<String>('extractHere', 'Extract here'),
         SheetChoice<String>('extractTo', 'Extract to…'),
       ],
@@ -137,6 +138,13 @@ Future<void> showEntryActions(
       context.push(
         Uri(
           path: '/takeout/import',
+          queryParameters: <String, String>{'path': entry.path},
+        ).toString(),
+      );
+    case 'viewContents':
+      context.push(
+        Uri(
+          path: '/files/zip',
           queryParameters: <String, String>{'path': entry.path},
         ).toString(),
       );
