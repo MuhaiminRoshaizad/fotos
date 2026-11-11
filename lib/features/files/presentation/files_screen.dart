@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart'
     show
         CupertinoButton,
@@ -9,6 +11,7 @@ import 'package:flutter/gestures.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderMetaData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -23,6 +26,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
+import '../../../core/widgets/swipe_actions.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../domain/file_entry.dart';
@@ -95,7 +99,11 @@ class _FilesScreenState extends ConsumerState<FilesScreen> {
                 preface: const Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[_StorageGroup(), GroupHeading('Folders')],
+                  children: <Widget>[
+                    _PinnedGroup(),
+                    _StorageGroup(),
+                    GroupHeading('Folders'),
+                  ],
                 ),
               ),
             (AsyncData<bool>(value: false), _) => headed(
@@ -128,6 +136,63 @@ class _FilesScreenState extends ConsumerState<FilesScreen> {
           };
         },
       ),
+    );
+  }
+}
+
+/// Pinned folders, above everything else on the Files tab. Nothing is
+/// shown until a folder is pinned from its More sheet.
+class _PinnedGroup extends ConsumerWidget {
+  const _PinnedGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final String? root = ref.watch(storageRootProvider).value;
+    final List<String> pins = <String>[
+      for (final String path
+          in ref.watch(pinnedFoldersProvider).value ?? const <String>[])
+        // A folder deleted or renamed since it was pinned has gone.
+        if (Directory(path).existsSync()) path,
+    ];
+    if (pins.isEmpty) return const SizedBox.shrink();
+    return InsetGroup(
+      header: 'Pinned',
+      children: <Widget>[
+        for (final String path in pins)
+          SwipeActions(
+            key: ValueKey<String>(path),
+            actions: <SwipeAction>[
+              SwipeAction(
+                icon: CupertinoIcons.pin_slash,
+                label: 'Unpin',
+                onTap: () =>
+                    ref.read(pinnedFoldersProvider.notifier).toggle(path),
+              ),
+            ],
+            // Opaque, or the Unpin action behind the row shows through.
+            child: Material(
+              color: cs.groupedRow,
+              child: GroupRow(
+                leading: Icon(CupertinoIcons.folder_fill, color: cs.primary),
+                title: p.basename(path),
+                subtitle: root == null
+                    ? null
+                    : p.relative(p.dirname(path), from: root) == '.'
+                    ? 'Internal storage'
+                    : p
+                          .relative(p.dirname(path), from: root)
+                          .replaceAll('/', ' › '),
+                onTap: () => context.push(
+                  Uri(
+                    path: '/files/folder',
+                    queryParameters: <String, String>{'path': path},
+                  ).toString(),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

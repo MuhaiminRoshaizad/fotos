@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/platform/native_channel.dart';
+import '../../../core/storage/preferences.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../data/files_repository.dart';
 import '../domain/file_entry.dart';
@@ -47,3 +48,29 @@ final zipCoverProvider = FutureProvider.family<Uint8List?, (String, int)>(
   (Ref ref, (String, int) zip) =>
       ref.watch(nativeChannelProvider).zipCover(zip.$1, 160),
 );
+
+/// Folders the user pinned to the top of the Files tab, newest pin first.
+/// Paths, kept in preferences; a pinned folder that has since been deleted
+/// or moved is left out by the page that shows them.
+class PinnedFoldersNotifier extends AsyncNotifier<List<String>> {
+  static const String _key = 'files.pinned';
+
+  @override
+  Future<List<String>> build() async =>
+      await ref.watch(preferencesProvider).getStringList(_key) ??
+      const <String>[];
+
+  Future<void> toggle(String path) async {
+    final List<String> now = state.value ?? const <String>[];
+    final List<String> next = now.contains(path)
+        ? (List<String>.of(now)..remove(path))
+        : <String>[path, ...now];
+    state = AsyncData<List<String>>(next);
+    await ref.read(preferencesProvider).setStringList(_key, next);
+  }
+}
+
+final pinnedFoldersProvider =
+    AsyncNotifierProvider<PinnedFoldersNotifier, List<String>>(
+      PinnedFoldersNotifier.new,
+    );
