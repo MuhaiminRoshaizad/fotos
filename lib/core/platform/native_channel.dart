@@ -251,6 +251,21 @@ class NativeChannel {
     }
   }
 
+  /// Whether the image at [path] is a Motion Photo (a still with a short
+  /// video appended to the same file).
+  Future<bool> isMotionPhoto(String path) async =>
+      await _channel.invokeMethod<bool>('isMotionPhoto', <String, Object>{
+        'path': path,
+      }) ??
+      false;
+
+  /// The video inside a Motion Photo, copied out to a file in the cache.
+  /// Null when [path] is not one.
+  Future<String?> motionVideo(String path) => _channel.invokeMethod<String>(
+    'motionVideo',
+    <String, Object>{'path': path},
+  );
+
   /// A picture from inside a ZIP as JPEG bytes about [px] across (the
   /// first image by name), or null when it holds none.
   Future<Uint8List?> zipCover(String path, int px) =>

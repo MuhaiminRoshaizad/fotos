@@ -16,6 +16,7 @@ import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/app_sheet.dart';
 import 'details_sheet.dart';
 import 'video_page.dart';
+import 'motion_photo.dart';
 import 'viewer_glass.dart';
 
 /// What the viewer opens with: the list it pages through, where to start,
@@ -302,7 +303,11 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                     }
                     return GestureDetector(
                       onTap: () => _setChrome(!_chrome),
-                      child: _photo(item, i),
+                      child: MotionPhoto(
+                        key: ValueKey<String>('motion-${item.id}'),
+                        asset: item,
+                        child: _photo(item, i),
+                      ),
                     );
                   },
                 ),
@@ -312,6 +317,20 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               visible: _chrome,
               date: e.createDateTime,
               onClose: () => Navigator.of(context).pop(),
+            ),
+            Positioned(
+              left: AppSpacing.lg,
+              top: MediaQuery.paddingOf(context).top + 64,
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: _chrome ? 1 : 0,
+                  duration: AppMotion.short,
+                  child: MotionBadge(
+                    key: ValueKey<String>('badge-${e.id}'),
+                    asset: e,
+                  ),
+                ),
+              ),
             ),
             Positioned(
               left: 0,

@@ -22,6 +22,12 @@ class NativeChannel(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "exif" -> background(result) { exif(call.argument<String>("path")!!) }
+            "isMotionPhoto" -> background(result) {
+                MotionPhotos.locate(call.argument<String>("path")!!) != null
+            }
+            "motionVideo" -> background(result) {
+                MotionPhotos.extract(activity, call.argument<String>("path")!!)
+            }
             "trashList" -> background(result) { TrashStore.list(activity) }
             "trashThumbnail" -> background(result) {
                 TrashStore.thumbnail(
