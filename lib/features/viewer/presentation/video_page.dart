@@ -204,109 +204,115 @@ class _VideoPageState extends ConsumerState<VideoPage> {
   Widget _page(VideoPlayerController? c, Widget picture) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints box) {
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapUp: (TapUpDetails d) {
-            final int side = _side(d.localPosition.dx, box.maxWidth);
-            final bool streak =
-                side != 0 &&
-                side == _streakSide &&
-                DateTime.now().difference(_streakAt).inMilliseconds < 700;
-            streak ? _seek(side) : widget.onTap();
-          },
-          onDoubleTapDown: (TapDownDetails d) {
-            final int side = _side(d.localPosition.dx, box.maxWidth);
-            side == 0 ? _togglePlay() : _seek(side);
-          },
-          onDoubleTap: () {},
-          onLongPressStart: (_) {
-            if (c == null) return;
-            _wasPlaying = c.value.isPlaying;
-            _session.setSpeed(2);
-            _session.play();
-            AppHaptics.light();
-            setState(() => _fast = true);
-          },
-          onLongPressEnd: (_) {
-            if (c == null) return;
-            _session.setSpeed(1);
-            if (!_wasPlaying) _session.pause();
-            setState(() => _fast = false);
-          },
-          child: Stack(
-            children: <Widget>[
-              Center(child: picture),
-              if (_streakSide != 0)
-                _SeekBadge(side: _streakSide, count: _streakCount),
-              if (_fast)
-                const Positioned(
-                  top: 96,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: _Pill(
-                      text: '2× speed',
-                      icon: CupertinoIcons.forward_fill,
-                    ),
-                  ),
-                ),
-              if (c != null &&
-                  !c.value.isPlaying &&
-                  !_scrubbing &&
-                  widget.chrome)
-                Center(
-                  child: ViewerGlass(
-                    shape: const CircleBorder(),
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(72, 72),
-                      onPressed: _togglePlay,
-                      child: const Icon(
-                        CupertinoIcons.play_fill,
-                        size: 32,
-                        color: Colors.white,
-                        semanticLabel: 'Play',
+        // The buttons sit beside the gesture layer, not inside it. Inside,
+        // every tap on Play, Loop or Mute waited out the double-tap window
+        // (about 300 ms) before it was allowed to count.
+        return Stack(
+          children: <Widget>[
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapUp: (TapUpDetails d) {
+                  final int side = _side(d.localPosition.dx, box.maxWidth);
+                  final bool streak =
+                      side != 0 &&
+                      side == _streakSide &&
+                      DateTime.now().difference(_streakAt).inMilliseconds < 700;
+                  streak ? _seek(side) : widget.onTap();
+                },
+                onDoubleTapDown: (TapDownDetails d) {
+                  final int side = _side(d.localPosition.dx, box.maxWidth);
+                  side == 0 ? _togglePlay() : _seek(side);
+                },
+                onDoubleTap: () {},
+                onLongPressStart: (_) {
+                  if (c == null) return;
+                  _wasPlaying = c.value.isPlaying;
+                  _session.setSpeed(2);
+                  _session.play();
+                  AppHaptics.light();
+                  setState(() => _fast = true);
+                },
+                onLongPressEnd: (_) {
+                  if (c == null) return;
+                  _session.setSpeed(1);
+                  if (!_wasPlaying) _session.pause();
+                  setState(() => _fast = false);
+                },
+                child: Stack(
+                  children: <Widget>[
+                    Center(child: picture),
+                    if (_streakSide != 0)
+                      _SeekBadge(side: _streakSide, count: _streakCount),
+                    if (_fast)
+                      const Positioned(
+                        top: 96,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: _Pill(
+                            text: '2× speed',
+                            icon: CupertinoIcons.forward_fill,
+                          ),
+                        ),
                       ),
+                  ],
+                ),
+              ),
+            ),
+            if (c != null && !c.value.isPlaying && !_scrubbing && widget.chrome)
+              Center(
+                child: ViewerGlass(
+                  shape: const CircleBorder(),
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(72, 72),
+                    onPressed: _togglePlay,
+                    child: const Icon(
+                      CupertinoIcons.play_fill,
+                      size: 32,
+                      color: Colors.white,
+                      semanticLabel: 'Play',
                     ),
                   ),
                 ),
-              if (c != null)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: IgnorePointer(
-                    ignoring: !widget.chrome,
-                    child: AnimatedOpacity(
-                      opacity: widget.chrome ? 1 : 0,
-                      duration: AppMotion.short,
-                      child: _Controls(
-                        asset: widget.asset,
-                        controller: c,
-                        position: _session.position,
-                        gliding: c.value.isPlaying && _session.target == null,
-                        onPlayPause: _togglePlay,
-                        onSeek: _session.seekTo,
-                        onScrubStart: () {
-                          _wasPlaying = c.value.isPlaying;
-                          _session.pause();
-                          setState(() => _scrubbing = true);
-                        },
-                        onScrubEnd: () {
-                          setState(() => _scrubbing = false);
-                          if (!_wasPlaying) return;
-                          // Start again only once the last seek has landed,
-                          // so playback picks up from the chosen frame.
-                          _session.settled.then((_) {
-                            if (mounted && !_scrubbing) _session.play();
-                          });
-                        },
-                      ),
+              ),
+            if (c != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  ignoring: !widget.chrome,
+                  child: AnimatedOpacity(
+                    opacity: widget.chrome ? 1 : 0,
+                    duration: AppMotion.short,
+                    child: _Controls(
+                      asset: widget.asset,
+                      controller: c,
+                      position: _session.position,
+                      gliding: c.value.isPlaying && _session.target == null,
+                      onPlayPause: _togglePlay,
+                      onSeek: _session.seekTo,
+                      onScrubStart: () {
+                        _wasPlaying = c.value.isPlaying;
+                        _session.pause();
+                        setState(() => _scrubbing = true);
+                      },
+                      onScrubEnd: () {
+                        setState(() => _scrubbing = false);
+                        if (!_wasPlaying) return;
+                        // Start again only once the last seek has landed,
+                        // so playback picks up from the chosen frame.
+                        _session.settled.then((_) {
+                          if (mounted && !_scrubbing) _session.play();
+                        });
+                      },
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         );
       },
     );
