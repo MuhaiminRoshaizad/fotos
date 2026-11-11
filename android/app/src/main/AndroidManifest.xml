@@ -68,6 +68,39 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- The photo widget: its provider, the service that hands it pictures,
+             and the setup screen Android opens when one is placed. -->
+        <receiver
+            android:name=".widget.FotosWidgetProvider"
+            android:exported="true"
+            android:label="fotos">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/fotos_widget_info" />
+        </receiver>
+        <service
+            android:name=".widget.FotosWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+        <activity
+            android:name=".widget.WidgetSetupActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/NormalTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

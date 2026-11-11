@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">Your photos or videos, changing by themselves, from the albums you choose.</string>
+    <string name="widget_empty">Nothing to show. Long-press, then Widget settings, to choose other albums.</string>
+    <string name="widget_next">Next</string>
+</resources>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- fotos' photo widget, changing every 10 seconds. Android widgets can't set
+     a flipper's interval in code, so each interval has its own copy of this
+     layout; keep the four alike. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_frame"
+    android:clipToOutline="true">
+
+    <AdapterViewFlipper
+        android:id="@+id/flipper"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:autoStart="true"
+        android:flipInterval="10000"
+        android:loopViews="true"
+        android:inAnimation="@animator/widget_fade_in"
+        android:outAnimation="@animator/widget_fade_out" />
+
+    <TextView
+        android:id="@+id/empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:padding="16dp"
+        android:text="@string/widget_empty"
+        android:textColor="#B3FFFFFF"
+        android:textSize="13sp" />
+
+    <ImageView
+        android:id="@+id/next"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|start"
+        android:padding="8dp"
+        android:src="@drawable/widget_next"
+        android:contentDescription="@string/widget_next" />
+</FrameLayout>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One picture in the photo widget, drawn at the widget's size by
+     FotosWidgetService, with its caption and badge. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/item"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/picture"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@drawable/widget_shade"
+        android:paddingStart="14dp"
+        android:paddingTop="24dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="10dp"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_margin="10dp"
+        android:background="@drawable/widget_badge"
+        android:paddingStart="8dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="9dp"
+        android:paddingBottom="3dp"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+</FrameLayout>
