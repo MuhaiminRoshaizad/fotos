@@ -13,7 +13,18 @@ void main() {
     expect(validateFolderName('a/b', taken), contains('/'));
     expect(validateFolderName(r'a\b', taken), contains('/'));
     expect(validateFolderName('.secret', taken), contains('dot'));
-    expect(validateFolderName('x' * 61, taken), contains('60'));
+    expect(validateFolderName('x' * 256, taken), 'That name is too long');
+  });
+
+  test('allows a long comic name, within the filesystem limit', () {
+    const String comic =
+        '(C97) [Circle (Author)] A Very Long Comic Title Volume 1 '
+        '(Some Series) [English] [Digital]';
+    expect(comic.length, greaterThan(60));
+    expect(validateFolderName('$comic.cbz', taken), isNull);
+    // 255 bytes is the ceiling; one over is rejected.
+    expect(validateFolderName('x' * 255, taken), isNull);
+    expect(validateFolderName('x' * 256, taken), 'That name is too long');
   });
 
   test('rejects a clash regardless of case, but not the current name', () {
