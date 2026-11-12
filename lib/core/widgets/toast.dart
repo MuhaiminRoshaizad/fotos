@@ -14,7 +14,7 @@ OverlayEntry? _showing;
 ///
 /// [failed] marks a message about something that did not work. A message
 /// that reports nothing done, such as a hint, passes its own [icon] in
-/// place of the tick.
+/// place of the tick, or [plain] for none at all.
 ///
 /// [duration] overrides how long it stays (3 s, or 5 s with an action);
 /// [countdown] draws a bar along its foot that drains over that time, for a
@@ -28,6 +28,7 @@ void showToast(
   VoidCallback? onAction,
   bool failed = false,
   IconData? icon,
+  bool plain = false,
   Duration? duration,
   bool countdown = false,
   VoidCallback? onHidden,
@@ -42,6 +43,7 @@ void showToast(
       onAction: onAction,
       failed: failed,
       icon: icon,
+      plain: plain,
       duration: duration ?? Duration(seconds: actionLabel == null ? 3 : 5),
       countdown: countdown,
       onHidden: onHidden,
@@ -68,6 +70,7 @@ class _Toast extends StatefulWidget {
     required this.onAction,
     required this.failed,
     required this.icon,
+    required this.plain,
     required this.duration,
     required this.countdown,
     required this.onHidden,
@@ -79,6 +82,7 @@ class _Toast extends StatefulWidget {
   final VoidCallback? onAction;
   final bool failed;
   final IconData? icon;
+  final bool plain;
   final Duration duration;
   final bool countdown;
   final VoidCallback? onHidden;
@@ -160,15 +164,17 @@ class _ToastState extends State<_Toast> with TickerProviderStateMixin {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(
-                widget.icon ??
-                    (widget.failed
-                        ? CupertinoIcons.exclamationmark_triangle
-                        : CupertinoIcons.checkmark_alt),
-                size: AppIconSize.dense,
-                color: widget.failed ? cs.error : cs.primary,
-              ),
-              const SizedBox(width: AppSpacing.sm),
+              if (!widget.plain) ...<Widget>[
+                Icon(
+                  widget.icon ??
+                      (widget.failed
+                          ? CupertinoIcons.exclamationmark_triangle
+                          : CupertinoIcons.checkmark_alt),
+                  size: AppIconSize.dense,
+                  color: widget.failed ? cs.error : cs.primary,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Flexible(
                 child: Text(
                   widget.message,

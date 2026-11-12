@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -87,7 +86,7 @@ class BackToClose {
     showToast(
       context,
       'Press back again to close fotos',
-      icon: CupertinoIcons.info_circle,
+      plain: true,
       duration: window,
       countdown: true,
       onHidden: () => _armed = false,
