@@ -39,6 +39,13 @@ class ZipScreen extends ConsumerWidget {
     final List<ZipEntry> pages = zipPagesInOrder(
       entries.value ?? const <ZipEntry>[],
     );
+    // Only pictures are pages; a ComicInfo.xml or a text note is listed but
+    // not counted or paged through.
+    final List<ZipEntry> pictures = <ZipEntry>[
+      for (final ZipEntry e in pages)
+        if (e.isImage) e,
+    ];
+    final int others = pages.length - pictures.length;
     final SelectionState sel = ref.watch(selectionProvider);
     final SelectionNotifier selection = ref.read(selectionProvider.notifier);
     final bool selecting = sel.isActiveFor(_owner);
@@ -71,8 +78,11 @@ class ZipScreen extends ConsumerWidget {
       child: LargeTitleScaffold(
         title: p.basename(path),
         subtitle: entries.hasValue
-            ? '${Fmt.count(pages.length, 'page')} · '
-                  '${Fmt.size(pages.fold(0, (int s, ZipEntry e) => s + e.size))}'
+            ? <String>[
+                Fmt.count(pictures.length, 'page'),
+                if (others > 0) Fmt.count(others, 'other file'),
+                Fmt.size(pages.fold(0, (int s, ZipEntry e) => s + e.size)),
+              ].join(' · ')
             : null,
         barTitle: selecting
             ? (sel.ids.isEmpty ? 'Select pages' : '${sel.ids.length} selected')
@@ -125,9 +135,11 @@ class ZipScreen extends ConsumerWidget {
                   path: path,
                   pages: pages,
                   selected: selecting ? sel.ids : null,
-                  onTap: (int i) => selecting
-                      ? selection.toggle(pages[i].name)
-                      : showZipPage(context, path, pages, i),
+                  onTap: (int i) {
+                    if (selecting) return selection.toggle(pages[i].name);
+                    final int at = pictures.indexOf(pages[i]);
+                    if (at >= 0) showZipPage(context, path, pictures, at);
+                  },
                   onLongPress: (int i) => selecting
                       ? selection.toggle(pages[i].name)
                       : startSelecting(pages[i].name),
@@ -445,8 +457,8 @@ class _PagesSkeleton extends StatelessWidget {
   }
 }
 
-/// Shows [pages] full screen from page [index], one at a time; swipe to
-/// turn, pinch to zoom.
+/// Shows [pages] (the pictures) full screen from page [index], one at a
+/// time; swipe to turn, pinch to zoom.
 void showZipPage(
   BuildContext context,
   String path,

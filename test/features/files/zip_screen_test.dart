@@ -43,6 +43,7 @@ void main() {
               _page('10.jpg'),
               _page('2.jpg'),
               _page('1.jpg'),
+              const ZipEntry(name: 'ComicInfo.xml', size: 1000, isImage: false),
             ],
           ),
           zipPageThumbProvider.overrideWith(
@@ -79,7 +80,8 @@ void main() {
       'order, and a tapped page opens large', (WidgetTester tester) async {
     await open(tester);
     expect(find.byType(LargeTitleScaffold), findsOneWidget);
-    expect(find.text('3 pages · 3 KB'), findsOneWidget);
+    // ComicInfo.xml is listed, but it is not a page.
+    expect(find.text('3 pages · 1 other file · 4 KB'), findsOneWidget);
     // Reading order, left to right: 1, 2, then 10.
     double x(String name) => tester.getTopLeft(find.bySemanticsLabel(name)).dx;
     expect(x('Page 1.jpg'), lessThan(x('Page 2.jpg')));
