@@ -62,48 +62,51 @@ class _EditTabsState extends State<_EditTabs> {
             ),
           ],
         ),
-        ReorderableListView(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          buildDefaultDragHandles: false,
-          // A tick as a row is picked up, as for each item drag-select adds.
-          onReorderStart: (_) => AppHaptics.tick(),
-          padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-          onReorderItem: (int from, int to) =>
-              setState(() => _order.insert(to, _order.removeAt(from))),
-          proxyDecorator: (Widget child, int index, Animation<double> a) =>
-              AnimatedBuilder(
-                animation: a,
-                builder: (BuildContext context, Widget? child) => Material(
-                  color: Colors.transparent,
-                  elevation: 8 * a.value,
-                  shadowColor: Colors.black54,
-                  borderRadius: BorderRadius.circular(AppRadii.md),
-                  child: Transform.scale(
-                    scale: 1 + 0.02 * a.value,
-                    child: child,
+        // Scrolls only when the sheet can't fit all four rows, as on a short
+        // screen in landscape or with large text.
+        Flexible(
+          child: ReorderableListView(
+            shrinkWrap: true,
+            buildDefaultDragHandles: false,
+            // A tick as a row is picked up, as for each item drag-select adds.
+            onReorderStart: (_) => AppHaptics.tick(),
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+            onReorderItem: (int from, int to) =>
+                setState(() => _order.insert(to, _order.removeAt(from))),
+            proxyDecorator: (Widget child, int index, Animation<double> a) =>
+                AnimatedBuilder(
+                  animation: a,
+                  builder: (BuildContext context, Widget? child) => Material(
+                    color: Colors.transparent,
+                    elevation: 8 * a.value,
+                    shadowColor: Colors.black54,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    child: Transform.scale(
+                      scale: 1 + 0.02 * a.value,
+                      child: child,
+                    ),
                   ),
+                  child: child,
                 ),
-                child: child,
-              ),
-          children: <Widget>[
-            for (int i = 0; i < _order.length; i++)
-              InsetGroupItem(
-                key: ValueKey<int>(_order[i]),
-                first: i == 0,
-                last: i == _order.length - 1,
-                // Press and hold anywhere on a row to pick it up; its grip
-                // picks it up at once.
-                child: ReorderableDelayedDragStartListener(
-                  index: i,
-                  child: _TabRow(
-                    tab: navDestinations[_order[i]],
+            children: <Widget>[
+              for (int i = 0; i < _order.length; i++)
+                InsetGroupItem(
+                  key: ValueKey<int>(_order[i]),
+                  first: i == 0,
+                  last: i == _order.length - 1,
+                  // Press and hold anywhere on a row to pick it up; its grip
+                  // picks it up at once.
+                  child: ReorderableDelayedDragStartListener(
                     index: i,
-                    opensFirst: i == 0,
+                    child: _TabRow(
+                      tab: navDestinations[_order[i]],
+                      index: i,
+                      opensFirst: i == 0,
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ],
     );
