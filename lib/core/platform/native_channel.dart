@@ -343,6 +343,19 @@ class NativeChannel {
         'px': px,
       });
 
+  /// [count] frames spread evenly through a video file, each JPEG bytes
+  /// about [px] across, null where Android cannot read one. Taken in one
+  /// pass from the keyframes nearest each slot.
+  Future<List<Uint8List?>> videoFrames(String path, int count, int px) async {
+    final List<Object?>? frames = await _channel.invokeListMethod<Object?>(
+      'videoFrames',
+      <String, Object>{'path': path, 'count': count, 'px': px},
+    );
+    return <Uint8List?>[
+      for (final Object? f in frames ?? const <Object?>[]) f as Uint8List?,
+    ];
+  }
+
   Future<int> pdfPageCount(String path) async => (await _channel
       .invokeMethod<int>('pdfPageCount', <String, Object>{'path': path}))!;
 

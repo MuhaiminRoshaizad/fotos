@@ -141,6 +141,13 @@ class NativeChannel(
             "videoFrame" -> background(result) {
                 FilesNative.videoFrame(call.argument<String>("path")!!, call.argument<Int>("px")!!)
             }
+            "videoFrames" -> background(result) {
+                FilesNative.videoFrames(
+                    call.argument<String>("path")!!,
+                    call.argument<Int>("count")!!,
+                    call.argument<Int>("px")!!,
+                )
+            }
             "pdfPage" -> background(result) {
                 FilesNative.pdfPage(
                     call.argument<String>("path")!!,

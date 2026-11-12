@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
@@ -15,6 +16,8 @@ import '../../../core/widgets/motion.dart';
 import '../data/viewer_settings.dart';
 import 'video_session.dart';
 import 'viewer_glass.dart';
+import '../../albums/presentation/albums_providers.dart'
+    show nativeChannelProvider;
 
 /// One video in the viewer.
 ///
@@ -309,6 +312,7 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                     duration: AppMotion.short,
                     child: _Controls(
                       asset: widget.asset,
+                      path: _file!.path,
                       controller: c,
                       position: _session.position,
                       gliding: c.value.isPlaying && _session.target == null,
@@ -424,6 +428,7 @@ class _Pill extends StatelessWidget {
 class _Controls extends ConsumerWidget {
   const _Controls({
     required this.asset,
+    required this.path,
     required this.controller,
     required this.position,
     required this.gliding,
@@ -434,6 +439,7 @@ class _Controls extends ConsumerWidget {
   });
 
   final AssetEntity asset;
+  final String path;
   final VideoPlayerController controller;
 
   /// The position to show: the seek target while one is under way.
@@ -529,6 +535,7 @@ class _Controls extends ConsumerWidget {
           const SizedBox(height: AppSpacing.sm),
           _Filmstrip(
             asset: asset,
+            path: path,
             controller: controller,
             position: position,
             gliding: gliding,
@@ -542,10 +549,19 @@ class _Controls extends ConsumerWidget {
   }
 }
 
+/// The filmstrip's frames for a video file, kept for the session so a
+/// video opened again shows its strip at once.
+final _filmstripFramesProvider =
+    FutureProvider.family<List<Uint8List?>, (String, int)>(
+      (Ref ref, (String, int) key) =>
+          ref.watch(nativeChannelProvider).videoFrames(key.$1, key.$2, 192),
+    );
+
 /// Eight frames across the video; drag anywhere on it to move the playhead.
-class _Filmstrip extends StatelessWidget {
+class _Filmstrip extends ConsumerWidget {
   const _Filmstrip({
     required this.asset,
+    required this.path,
     required this.controller,
     required this.position,
     required this.gliding,
@@ -557,6 +573,7 @@ class _Filmstrip extends StatelessWidget {
   static const int _frames = 8;
 
   final AssetEntity asset;
+  final String path;
   final VideoPlayerController controller;
   final Duration position;
   final bool gliding;
@@ -565,7 +582,21 @@ class _Filmstrip extends StatelessWidget {
   final VoidCallback onEnd;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<Uint8List?>? frames = ref
+        .watch(_filmstripFramesProvider((path, _frames)))
+        .value;
+    final Widget cover = Image(
+      key: const ValueKey<String>('cover'),
+      image: AssetEntityImageProvider(
+        asset,
+        isOriginal: false,
+        thumbnailSize: const ThumbnailSize.square(128),
+      ),
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+    );
     final Duration total = controller.value.duration;
     final double f = total.inMilliseconds == 0
         ? 0
@@ -603,34 +634,20 @@ class _Filmstrip extends StatelessWidget {
                         for (int i = 0; i < _frames; i++)
                           Expanded(
                             child: SizedBox.expand(
-                              child: Image(
-                                image: AssetEntityImageProvider(
-                                  asset,
-                                  isOriginal: false,
-                                  thumbnailSize: const ThumbnailSize.square(
-                                    128,
-                                  ),
-                                  // Glide's frame option is in microseconds.
-                                  frame:
-                                      (total.inMicroseconds *
-                                              (i + 0.5) /
-                                              _frames)
-                                          .round(),
-                                ),
-                                fit: BoxFit.cover,
-                                gaplessPlayback: true,
-                                // Some videos can't give a frame at every
-                                // time; show the cover frame there instead.
-                                errorBuilder: (_, _, _) => Image(
-                                  image: AssetEntityImageProvider(
-                                    asset,
-                                    isOriginal: false,
-                                    thumbnailSize: const ThumbnailSize.square(
-                                      128,
-                                    ),
-                                  ),
-                                  fit: BoxFit.cover,
-                                ),
+                              // The cover holds each slot until the frames
+                              // arrive, then the frame fades in over it.
+                              child: AnimatedSwitcher(
+                                duration: AppMotion.short,
+                                child: frames?.elementAtOrNull(i) == null
+                                    ? cover
+                                    : Image.memory(
+                                        frames![i]!,
+                                        key: ValueKey<int>(i),
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                        gaplessPlayback: true,
+                                      ),
                               ),
                             ),
                           ),

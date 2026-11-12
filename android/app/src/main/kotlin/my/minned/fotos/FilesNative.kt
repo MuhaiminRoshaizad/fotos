@@ -289,15 +289,50 @@ object FilesNative {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(path)
-            val frame = retriever.getScaledFrameAtTime(
-                -1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, px, px,
-            ) ?: return null
-            ByteArrayOutputStream().also { frame.compress(Bitmap.CompressFormat.JPEG, 80, it) }.toByteArray()
+            frameAt(retriever, -1, px)
         } catch (_: Exception) {
             null
         } finally {
             retriever.release()
         }
+    }
+
+    /**
+     * [count] frames spread evenly through the video at [path], each a JPEG
+     * about [px] across, or null where one can't be read. One reader opens
+     * the file once and takes each frame from the keyframe nearest its slot:
+     * a long video may have one keyframe every few seconds, and decoding up
+     * to an exact time would cost hundreds of frames per slot.
+     */
+    fun videoFrames(path: String, count: Int, px: Int): List<ByteArray?> {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(path)
+            val ms = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_DURATION,
+            )?.toLongOrNull() ?: 0L
+            List(count) { i ->
+                val us = (ms * 1000.0 * (i + 0.5) / count).toLong()
+                try {
+                    frameAt(retriever, us, px)
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        } catch (_: Exception) {
+            List(count) { null }
+        } finally {
+            retriever.release()
+        }
+    }
+
+    private fun frameAt(retriever: MediaMetadataRetriever, us: Long, px: Int): ByteArray? {
+        val frame = retriever.getScaledFrameAtTime(
+            us, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, px, px,
+        ) ?: return null
+        return ByteArrayOutputStream()
+            .also { frame.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+            .toByteArray()
     }
 
     fun pdfPageCount(path: String): Int =
