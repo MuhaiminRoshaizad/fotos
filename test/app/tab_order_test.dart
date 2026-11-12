@@ -85,8 +85,22 @@ void main() {
     }
     await g.up();
     await tester.pumpAndSettle();
+    final double photosBefore = tester
+        .getCenter(find.bySemanticsLabel('Photos').last)
+        .dx;
     await tester.tap(find.text('Done'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    // Mid-way the tab is between its old and new places: it slides there.
+    final double photosMid = tester
+        .getCenter(find.bySemanticsLabel('Photos').last)
+        .dx;
     await tester.pumpAndSettle();
+    final double photosAfter = tester
+        .getCenter(find.bySemanticsLabel('Photos').last)
+        .dx;
+    expect(photosMid, greaterThan(photosBefore + 1));
+    expect(photosMid, lessThan(photosAfter - 1));
 
     expect(find.text('Edit tabs'), findsNothing);
     expect(barLabels(tester), <String>['Videos', 'Albums', 'Photos', 'Files']);

@@ -1,10 +1,12 @@
-import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/haptics/app_haptics.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_sheet.dart';
 import '../core/widgets/inset_group.dart';
+import '../core/widgets/large_title_scaffold.dart';
 import 'floating_nav.dart';
 import 'tab_order.dart';
 
@@ -39,7 +41,6 @@ class _EditTabsState extends State<_EditTabs> {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -52,18 +53,11 @@ class _EditTabsState extends State<_EditTabs> {
             ),
             Positioned(
               right: AppSpacing.sm,
-              top: -10,
-              child: CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                minimumSize: const Size(48, 44),
+              top: -6,
+              child: BarButton.text(
+                label: 'Done',
+                prominent: true,
                 onPressed: () => widget.onDone(_order),
-                child: Text(
-                  'Done',
-                  style: TextStyle(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
             ),
           ],
@@ -72,6 +66,8 @@ class _EditTabsState extends State<_EditTabs> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           buildDefaultDragHandles: false,
+          // A tick as a row is picked up, as for each item drag-select adds.
+          onReorderStart: (_) => AppHaptics.tick(),
           padding: const EdgeInsets.only(bottom: AppSpacing.lg),
           onReorderItem: (int from, int to) =>
               setState(() => _order.insert(to, _order.removeAt(from))),
