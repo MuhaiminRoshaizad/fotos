@@ -2,6 +2,7 @@ package my.minned.fotos
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.graphics.Rect
 import android.media.ExifInterface
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -145,6 +146,14 @@ class NativeChannel(
             }
             "videoFrame" -> background(result) {
                 FilesNative.videoFrame(call.argument<String>("path")!!, call.argument<Int>("px")!!)
+            }
+            "setGestureExclusion" -> {
+                // Areas in window pixels where Android's back swipe is off,
+                // such as the scroll handle on the right edge.
+                val rects = call.argument<List<List<Int>>>("rects").orEmpty()
+                activity.window.decorView.systemGestureExclusionRects =
+                    rects.map { Rect(it[0], it[1], it[2], it[3]) }
+                result.success(null)
             }
             "thumbnail" -> background(result, thumbs) {
                 FilesNative.thumbnail(

@@ -434,9 +434,11 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
   }
 
   /// The label for the row at the top of the screen, under the bar.
-  String _handleLabel(double offset) {
+  HandleLabel _handleLabel(double offset) {
     final RenderObject? r = _rowsKey.currentContext?.findRenderObject();
-    if (r is! RenderSliverMultiBoxAdaptor || _handleRows.isEmpty) return '';
+    if (r is! RenderSliverMultiBoxAdaptor || _handleRows.isEmpty) {
+      return HandleLabel.none;
+    }
     final RenderAbstractViewport viewport = RenderAbstractViewport.of(r);
     final double y = offset + MediaQuery.paddingOf(context).top + kBarHeight;
     int index = 0;
@@ -446,11 +448,13 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
       final double top = viewport.getOffsetToReveal(c, 0).offset;
       if (top + c.size.height > y) break;
     }
-    return folderHandleLabel(
-      rows: _handleRows,
-      index: index,
-      sort: _handleSort,
-      pins: _handlePins,
+    return HandleLabel(
+      folderHandleLabel(
+        rows: _handleRows,
+        index: index,
+        sort: _handleSort,
+        pins: _handlePins,
+      ),
     );
   }
 

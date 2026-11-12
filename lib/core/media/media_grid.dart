@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
+import '../format/formatters.dart';
 import '../haptics/app_haptics.dart';
 import '../selection/selection.dart';
 import '../theme/app_tokens.dart';
@@ -119,6 +120,52 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
           widget.level,
         )
       : <MediaGroup<AssetEntity>>[MediaGroup<AssetEntity>('', widget.items)];
+
+  // ---- scroll handle -------------------------------------------------------
+
+  static bool _oneYear(List<MediaGroup<AssetEntity>> groups) =>
+      groups.isEmpty ||
+      groups.first.items.first.createDateTime.year ==
+          groups.last.items.first.createDateTime.year;
+
+  /// The handle's label for a date group: the month large and its year
+  /// under it, the year alone at Years, the day and date at Days. The mark
+  /// is the year, or the month when everything is in one year.
+  HandleLabel _dateLabel(
+    MediaGroup<AssetEntity> group, {
+    required bool oneYear,
+  }) {
+    final DateTime d = group.items.first.createDateTime;
+    final String month = Fmt.months[d.month - 1];
+    final String mark = oneYear ? month : '${d.year}';
+    return switch (widget.level) {
+      GridLevel.years => HandleLabel('${d.year}', mark: mark),
+      GridLevel.days => HandleLabel(
+        Fmt.weekdays[d.weekday - 1],
+        secondary: Fmt.date(d),
+        mark: mark,
+      ),
+      GridLevel.months ||
+      GridLevel.all => HandleLabel(month, secondary: '${d.year}', mark: mark),
+    };
+  }
+
+  /// Where each year (or month, within one year) starts, to line the track.
+  List<HandleMark> _dateMarks(
+    List<MediaGroup<AssetEntity>> groups,
+    GridGeometry geo,
+  ) {
+    final bool oneYear = _oneYear(groups);
+    final List<HandleMark> marks = <HandleMark>[];
+    String? last;
+    for (int g = 0; g < groups.length; g++) {
+      final String? mark = _dateLabel(groups[g], oneYear: oneYear).mark;
+      if (mark == null || mark == last) continue;
+      last = mark;
+      marks.add(HandleMark(_headerExtent + geo.groupTop(g), mark));
+    }
+    return marks;
+  }
 
   // ---- selection -----------------------------------------------------------
 
@@ -467,8 +514,12 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
                     controller: _scroll,
                     semanticLabel: 'Scroll by date',
                     labelAt: (double offset) => groups.isEmpty
-                        ? ''
-                        : groups[geo.groupAt(_gridOffset(offset))].label,
+                        ? HandleLabel.none
+                        : _dateLabel(
+                            groups[geo.groupAt(_gridOffset(offset))],
+                            oneYear: _oneYear(groups),
+                          ),
+                    marks: () => _dateMarks(groups, geo),
                   ),
                 ),
             ],

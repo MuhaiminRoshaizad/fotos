@@ -196,8 +196,10 @@ class _StripViewerState extends State<StripViewer> {
                 child: ScrollHandle(
                   controller: _scroll!,
                   semanticLabel: 'Scroll by page',
-                  labelAt: (double offset) =>
-                      'Page ${_pageAt(offset) + 1} of ${widget.pages.length}',
+                  labelAt: (double offset) => HandleLabel(
+                    'Page ${_pageAt(offset) + 1}',
+                    secondary: 'of ${widget.pages.length}',
+                  ),
                 ),
               ),
               _StripBar(

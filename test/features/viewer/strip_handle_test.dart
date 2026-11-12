@@ -49,7 +49,8 @@ void main() {
     // The label names the page under the middle of the screen.
     final int page = ((pos.pixels + 400) / 560).floor() + 1;
     expect(pos.pixels, greaterThan(5000));
-    expect(find.text('Page $page of 40'), findsOneWidget);
+    expect(find.text('Page $page'), findsOneWidget);
+    expect(find.text('of 40'), findsOneWidget);
     await g.up();
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 2));
