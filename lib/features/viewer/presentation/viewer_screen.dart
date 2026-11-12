@@ -337,15 +337,21 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_mode == ReadMode.strip) {
+      // A strip is pictures only; a video can't play as a still in it.
+      final List<AssetEntity> pictures = <AssetEntity>[
+        for (final AssetEntity e in _items)
+          if (e.type != AssetType.video) e,
+      ];
+      final int at = pictures.indexOf(_current);
       return StripViewer(
         title: widget.args.title,
         pages: <StripPage>[
-          for (final AssetEntity e in _items) StripPage.asset(e),
+          for (final AssetEntity e in pictures) StripPage.asset(e),
         ],
-        index: _index,
+        index: at < 0 ? 0 : at,
         onReadMode: (int page) {
           // Back in Photos or Pages, carry on from the page on screen.
-          _showAt(page);
+          _showAt(_items.indexOf(pictures[page]));
           _chooseReadMode();
         },
       );
@@ -432,7 +438,11 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               visible: _chrome,
               date: e.createDateTime,
               onClose: () => Navigator.of(context).pop(),
-              onReadMode: widget.args.folder == null ? null : _chooseReadMode,
+              // Pages and Strip are ways to read pictures, not videos.
+              onReadMode:
+                  widget.args.folder == null || e.type == AssetType.video
+                  ? null
+                  : _chooseReadMode,
             ),
             Positioned(
               left: AppSpacing.lg,

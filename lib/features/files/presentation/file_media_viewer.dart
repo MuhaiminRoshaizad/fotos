@@ -155,7 +155,8 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
                 ],
               ),
               actions: <Widget>[
-                if (folder != null)
+                // Pages and Strip are ways to read pictures, not videos.
+                if (folder != null && e.kind == FileKind.image)
                   IconButton(
                     tooltip: 'Read as',
                     icon: const Icon(CupertinoIcons.book),

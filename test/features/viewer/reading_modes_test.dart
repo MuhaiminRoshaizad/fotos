@@ -113,6 +113,43 @@ void main() {
     await finish(tester);
   });
 
+  testWidgets('a strip leaves videos out: they cannot play as a still', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          readModesProvider.overrideWith(() => _Modes(ReadMode.strip)),
+        ],
+        child: MaterialApp(
+          home: ViewerScreen(
+            args: ViewerArgs(
+              items: <AssetEntity>[
+                _page('a'),
+                AssetEntity(id: 'v', typeInt: 2, width: 1920, height: 1080),
+                _page('b'),
+              ],
+              index: 2,
+              heroPrefix: 'album-comic',
+              folder: 'Comic/Album/Iron Orchard',
+              title: 'Iron Orchard',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    // Two pictures; the one opened is the second of them.
+    expect(find.text('2 of 2'), findsOneWidget);
+    await finish(tester);
+  });
+
   testWidgets('the bar switches the reading mode while reading, and the '
       'folder remembers it', (WidgetTester tester) async {
     await open(tester, ReadMode.photos);
