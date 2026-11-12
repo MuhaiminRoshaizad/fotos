@@ -137,27 +137,33 @@ class AlbumPrefs {
     this.pinned = const <String>[],
     this.covers = const <String, String>{},
     this.sorts = const <String, AlbumSort>{},
+    this.defaultSort = AlbumSort.standard,
     this.order = AlbumsOrder.standard,
   });
 
   final List<String> pinned;
   final Map<String, String> covers;
   final Map<String, AlbumSort> sorts;
+
+  /// The sort of every album not given its own, new albums included.
+  final AlbumSort defaultSort;
   final AlbumsOrder order;
 
   AlbumPrefs copyWith({
     List<String>? pinned,
     Map<String, String>? covers,
     Map<String, AlbumSort>? sorts,
+    AlbumSort? defaultSort,
     AlbumsOrder? order,
   }) => AlbumPrefs(
     pinned: pinned ?? this.pinned,
     covers: covers ?? this.covers,
     sorts: sorts ?? this.sorts,
+    defaultSort: defaultSort ?? this.defaultSort,
     order: order ?? this.order,
   );
 
-  AlbumSort sortFor(String albumId) => sorts[albumId] ?? AlbumSort.standard;
+  AlbumSort sortFor(String albumId) => sorts[albumId] ?? defaultSort;
 }
 
 class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
@@ -178,6 +184,9 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
                 .entries)
           e.key: AlbumSort.decode(e.value! as String),
       },
+      defaultSort: m['defaultSort'] == null
+          ? AlbumSort.standard
+          : AlbumSort.decode(m['defaultSort']! as String),
       order: m['order'] == null
           ? AlbumsOrder.standard
           : AlbumsOrder.decode(m['order']! as String),
@@ -197,6 +206,7 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
               for (final MapEntry<String, AlbumSort> e in p.sorts.entries)
                 e.key: e.value.encode(),
             },
+            'defaultSort': p.defaultSort.encode(),
             'order': p.order.encode(),
           }),
         );
@@ -241,6 +251,21 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
         sorts: <String, AlbumSort>{
           for (final MapEntry<String, AlbumSort> e in p.sorts.entries)
             swap(e.key): e.value,
+        },
+      ),
+    );
+  }
+
+  /// Makes [sort] the default and lets [albumId] follow it, dropping the
+  /// album's own sort.
+  Future<void> setSortForAll(String albumId, AlbumSort sort) {
+    final AlbumPrefs p = _now;
+    return _save(
+      p.copyWith(
+        defaultSort: sort,
+        sorts: <String, AlbumSort>{
+          for (final MapEntry<String, AlbumSort> e in p.sorts.entries)
+            if (e.key != albumId) e.key: e.value,
         },
       ),
     );
