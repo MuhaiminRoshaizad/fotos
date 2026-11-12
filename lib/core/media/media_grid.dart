@@ -44,6 +44,7 @@ class MediaGrid extends ConsumerStatefulWidget {
     this.selectionOwner,
     this.selectionActions,
     this.grouped = true,
+    this.orderLabel,
     this.header,
     this.overlayTop = 0,
     this.animateIn = false,
@@ -59,6 +60,12 @@ class MediaGrid extends ConsumerStatefulWidget {
 
   /// False for albums sorted by name or size, where date headings mislead.
   final bool grouped;
+
+  /// For a grid not grouped by date, what the scroll handle says over an
+  /// item (its place, its length) and the mark it belongs to; null leaves
+  /// such a grid without a handle.
+  final HandleLabel Function(AssetEntity item, int index, int count)?
+  orderLabel;
 
   /// Scrolls in above the first group (a large title). Its height is
   /// measured after layout so scroll offsets can be mapped past it.
@@ -163,6 +170,22 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
       if (mark == null || mark == last) continue;
       last = mark;
       marks.add(HandleMark(_headerExtent + geo.groupTop(g), mark));
+    }
+    return marks;
+  }
+
+  HandleLabel _orderLabelAt(int index) =>
+      widget.orderLabel!(widget.items[index], index, widget.items.length);
+
+  /// Where each step of an ungrouped order (a length band) starts.
+  List<HandleMark> _orderMarks(GridGeometry geo) {
+    final List<HandleMark> marks = <HandleMark>[];
+    String? last;
+    for (int i = 0; i < widget.items.length; i++) {
+      final String? mark = _orderLabelAt(i).mark;
+      if (mark == null || mark == last) continue;
+      last = mark;
+      marks.add(HandleMark(_headerExtent + geo.offsetOf(i), mark));
     }
     return marks;
   }
@@ -505,22 +528,31 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
                   child: scroll,
                 ),
               ),
-              if (widget.grouped)
+              if (widget.grouped || widget.orderLabel != null)
                 Positioned(
                   top: widget.overlayTop,
                   right: 0,
                   bottom: bottom - AppSpacing.lg,
-                  child: ScrollHandle(
-                    controller: _scroll,
-                    semanticLabel: 'Scroll by date',
-                    labelAt: (double offset) => groups.isEmpty
-                        ? HandleLabel.none
-                        : _dateLabel(
-                            groups[geo.groupAt(_gridOffset(offset))],
-                            oneYear: _oneYear(groups),
-                          ),
-                    marks: () => _dateMarks(groups, geo),
-                  ),
+                  child: widget.grouped
+                      ? ScrollHandle(
+                          controller: _scroll,
+                          semanticLabel: 'Scroll by date',
+                          labelAt: (double offset) => groups.isEmpty
+                              ? HandleLabel.none
+                              : _dateLabel(
+                                  groups[geo.groupAt(_gridOffset(offset))],
+                                  oneYear: _oneYear(groups),
+                                ),
+                          marks: () => _dateMarks(groups, geo),
+                        )
+                      : ScrollHandle(
+                          controller: _scroll,
+                          semanticLabel: 'Scroll through this album',
+                          labelAt: (double offset) => widget.items.isEmpty
+                              ? HandleLabel.none
+                              : _orderLabelAt(geo.itemAt(_gridOffset(offset))),
+                          marks: () => _orderMarks(geo),
+                        ),
                 ),
             ],
           ),

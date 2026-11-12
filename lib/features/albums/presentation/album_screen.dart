@@ -15,6 +15,7 @@ import '../../../core/selection/selection.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
+import '../../../core/widgets/scroll_handle.dart';
 import '../../viewer/presentation/viewer_screen.dart';
 import '../data/album_prefs.dart';
 import 'album_sheets.dart';
@@ -41,6 +42,7 @@ class AlbumScreen extends ConsumerWidget {
       readingFolder: ref.watch(albumFolderProvider(albumId)).value,
       items: items,
       grouped: sort.groupsByDate,
+      orderLabel: _orderLabel(sort.by),
       onRetry: () => ref.invalidate(albumItemsProvider(albumId)),
       emptyTitle: 'This album is empty',
       emptyMessage: 'Its folder no longer holds any photos or videos.',
@@ -95,6 +97,7 @@ class MediaListScreen extends ConsumerWidget {
     required this.title,
     required this.items,
     required this.grouped,
+    this.orderLabel,
     required this.onRetry,
     required this.emptyTitle,
     required this.emptyMessage,
@@ -106,6 +109,11 @@ class MediaListScreen extends ConsumerWidget {
   final String title;
   final AsyncValue<List<AssetEntity>> items;
   final bool grouped;
+
+  /// The scroll handle's label when [grouped] is false; see
+  /// [MediaGrid.orderLabel].
+  final HandleLabel Function(AssetEntity item, int index, int count)?
+  orderLabel;
   final VoidCallback onRetry;
   final String emptyTitle;
   final String emptyMessage;
@@ -194,6 +202,7 @@ class MediaListScreen extends ConsumerWidget {
                       items: data,
                       level: GridLevel.all,
                       grouped: grouped,
+                      orderLabel: orderLabel,
                       header: header,
                       overlayTop:
                           MediaQuery.paddingOf(context).top + kBarHeight,
@@ -219,3 +228,28 @@ class MediaListScreen extends ConsumerWidget {
     );
   }
 }
+
+/// What an album's scroll handle says when it is sorted by name (how far
+/// in, as a comic's pages are named 001.jpg on) or by length (the video's
+/// length, marked in bands). Sorted by date it shows the date instead.
+HandleLabel Function(AssetEntity item, int index, int count)? _orderLabel(
+  AlbumSortBy by,
+) => switch (by) {
+  AlbumSortBy.taken => null,
+  AlbumSortBy.name => (AssetEntity item, int index, int count) => HandleLabel(
+    '${index + 1}',
+    secondary: 'of $count',
+  ),
+  AlbumSortBy.length =>
+    (AssetEntity item, int index, int count) => item.type == AssetType.video
+        ? HandleLabel(
+            Fmt.duration(Duration(seconds: item.duration)),
+            secondary: 'long',
+            mark: switch (item.duration) {
+              >= 600 => 'Over 10 min',
+              >= 60 => '1 to 10 min',
+              _ => 'Under 1 min',
+            },
+          )
+        : const HandleLabel('Photo', mark: 'Photos'),
+};
