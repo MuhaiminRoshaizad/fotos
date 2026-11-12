@@ -11,6 +11,7 @@ import '../../../core/media/read_mode.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
 import 'viewer_glass.dart';
+import '../../../core/widgets/scroll_handle.dart';
 
 /// One page of a strip: its shape, and its picture decoded [width] pixels
 /// across.
@@ -122,11 +123,11 @@ class _StripViewerState extends State<StripViewer> {
     );
   }
 
-  /// The page under the middle of the screen.
-  void _track() {
+  /// The page under the middle of the screen when scrolled to [offset].
+  int _pageAt(double offset) {
     final ScrollController? s = _scroll;
-    if (s == null || !s.hasClients || _tops.length < 2) return;
-    final double mid = s.offset + s.position.viewportDimension / 2;
+    if (s == null || !s.hasClients || _tops.length < 2) return _page;
+    final double mid = offset + s.position.viewportDimension / 2;
     int lo = 0;
     int hi = widget.pages.length - 1;
     while (lo < hi) {
@@ -137,7 +138,14 @@ class _StripViewerState extends State<StripViewer> {
         hi = m - 1;
       }
     }
-    if (lo != _page) setState(() => _page = lo);
+    return lo;
+  }
+
+  void _track() {
+    final ScrollController? s = _scroll;
+    if (s == null || !s.hasClients) return;
+    final int page = _pageAt(s.offset);
+    if (page != _page) setState(() => _page = page);
   }
 
   @override
@@ -177,6 +185,19 @@ class _StripViewerState extends State<StripViewer> {
                       ),
                     ),
                   ),
+                ),
+              ),
+              // A long comic is hundreds of screens; the handle jumps
+              // through it, naming the page it lands on.
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + 72,
+                right: 0,
+                bottom: MediaQuery.paddingOf(context).bottom + AppSpacing.lg,
+                child: ScrollHandle(
+                  controller: _scroll!,
+                  semanticLabel: 'Scroll by page',
+                  labelAt: (double offset) =>
+                      'Page ${_pageAt(offset) + 1} of ${widget.pages.length}',
                 ),
               ),
               _StripBar(
