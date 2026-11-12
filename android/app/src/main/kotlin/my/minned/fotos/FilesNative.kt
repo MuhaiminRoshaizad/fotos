@@ -205,6 +205,8 @@ object FilesNative {
     /**
      * Rewrites the ZIP at [path] without the entries named in [names], to a
      * temp file in the same folder that then atomically replaces the original.
+     * Pictures go in stored as they are, without a second round of
+     * compression; see [storesAsIs].
      * An interrupted run leaves the archive untouched. Reports progress after
      * each kept entry, and returns how many files remain inside. Throws with
      * "not_enough_space:<bytes>" before writing anything when the disk is full.
@@ -222,14 +224,28 @@ object FilesNative {
             ZipFile(path).use { zip ->
                 val keepers = zip.entries().toList().filter { it.name !in names }
                 val need = keepers.sumOf {
-                    if (it.compressedSize >= 0) it.compressedSize else maxOf(it.size, 0L)
+                    when {
+                        storesAsIs(it) -> it.size
+                        it.compressedSize >= 0 -> it.compressedSize
+                        else -> maxOf(it.size, 0L)
+                    }
                 }
                 if (need > StatFs(dir.path).availableBytes) {
                     throw IllegalStateException("not_enough_space:$need")
                 }
                 ZipOutputStream(BufferedOutputStream(tmp.outputStream())).use { out ->
                     keepers.forEachIndexed { i, e ->
-                        out.putNextEntry(ZipEntry(e.name).apply { time = e.time })
+                        out.putNextEntry(
+                            ZipEntry(e.name).apply {
+                                time = e.time
+                                if (storesAsIs(e)) {
+                                    method = ZipEntry.STORED
+                                    size = e.size
+                                    compressedSize = e.size
+                                    crc = e.crc
+                                }
+                            },
+                        )
                         if (!e.isDirectory) {
                             zip.getInputStream(e).use { it.copyTo(out) }
                             files++
@@ -254,6 +270,19 @@ object FilesNative {
         }
         return files
     }
+
+    /** Picture formats that are compressed already; zipping them again saves little. */
+    private val alreadyCompressed = setOf("jpg", "jpeg", "png", "webp", "gif", "avif", "heic", "heif")
+
+    /**
+     * Whether a kept ZIP entry goes into the rewritten archive stored as it
+     * is rather than compressed a second time: a picture, whose size and
+     * checksum the archive records (a stored entry needs both up front).
+     * Anything else, such as text, is still compressed.
+     */
+    private fun storesAsIs(e: ZipEntry): Boolean =
+        !e.isDirectory && e.size >= 0 && e.crc >= 0 &&
+            e.name.substringAfterLast('.', "").lowercase() in alreadyCompressed
 
     /** A frame from the video at [path] as a JPEG about [px] across, or null. */
     fun videoFrame(path: String, px: Int): ByteArray? {
