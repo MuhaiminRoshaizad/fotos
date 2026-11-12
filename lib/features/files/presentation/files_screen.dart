@@ -484,7 +484,11 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
       ),
       data: (List<FileEntry> entries) {
         final String q = _query.text.trim();
-        final Set<String> pins = <String>{...?ref.watch(topPinsProvider).value};
+        // The Files tab's own folders are pinned to its Pinned section, not
+        // to the top of the list.
+        final Set<String> pins = dir == ref.watch(storageRootProvider).value
+            ? const <String>{}
+            : <String>{...?ref.watch(topPinsProvider).value};
         final FileSort sort =
             (ref.watch(fileSortsProvider).value ?? const FileSorts()).sortFor(
               dir,

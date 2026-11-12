@@ -106,6 +106,10 @@ Future<void> showEntryActions(
       .contains(entry.path);
   final bool onTab = (ref.read(filesTabPinsProvider).value ?? const <String>[])
       .contains(entry.path);
+  // On the Files tab itself a folder has one Pin, to its Pinned section;
+  // keeping it first in a list it already heads would mean nothing.
+  final bool onFilesTab =
+      p.dirname(entry.path) == ref.read(storageRootProvider).value;
   final String? choice = await showActionSheet<String>(
     context,
     title: entry.name,
@@ -128,12 +132,16 @@ Future<void> showEntryActions(
         SheetChoice<String>('openWith', 'Open with another app'),
         SheetChoice<String>('share', 'Share'),
       ],
-      SheetChoice<String>('top', onTop ? 'Unpin from top' : 'Pin to top'),
-      if (entry.isFolder)
-        SheetChoice<String>(
-          'tab',
-          onTab ? 'Remove from Files tab' : 'Add to Files tab',
-        ),
+      if (onFilesTab && entry.isFolder)
+        SheetChoice<String>('tab', onTab ? 'Unpin' : 'Pin')
+      else ...<SheetChoice<String>>[
+        SheetChoice<String>('top', onTop ? 'Unpin from top' : 'Pin to top'),
+        if (entry.isFolder)
+          SheetChoice<String>(
+            'tab',
+            onTab ? 'Remove from Files tab' : 'Add to Files tab',
+          ),
+      ],
       const SheetChoice<String>('rename', 'Rename'),
       const SheetChoice<String>('move', 'Move to…'),
       const SheetChoice<String>('copy', 'Copy to…'),
@@ -196,8 +204,12 @@ Future<void> showEntryActions(
         showToast(
           context,
           onTab
-              ? 'Removed ${entry.name} from the Files tab'
-              : 'Added ${entry.name} to the Files tab',
+              ? (onFilesTab
+                    ? 'Unpinned ${entry.name}'
+                    : 'Removed ${entry.name} from the Files tab')
+              : (onFilesTab
+                    ? 'Pinned ${entry.name}'
+                    : 'Added ${entry.name} to the Files tab'),
         );
       }
     case 'rename':
