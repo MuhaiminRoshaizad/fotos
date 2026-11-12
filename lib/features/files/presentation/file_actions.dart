@@ -235,8 +235,8 @@ Future<void> followRenamed(WidgetRef ref, String from, String to) async {
     await ref
         .read(readModesProvider.notifier)
         .follow(
-          readingKey(p.relative(from, from: root)),
-          readingKey(p.relative(to, from: root)),
+          readingKey(p.split(p.relative(from, from: root)).join('/')),
+          readingKey(p.split(p.relative(to, from: root)).join('/')),
         );
   }
 }
