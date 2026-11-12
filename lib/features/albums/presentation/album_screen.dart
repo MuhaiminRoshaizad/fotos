@@ -10,6 +10,7 @@ import '../../../core/media/grouping.dart';
 import '../../../core/media/media_grid.dart';
 import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
+import '../../../core/media/read_mode.dart';
 import '../../../core/media/selection_actions.dart';
 import '../../../core/selection/selection.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -38,6 +39,8 @@ class AlbumScreen extends ConsumerWidget {
     return MediaListScreen(
       owner: 'album-$albumId',
       title: album?.name ?? '',
+      readMode: (ref.watch(albumPrefsProvider).value ?? const AlbumPrefs())
+          .readingFor(albumId),
       items: items,
       grouped: sort.groupsByDate,
       onRetry: () => ref.invalidate(albumItemsProvider(albumId)),
@@ -98,6 +101,7 @@ class MediaListScreen extends ConsumerWidget {
     required this.emptyTitle,
     required this.emptyMessage,
     this.actions = const <Widget>[],
+    this.readMode = ReadMode.photos,
   });
 
   final String owner;
@@ -110,6 +114,9 @@ class MediaListScreen extends ConsumerWidget {
 
   /// Bar buttons after Select.
   final List<Widget> actions;
+
+  /// How the viewer reads this list.
+  final ReadMode readMode;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -201,6 +208,8 @@ class MediaListScreen extends ConsumerWidget {
                           items: data,
                           index: index,
                           heroPrefix: owner,
+                          readMode: readMode,
+                          title: title,
                         ),
                       ),
                     ),

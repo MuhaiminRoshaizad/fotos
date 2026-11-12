@@ -14,9 +14,11 @@ import '../../../core/media/media_flight.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/app_sheet.dart';
+import '../../../core/media/read_mode.dart';
 import 'details_sheet.dart';
 import 'video_page.dart';
 import 'motion_photo.dart';
+import 'strip_viewer.dart';
 import 'viewer_glass.dart';
 
 /// What the viewer opens with: the list it pages through, where to start,
@@ -27,6 +29,8 @@ class ViewerArgs {
     required this.index,
     required this.heroPrefix,
     this.library,
+    this.readMode = ReadMode.photos,
+    this.title = '',
   });
 
   final List<AssetEntity> items;
@@ -38,6 +42,13 @@ class ViewerArgs {
   /// photo: opening one photo from the widget or the camera need not wait
   /// for the library.
   final Future<List<AssetEntity>>? library;
+
+  /// How the album is read; Pages turns on a tap at either edge, Strip
+  /// opens one long scroll instead.
+  final ReadMode readMode;
+
+  /// The album's name, shown by the strip.
+  final String title;
 }
 
 /// Full-screen photo and video viewer. Swipe sideways to page, down to close,
@@ -271,8 +282,35 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     );
   }
 
+  /// Pages mode: a tap on the left or right third turns the page, the
+  /// middle third shows or hides the controls.
+  void _tapAt(double dx) {
+    if (widget.args.readMode != ReadMode.pages) return _setChrome(!_chrome);
+    final double third = MediaQuery.sizeOf(context).width / 3;
+    final int step = dx < third ? -1 : (dx > third * 2 ? 1 : 0);
+    if (step == 0) return _setChrome(!_chrome);
+    final int to = _index + step;
+    if (to < 0 || to >= _items.length) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pages.jumpToPage(to);
+    } else {
+      _pages.animateToPage(
+        to,
+        duration: AppMotion.medium,
+        curve: AppMotion.emphasized,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.args.readMode == ReadMode.strip) {
+      return StripViewer(
+        title: widget.args.title,
+        items: _items,
+        index: _index,
+      );
+    }
     final AssetEntity e = _current;
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -340,7 +378,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                       );
                     }
                     return GestureDetector(
-                      onTap: () => _setChrome(!_chrome),
+                      onTapUp: (TapUpDetails d) => _tapAt(d.globalPosition.dx),
                       child: MotionPhoto(
                         key: ValueKey<String>('motion-${item.id}'),
                         asset: item,
