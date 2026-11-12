@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart'
 import 'package:flutter/material.dart';
 
 import 'app_tokens.dart';
+import '../widgets/glide_back_physics.dart';
 
 /// Builds the light or dark theme. Neutrals follow iOS's system greys (white
 /// and grouped grey in light; a soft near-black rather than pure black in
@@ -209,7 +210,7 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) =>
-      const BouncingScrollPhysics(parent: RangeMaintainingScrollPhysics());
+      const GlideBackPhysics(parent: RangeMaintainingScrollPhysics());
 
   @override
   Widget buildOverscrollIndicator(

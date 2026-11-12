@@ -31,6 +31,7 @@ import 'file_tile.dart';
 import 'files_providers.dart';
 import 'files_selection.dart';
 import '../../../core/widgets/bottom_bar_space.dart';
+import '../../../core/widgets/glide_back_physics.dart';
 
 /// The Files tab root: asks for All files access in context, then shows
 /// storage use and the top-level folders.
@@ -470,7 +471,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
           child: CustomScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
+              parent: GlideBackPhysics(),
             ),
             slivers: <Widget>[
               SliverToBoxAdapter(child: header),

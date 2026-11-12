@@ -19,6 +19,7 @@ import '../../albums/presentation/albums_providers.dart';
 import '../../files/presentation/files_providers.dart';
 import '../data/takeout_repository.dart';
 import '../../../core/widgets/bottom_bar_space.dart';
+import '../../../core/widgets/glide_back_physics.dart';
 
 /// Takeout ZIPs found in Download, newest first.
 final _takeoutZipsProvider = FutureProvider.autoDispose<List<File>>((
@@ -90,7 +91,7 @@ class _Body extends ConsumerWidget {
     return EntranceScope(
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+          parent: GlideBackPhysics(),
         ),
         slivers: <Widget>[
           SliverToBoxAdapter(child: header),
