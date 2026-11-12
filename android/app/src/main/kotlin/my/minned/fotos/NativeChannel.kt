@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager
 import android.media.ExifInterface
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import my.minned.fotos.widget.WidgetConfig
 
@@ -18,6 +19,10 @@ class NativeChannel(
     }
 
     private val io = Executors.newCachedThreadPool()
+
+    // Thumbnails for Files tiles. A fling or the scroll handle can ask for
+    // dozens at once; three at a time keeps the rest of the app responsive.
+    private val thumbs = Executors.newFixedThreadPool(3)
 
     @Volatile private var takeout: TakeoutImporter? = null
 
@@ -141,6 +146,13 @@ class NativeChannel(
             "videoFrame" -> background(result) {
                 FilesNative.videoFrame(call.argument<String>("path")!!, call.argument<Int>("px")!!)
             }
+            "thumbnail" -> background(result, thumbs) {
+                FilesNative.thumbnail(
+                    activity,
+                    call.argument<String>("path")!!,
+                    call.argument<Int>("px")!!,
+                )
+            }
             "videoFrames" -> background(result) {
                 FilesNative.videoFrames(
                     call.argument<String>("path")!!,
@@ -196,8 +208,12 @@ class NativeChannel(
         }
     }
 
-    private fun background(result: MethodChannel.Result, work: () -> Any?) {
-        io.execute {
+    private fun background(
+        result: MethodChannel.Result,
+        pool: ExecutorService = io,
+        work: () -> Any?,
+    ) {
+        pool.execute {
             try {
                 // A Unit result can't cross the channel; replying with it
                 // throws on the main thread and takes the whole app down.

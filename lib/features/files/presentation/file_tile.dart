@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -10,6 +9,7 @@ import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/motion.dart';
 import '../domain/file_entry.dart';
 import 'files_providers.dart';
+import 'file_thumb.dart';
 
 /// One file or folder in the grid view: a large picture (the image itself,
 /// a page from inside a ZIP, a frame of a video, or the type's glyph) with
@@ -198,28 +198,14 @@ class _Cover extends ConsumerWidget {
       final String? cover = ref.watch(folderCoverProvider(entry.path)).value;
       return cover == null
           ? glyph
-          : Image.file(
-              File(cover),
-              fit: BoxFit.cover,
-              cacheWidth: 400,
-              errorBuilder: (_, _, _) => glyph,
-            );
+          : FileThumb(path: cover, px: 400, placeholder: glyph);
     }
-    if (entry.kind == FileKind.image) {
-      return Image.file(
-        File(entry.path),
-        fit: BoxFit.cover,
-        cacheWidth: 400,
-        errorBuilder: (_, _, _) => glyph,
-      );
+    if (entry.isMedia) {
+      return FileThumb(path: entry.path, px: 400, placeholder: glyph);
     }
-    final Uint8List? bytes = switch (entry.kind) {
-      FileKind.zip =>
-        ref.watch(zipCoverProvider((entry.path, entry.size))).value,
-      FileKind.video =>
-        ref.watch(videoFrameProvider((entry.path, entry.size))).value,
-      _ => null,
-    };
+    final Uint8List? bytes = entry.kind == FileKind.zip
+        ? ref.watch(zipCoverProvider((entry.path, entry.size))).value
+        : null;
     // The glyph holds the place until the picture has been read, and stays
     // when there is none.
     return bytes == null

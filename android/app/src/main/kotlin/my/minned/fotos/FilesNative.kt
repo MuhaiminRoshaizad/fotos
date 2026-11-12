@@ -1,10 +1,13 @@
 package my.minned.fotos
 
 import android.app.Activity
+import android.content.ContentUris
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.ImageDecoder
 import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
 import android.media.MediaScannerConnection
@@ -12,7 +15,9 @@ import android.net.Uri
 import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.os.StatFs
+import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Size
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import java.io.BufferedOutputStream
@@ -21,8 +26,8 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -338,6 +343,62 @@ object FilesNative {
             pool.shutdown()
         }
         return frames.toList()
+    }
+
+    /**
+     * A picture or video file's thumbnail as a JPEG about [px] across, or
+     * null. Android keeps its own thumbnails for every file MediaStore
+     * knows, as the Photos tab uses; decoding the original instead read
+     * every byte of 4 to 20 MB camera files for a tile 120 points wide.
+     * A file MediaStore doesn't know is decoded at about that size.
+     */
+    fun thumbnail(context: Context, path: String, px: Int): ByteArray? {
+        val bitmap = storeThumbnail(context, path, px) ?: decodeSmall(path, px) ?: return null
+        return ByteArrayOutputStream()
+            .also { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+            .toByteArray()
+    }
+
+    private fun storeThumbnail(context: Context, path: String, px: Int): Bitmap? {
+        val files = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        val columns = arrayOf(MediaStore.Files.FileColumns._ID, MediaStore.Files.FileColumns.MEDIA_TYPE)
+        @Suppress("DEPRECATION") // DATA is still the only way to look a path up.
+        val where = "${MediaStore.MediaColumns.DATA}=?"
+        context.contentResolver.query(files, columns, where, arrayOf(path), null)?.use { c ->
+            if (!c.moveToFirst()) return null
+            val base = when (c.getInt(1)) {
+                MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE ->
+                    MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO ->
+                    MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                else -> return null
+            }
+            return try {
+                context.contentResolver.loadThumbnail(
+                    ContentUris.withAppendedId(base, c.getLong(0)), Size(px, px), null,
+                )
+            } catch (_: Exception) {
+                null
+            }
+        }
+        return null
+    }
+
+    private fun decodeSmall(path: String, px: Int): Bitmap? = try {
+        ImageDecoder.decodeBitmap(ImageDecoder.createSource(File(path))) { decoder, info, _ ->
+            val shorter = minOf(info.size.width, info.size.height)
+            decoder.setTargetSampleSize(maxOf(1, shorter / px))
+        }
+    } catch (_: Exception) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(path)
+            retriever.getScaledFrameAtTime(-1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, px, px)
+        } catch (_: Exception) {
+            null
+        } finally {
+            retriever.release()
+        }
     }
 
     private fun frameAt(retriever: MediaMetadataRetriever, us: Long, px: Int): ByteArray? {

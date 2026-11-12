@@ -343,6 +343,14 @@ class NativeChannel {
         'px': px,
       });
 
+  /// A picture or video file's thumbnail as JPEG bytes about [px] across,
+  /// from Android's own thumbnail store where it knows the file, or null.
+  Future<Uint8List?> thumbnail(String path, int px) =>
+      _channel.invokeMethod<Uint8List>('thumbnail', <String, Object>{
+        'path': path,
+        'px': px,
+      });
+
   /// [count] frames spread evenly through a video file, each JPEG bytes
   /// about [px] across, null where Android cannot read one. Taken in one
   /// pass from the keyframes nearest each slot.

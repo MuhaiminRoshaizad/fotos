@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -287,12 +288,30 @@ class FolderQuery extends Notifier<String> {
 final folderQueryProvider = NotifierProvider.autoDispose
     .family<FolderQuery, String, String>(FolderQuery.new);
 
-/// A frame from a video file, for its tile in the grid view. Kept for the
-/// session, keyed like [zipCoverProvider].
-final videoFrameProvider = FutureProvider.family<Uint8List?, (String, int)>(
-  (Ref ref, (String, int) video) =>
-      ref.watch(nativeChannelProvider).videoFrame(video.$1, 400),
-);
+/// A picture or video file's thumbnail for its tile or row, keyed by path
+/// and size in pixels.
+///
+/// A tile asks only once it has stayed on screen for a moment, so the rows
+/// a fling or the scroll handle passes over cost nothing. Thumbnails seen
+/// recently are kept for two minutes, so scrolling back doesn't load them
+/// again.
+final fileThumbProvider = FutureProvider.autoDispose
+    .family<Uint8List?, (String, int)>((Ref ref, (String, int) key) async {
+      final NativeChannel native = ref.read(nativeChannelProvider);
+      bool gone = false;
+      ref.onDispose(() => gone = true);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      if (gone) return null;
+      final Uint8List? bytes = await native.thumbnail(key.$1, key.$2);
+      final link = ref.keepAlive();
+      Timer? release;
+      ref.onCancel(
+        () => release = Timer(const Duration(minutes: 2), link.close),
+      );
+      ref.onResume(() => release?.cancel());
+      ref.onDispose(() => release?.cancel());
+      return bytes;
+    });
 
 /// Whether folders are shown as a grid of pictures instead of a list of
 /// rows. One choice for every folder, remembered between sessions.

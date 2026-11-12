@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -13,6 +12,7 @@ import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/swipe_actions.dart';
 import '../domain/file_entry.dart';
 import 'files_providers.dart';
+import 'file_thumb.dart';
 
 /// One line in a folder: icon (or thumbnail), name, size and date. Swipe
 /// left for More and Delete; press and hold to start selecting.
@@ -259,14 +259,13 @@ class FileIcon extends ConsumerWidget {
       if (cover != null) {
         return ClipRRect(
           borderRadius: BorderRadius.circular(AppRadii.sm),
-          child: Image.file(
-            File(cover),
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-            errorBuilder: (_, _, _) =>
-                _box(cs, CupertinoIcons.folder_fill, cs.primary),
+          child: SizedBox.square(
+            dimension: size,
+            child: FileThumb(
+              path: cover,
+              px: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+              placeholder: _box(cs, CupertinoIcons.folder_fill, cs.primary),
+            ),
           ),
         );
       }
@@ -274,13 +273,13 @@ class FileIcon extends ConsumerWidget {
     if (entry.kind == FileKind.image) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(AppRadii.sm),
-        child: Image.file(
-          File(entry.path),
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-          errorBuilder: (_, _, _) => _box(cs, CupertinoIcons.photo, null),
+        child: SizedBox.square(
+          dimension: size,
+          child: FileThumb(
+            path: entry.path,
+            px: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+            placeholder: _box(cs, CupertinoIcons.photo, null),
+          ),
         ),
       );
     }
