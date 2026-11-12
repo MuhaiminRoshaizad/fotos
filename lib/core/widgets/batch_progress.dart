@@ -13,8 +13,10 @@ import '../theme/app_tokens.dart';
 ///
 /// [verb] and [doneVerb] are the two tenses ("Moving", "Moved") and [what]
 /// names the lot ("12 items", "report.pdf"). A single item has nothing to
-/// count, so its bar runs without a fraction. With [show] false the work
-/// runs with no dialog at all, for something too quick to be worth one.
+/// count, so its bar runs without a fraction, unless [progress] reports how
+/// far that one piece of work has got as (done, total). With [show] false
+/// the work runs with no dialog at all, for something too quick to be worth
+/// one.
 Future<int> runBatch<T>(
   BuildContext context, {
   required String verb,
@@ -23,9 +25,17 @@ Future<int> runBatch<T>(
   required List<T> items,
   required Future<void> Function(T item) each,
   String Function(T item)? nameOf,
+  Stream<(int, int)>? progress,
   bool show = true,
 }) async {
   final ValueNotifier<_Batch> state = ValueNotifier<_Batch>(const _Batch());
+  final StreamSubscription<(int, int)>? part = progress?.listen(
+    ((int, int) p) => state.value = _Batch(
+      done: state.value.done,
+      failed: state.value.failed,
+      part: p,
+    ),
+  );
   final NavigatorState navigator = Navigator.of(context, rootNavigator: true);
   if (show) {
     unawaited(
@@ -55,6 +65,8 @@ Future<int> runBatch<T>(
     }
     state.value = _Batch(done: state.value.done + 1, failed: failed);
   }
+  // Nothing more will come that matters; no need to wait for it to close.
+  if (part != null) unawaited(part.cancel());
   if (show) {
     // Let the bar reach the end, then show the outcome long enough to read.
     await Future<void>.delayed(const Duration(milliseconds: 220));
@@ -68,10 +80,18 @@ Future<int> runBatch<T>(
 }
 
 class _Batch {
-  const _Batch({this.done = 0, this.failed = 0, this.finished = false});
+  const _Batch({
+    this.done = 0,
+    this.failed = 0,
+    this.finished = false,
+    this.part,
+  });
   final int done;
   final int failed;
   final bool finished;
+
+  /// How far a single piece of work has got, when it reports that.
+  final (int, int)? part;
 }
 
 class _BatchDialog extends StatelessWidget {
@@ -139,8 +159,12 @@ class _BatchDialog extends StatelessWidget {
                       )
                     : _Bar(
                         key: const ValueKey<String>('bar'),
-                        done: b.done,
-                        total: total,
+                        done: b.part != null && total <= 1
+                            ? b.part!.$1
+                            : b.done,
+                        total: b.part != null && total <= 1
+                            ? b.part!.$2
+                            : total,
                         name: names != null && b.done < total
                             ? names![b.done]
                             : null,
