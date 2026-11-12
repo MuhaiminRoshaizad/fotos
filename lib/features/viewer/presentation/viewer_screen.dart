@@ -342,8 +342,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_mode == ReadMode.strip) {
-      // A strip is pictures only; a video can't play as a still in it.
+    if (opensAsStrip(_mode, _current)) {
       final List<AssetEntity> pictures = <AssetEntity>[
         for (final AssetEntity e in _items)
           if (e.type != AssetType.video) e,
@@ -733,3 +732,10 @@ class _Actions extends StatelessWidget {
     );
   }
 }
+
+/// Whether [item] opens in the strip reader for a folder read as [mode]. A
+/// strip is pictures only: a video can't play as a still in it, so a video
+/// opens in the viewer even in a folder read as a strip, rather than an
+/// empty strip of none of its pictures.
+bool opensAsStrip(ReadMode mode, AssetEntity item) =>
+    mode == ReadMode.strip && item.type != AssetType.video;

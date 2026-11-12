@@ -150,6 +150,19 @@ void main() {
     await finish(tester);
   });
 
+  test('a video opened in a folder read as a strip opens in the viewer, '
+      'not an empty strip', () {
+    final AssetEntity video = AssetEntity(
+      id: 'v',
+      typeInt: 2,
+      width: 360,
+      height: 640,
+    );
+    expect(opensAsStrip(ReadMode.strip, video), isFalse);
+    expect(opensAsStrip(ReadMode.strip, _page('a')), isTrue);
+    expect(opensAsStrip(ReadMode.pages, _page('a')), isFalse);
+  });
+
   testWidgets('the bar switches the reading mode while reading, and the '
       'folder remembers it', (WidgetTester tester) async {
     await open(tester, ReadMode.photos);
