@@ -6,10 +6,53 @@ import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
+import '../../../core/media/read_mode.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_sheet.dart';
 import 'viewer_glass.dart';
 
-/// An album read as one long strip: every page full width, top to bottom,
+/// One page of a strip: its shape, and its picture decoded [width] pixels
+/// across.
+class StripPage {
+  const StripPage({required this.aspect, required this.image});
+
+  /// Width over height.
+  final double aspect;
+  final ImageProvider Function(int width) image;
+
+  /// A photo or video frame from the library, by its known size.
+  factory StripPage.asset(AssetEntity e) {
+    final Size s = e.orientatedSize;
+    return StripPage(
+      // An item whose size Android doesn't know reads as a comic page.
+      aspect: s.width > 0 && s.height > 0 ? s.width / s.height : 0.7,
+      image: (int width) => AssetEntityImageProvider(
+        e,
+        isOriginal: false,
+        thumbnailSize: ThumbnailSize(
+          width,
+          (width * (s.height > 0 && s.width > 0 ? s.height / s.width : 1.43))
+              .round(),
+        ),
+      ),
+    );
+  }
+}
+
+/// Asks which way to read, showing the current one. Null when dismissed.
+Future<ReadMode?> chooseReadMode(BuildContext context, ReadMode now) =>
+    showActionSheet<ReadMode>(
+      context,
+      title: 'Read as',
+      message: 'Now: ${now.label}',
+      choices: const <SheetChoice<ReadMode>>[
+        SheetChoice<ReadMode>(ReadMode.photos, 'Photos'),
+        SheetChoice<ReadMode>(ReadMode.pages, 'Pages: tap the edges to turn'),
+        SheetChoice<ReadMode>(ReadMode.strip, 'Strip: one long scroll'),
+      ],
+    );
+
+/// A folder read as one long strip: every page full width, top to bottom,
 /// with no gaps, the way long-strip comics are drawn. Each page takes its
 /// real height from the start, so nothing shifts as the pictures arrive. A
 /// tap shows or hides the bar.
@@ -17,15 +60,20 @@ class StripViewer extends StatefulWidget {
   const StripViewer({
     super.key,
     required this.title,
-    required this.items,
+    required this.pages,
     required this.index,
+    this.onReadMode,
   });
 
   final String title;
-  final List<AssetEntity> items;
+  final List<StripPage> pages;
 
   /// The page to open at.
   final int index;
+
+  /// The bar's reading-mode button, given the page on screen; none when
+  /// null.
+  final ValueChanged<int>? onReadMode;
 
   @override
   State<StripViewer> createState() => _StripViewerState();
@@ -40,20 +88,14 @@ class _StripViewerState extends State<StripViewer> {
   List<double> _tops = const <double>[];
   double _width = 0;
 
-  static double _aspect(AssetEntity e) {
-    final Size s = e.orientatedSize;
-    // An item whose size Android doesn't know reads as a comic page.
-    return s.width > 0 && s.height > 0 ? s.width / s.height : 0.7;
-  }
-
   void _layout(double width) {
     if (width == _width) return;
     _width = width;
     double y = 0;
     final List<double> tops = <double>[];
-    for (final AssetEntity e in widget.items) {
+    for (final StripPage page in widget.pages) {
       tops.add(y);
-      y += width / _aspect(e);
+      y += width / page.aspect;
     }
     _tops = <double>[...tops, y];
   }
@@ -78,7 +120,7 @@ class _StripViewerState extends State<StripViewer> {
     if (s == null || !s.hasClients || _tops.length < 2) return;
     final double mid = s.offset + s.position.viewportDimension / 2;
     int lo = 0;
-    int hi = widget.items.length - 1;
+    int hi = widget.pages.length - 1;
     while (lo < hi) {
       final int m = (lo + hi + 1) ~/ 2;
       if (_tops[m] <= mid) {
@@ -113,35 +155,30 @@ class _StripViewerState extends State<StripViewer> {
                   padding: EdgeInsets.only(
                     bottom: MediaQuery.paddingOf(context).bottom,
                   ),
-                  itemCount: widget.items.length,
+                  itemCount: widget.pages.length,
                   itemExtentBuilder: (int i, _) => _tops[i + 1] - _tops[i],
-                  itemBuilder: (BuildContext context, int i) {
-                    final AssetEntity e = widget.items[i];
-                    final int h = (px / _aspect(e)).round();
-                    return Semantics(
-                      image: true,
-                      label: 'Page ${i + 1} of ${widget.items.length}',
-                      child: ColoredBox(
-                        color: const Color(0xFF151517),
-                        child: Image(
-                          image: AssetEntityImageProvider(
-                            e,
-                            isOriginal: false,
-                            thumbnailSize: ThumbnailSize(px, h),
-                          ),
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
-                        ),
+                  itemBuilder: (BuildContext context, int i) => Semantics(
+                    image: true,
+                    label: 'Page ${i + 1} of ${widget.pages.length}',
+                    child: ColoredBox(
+                      color: const Color(0xFF151517),
+                      child: Image(
+                        image: widget.pages[i].image(px),
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
               _StripBar(
                 visible: _chrome,
                 title: widget.title,
-                page: '${_page + 1} of ${widget.items.length}',
+                page: '${_page + 1} of ${widget.pages.length}',
                 onClose: () => Navigator.of(context).pop(),
+                onReadMode: widget.onReadMode == null
+                    ? null
+                    : () => widget.onReadMode!(_page),
               ),
             ],
           );
@@ -157,12 +194,14 @@ class _StripBar extends StatelessWidget {
     required this.title,
     required this.page,
     required this.onClose,
+    required this.onReadMode,
   });
 
   final bool visible;
   final String title;
   final String page;
   final VoidCallback onClose;
+  final VoidCallback? onReadMode;
 
   @override
   Widget build(BuildContext context) {
@@ -208,6 +247,9 @@ class _StripBar extends StatelessWidget {
                         ),
                       ),
                     ),
+                    trailing: onReadMode == null
+                        ? null
+                        : ReadModeButton(onPressed: onReadMode!),
                     middle: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
@@ -242,4 +284,26 @@ class _StripBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The viewer bar's button for switching between Photos, Pages and Strip.
+class ReadModeButton extends StatelessWidget {
+  const ReadModeButton({super.key, required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => ViewerGlass(
+    shape: const CircleBorder(),
+    child: CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: const Size(44, 44),
+      onPressed: onPressed,
+      child: const Icon(
+        CupertinoIcons.book,
+        color: Colors.white,
+        semanticLabel: 'Read as',
+      ),
+    ),
+  );
 }

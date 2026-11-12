@@ -5,7 +5,6 @@ import 'package:photo_manager/photo_manager.dart';
 
 import '../../../core/format/natural_sort.dart';
 import '../../../core/media/media_repository.dart';
-import '../../../core/media/read_mode.dart';
 import '../../../core/storage/preferences.dart';
 
 enum AlbumSortBy {
@@ -139,7 +138,6 @@ class AlbumPrefs {
     this.covers = const <String, String>{},
     this.sorts = const <String, AlbumSort>{},
     this.defaultSort = AlbumSort.standard,
-    this.reading = const <String, ReadMode>{},
     this.order = AlbumsOrder.standard,
   });
 
@@ -150,8 +148,6 @@ class AlbumPrefs {
   /// The sort of every album not given its own, new albums included.
   final AlbumSort defaultSort;
 
-  /// How each album is read, for those not read as photos.
-  final Map<String, ReadMode> reading;
   final AlbumsOrder order;
 
   AlbumPrefs copyWith({
@@ -159,18 +155,14 @@ class AlbumPrefs {
     Map<String, String>? covers,
     Map<String, AlbumSort>? sorts,
     AlbumSort? defaultSort,
-    Map<String, ReadMode>? reading,
     AlbumsOrder? order,
   }) => AlbumPrefs(
     pinned: pinned ?? this.pinned,
     covers: covers ?? this.covers,
     sorts: sorts ?? this.sorts,
     defaultSort: defaultSort ?? this.defaultSort,
-    reading: reading ?? this.reading,
     order: order ?? this.order,
   );
-
-  ReadMode readingFor(String albumId) => reading[albumId] ?? ReadMode.photos;
 
   AlbumSort sortFor(String albumId) => sorts[albumId] ?? defaultSort;
 }
@@ -192,12 +184,6 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
             in (m['sorts'] as Map<String, Object?>? ?? <String, Object?>{})
                 .entries)
           e.key: AlbumSort.decode(e.value! as String),
-      },
-      reading: <String, ReadMode>{
-        for (final MapEntry<String, Object?> e
-            in (m['reading'] as Map<String, Object?>? ?? <String, Object?>{})
-                .entries)
-          e.key: ReadMode.decode(e.value! as String),
       },
       defaultSort: m['defaultSort'] == null
           ? AlbumSort.standard
@@ -222,10 +208,6 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
                 e.key: e.value.encode(),
             },
             'defaultSort': p.defaultSort.encode(),
-            'reading': <String, String>{
-              for (final MapEntry<String, ReadMode> e in p.reading.entries)
-                e.key: e.value.name,
-            },
             'order': p.order.encode(),
           }),
         );
@@ -271,10 +253,6 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
           for (final MapEntry<String, AlbumSort> e in p.sorts.entries)
             swap(e.key): e.value,
         },
-        reading: <String, ReadMode>{
-          for (final MapEntry<String, ReadMode> e in p.reading.entries)
-            swap(e.key): e.value,
-        },
       ),
     );
   }
@@ -289,19 +267,6 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
         sorts: <String, AlbumSort>{
           for (final MapEntry<String, AlbumSort> e in p.sorts.entries)
             if (e.key != albumId) e.key: e.value,
-        },
-      ),
-    );
-  }
-
-  Future<void> setReading(String albumId, ReadMode mode) {
-    final AlbumPrefs p = _now;
-    return _save(
-      p.copyWith(
-        reading: <String, ReadMode>{
-          for (final MapEntry<String, ReadMode> e in p.reading.entries)
-            if (e.key != albumId) e.key: e.value,
-          if (mode != ReadMode.photos) albumId: mode,
         },
       ),
     );

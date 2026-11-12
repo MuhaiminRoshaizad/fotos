@@ -29,7 +29,7 @@ class ViewerArgs {
     required this.index,
     required this.heroPrefix,
     this.library,
-    this.readMode = ReadMode.photos,
+    this.folder,
     this.title = '',
   });
 
@@ -43,9 +43,10 @@ class ViewerArgs {
   /// for the library.
   final Future<List<AssetEntity>>? library;
 
-  /// How the album is read; Pages turns on a tap at either edge, Strip
-  /// opens one long scroll instead.
-  final ReadMode readMode;
+  /// The folder these come from, as a [readingKey], which decides how they
+  /// are read and lets the bar switch it; null for a mixed view such as
+  /// the Photos tab, read as photos.
+  final String? folder;
 
   /// The album's name, shown by the strip.
   final String title;
@@ -97,6 +98,33 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         // Paging stays limited to what the viewer opened with.
       },
     );
+  }
+
+  /// Moves to [at], building the pages afresh there.
+  void _showAt(int at) {
+    if (at == _index) return;
+    final ExtendedPageController old = _pages;
+    setState(() {
+      _index = at;
+      _pages = _pagesAt(at);
+      _generation++;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      old.dispose();
+      if (mounted) _centreStrip(false);
+    });
+  }
+
+  ReadMode get _mode =>
+      readModeFor(ref.watch(readModesProvider).value, widget.args.folder);
+
+  Future<void> _chooseReadMode() async {
+    final String? folder = widget.args.folder;
+    if (folder == null) return;
+    final ReadMode now = readModeFor(ref.read(readModesProvider).value, folder);
+    final ReadMode? next = await chooseReadMode(context, now);
+    if (next == null || next == now) return;
+    await ref.read(readModesProvider.notifier).set(folder, next);
   }
 
   void _takeLibrary(List<AssetEntity> all) {
@@ -285,7 +313,11 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   /// Pages mode: a tap on the left or right third turns the page, the
   /// middle third shows or hides the controls.
   void _tapAt(double dx) {
-    if (widget.args.readMode != ReadMode.pages) return _setChrome(!_chrome);
+    final ReadMode mode = readModeFor(
+      ref.read(readModesProvider).value,
+      widget.args.folder,
+    );
+    if (mode != ReadMode.pages) return _setChrome(!_chrome);
     final double third = MediaQuery.sizeOf(context).width / 3;
     final int step = dx < third ? -1 : (dx > third * 2 ? 1 : 0);
     if (step == 0) return _setChrome(!_chrome);
@@ -304,11 +336,18 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.args.readMode == ReadMode.strip) {
+    if (_mode == ReadMode.strip) {
       return StripViewer(
         title: widget.args.title,
-        items: _items,
+        pages: <StripPage>[
+          for (final AssetEntity e in _items) StripPage.asset(e),
+        ],
         index: _index,
+        onReadMode: (int page) {
+          // Back in Photos or Pages, carry on from the page on screen.
+          _showAt(page);
+          _chooseReadMode();
+        },
       );
     }
     final AssetEntity e = _current;
@@ -393,6 +432,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               visible: _chrome,
               date: e.createDateTime,
               onClose: () => Navigator.of(context).pop(),
+              onReadMode: widget.args.folder == null ? null : _chooseReadMode,
             ),
             Positioned(
               left: AppSpacing.lg,
@@ -524,11 +564,15 @@ class _TopBar extends StatelessWidget {
     required this.visible,
     required this.date,
     required this.onClose,
+    required this.onReadMode,
   });
 
   final bool visible;
   final DateTime date;
   final VoidCallback onClose;
+
+  /// Switches between Photos, Pages and Strip; no button when null.
+  final VoidCallback? onReadMode;
 
   @override
   Widget build(BuildContext context) {
@@ -576,6 +620,9 @@ class _TopBar extends StatelessWidget {
                         ),
                       ),
                     ),
+                    trailing: onReadMode == null
+                        ? null
+                        : ReadModeButton(onPressed: onReadMode!),
                     middle: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[

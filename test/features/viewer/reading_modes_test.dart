@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/core/media/read_mode.dart';
-import 'package:fotos/features/albums/data/album_prefs.dart';
 import 'package:fotos/features/viewer/presentation/strip_viewer.dart';
 import 'package:fotos/features/viewer/presentation/viewer_screen.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -32,18 +31,21 @@ void main() {
   });
 
   Future<void> open(WidgetTester tester, ReadMode mode) async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [readModesProvider.overrideWith(() => _Modes(mode))],
         child: MaterialApp(
           home: ViewerScreen(
             args: ViewerArgs(
               items: <AssetEntity>[_page('a'), _page('b'), _page('c')],
               index: 1,
               heroPrefix: 'album-comic',
-              readMode: mode,
+              folder: 'Comic/Album/Iron Orchard',
               title: 'Iron Orchard',
             ),
           ),
@@ -111,26 +113,63 @@ void main() {
     await finish(tester);
   });
 
-  test('an album remembers how it is read, through a rename too', () async {
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
-    final ProviderContainer c = ProviderContainer();
-    addTearDown(c.dispose);
-    await c.read(albumPrefsProvider.future);
-    final AlbumPrefsNotifier prefs = c.read(albumPrefsProvider.notifier);
-    await prefs.setReading('comic', ReadMode.strip);
-    expect(
-      c.read(albumPrefsProvider).value!.readingFor('comic'),
-      ReadMode.strip,
-    );
-    expect(
-      c.read(albumPrefsProvider).value!.readingFor('camera'),
-      ReadMode.photos,
-    );
-    await prefs.rekey('comic', 'comic-renamed');
-    expect(
-      c.read(albumPrefsProvider).value!.readingFor('comic-renamed'),
-      ReadMode.strip,
-    );
+  testWidgets('the bar switches the reading mode while reading, and the '
+      'folder remembers it', (WidgetTester tester) async {
+    await open(tester, ReadMode.photos);
+    await tester.tap(find.bySemanticsLabel('Read as'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Strip: one long scroll'));
+    await settle(tester);
+    expect(find.byType(StripViewer), findsOneWidget);
+    // Still on the page it was opened at.
+    expect(find.text('2 of 3'), findsOneWidget);
+    await finish(tester);
   });
+
+  test(
+    'a folder keeps its mode through a rename of it or of a parent',
+    () async {
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      final ProviderContainer c = ProviderContainer();
+      addTearDown(c.dispose);
+      await c.read(readModesProvider.future);
+      final ReadModesNotifier modes = c.read(readModesProvider.notifier);
+      await modes.set('Comic/Album/Iron Orchard', ReadMode.strip);
+      expect(
+        readModeFor(
+          c.read(readModesProvider).value,
+          'Comic/Album/Iron Orchard',
+        ),
+        ReadMode.strip,
+      );
+      expect(
+        readModeFor(c.read(readModesProvider).value, 'DCIM/Camera'),
+        ReadMode.photos,
+      );
+      await modes.follow('Comic', 'Comics');
+      expect(
+        readModeFor(
+          c.read(readModesProvider).value,
+          'Comics/Album/Iron Orchard',
+        ),
+        ReadMode.strip,
+      );
+      expect(
+        readingKey('Comic/Album/Iron Orchard/'),
+        'Comic/Album/Iron Orchard',
+      );
+    },
+  );
+}
+
+/// Starts with [mode] for every folder, as if chosen before.
+class _Modes extends ReadModesNotifier {
+  _Modes(this.mode);
+  final ReadMode mode;
+
+  @override
+  Future<Map<String, ReadMode>> build() async => <String, ReadMode>{
+    'Comic/Album/Iron Orchard': mode,
+  };
 }

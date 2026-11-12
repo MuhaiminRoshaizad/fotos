@@ -5,6 +5,7 @@ import 'package:photo_manager/photo_manager.dart';
 
 import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
+import '../../../core/media/read_mode.dart';
 import '../../../core/platform/native_channel.dart';
 
 /// The album with [id], looked up fresh so renames and moves show at once.
@@ -17,6 +18,16 @@ final albumProvider = FutureProvider.autoDispose.family<Album?, String>((
     if (a.id == id) return a;
   }
   return null;
+});
+
+/// The album's folder as a reading key, for its reading mode.
+final albumFolderProvider = FutureProvider.autoDispose.family<String?, String>((
+  Ref ref,
+  String id,
+) async {
+  final Album? album = await ref.watch(albumProvider(id).future);
+  final String? path = await album?.path.relativePathAsync;
+  return path == null ? null : readingKey(path);
 });
 
 final albumItemsProvider = FutureProvider.autoDispose

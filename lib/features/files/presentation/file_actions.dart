@@ -12,6 +12,7 @@ import '../../../core/format/formatters.dart';
 import '../../../core/format/natural_sort.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/media/media_providers.dart';
+import '../../../core/media/read_mode.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/platform/native_channel.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -229,6 +230,15 @@ Future<void> followRenamed(WidgetRef ref, String from, String to) async {
   await ref.read(topPinsProvider.notifier).follow(from, to);
   await ref.read(filesTabPinsProvider.notifier).follow(from, to);
   await ref.read(fileSortsProvider.notifier).follow(from, to);
+  final String? root = ref.read(storageRootProvider).value;
+  if (root != null) {
+    await ref
+        .read(readModesProvider.notifier)
+        .follow(
+          readingKey(p.relative(from, from: root)),
+          readingKey(p.relative(to, from: root)),
+        );
+  }
 }
 
 /// Chooses how the folder at [dir] is sorted, or the default for all.

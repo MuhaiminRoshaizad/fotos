@@ -34,7 +34,6 @@ enum AlbumOption {
   gallery('Add to gallery', CupertinoIcons.rectangle_stack_badge_plus),
   cover('Change cover', CupertinoIcons.photo),
   sort('Sort', CupertinoIcons.arrow_up_arrow_down),
-  reading('Read as', CupertinoIcons.book),
   delete('Delete album', CupertinoIcons.trash);
 
   const AlbumOption(this.label, this.icon);
@@ -143,8 +142,6 @@ Future<Album?> runAlbumOption(
       await pickAlbumCover(context, ref, album);
     case AlbumOption.sort:
       await showSortSheet(context, ref, album);
-    case AlbumOption.reading:
-      await showReadAsSheet(context, ref, album);
     case AlbumOption.delete:
       await deleteAlbum(context, ref, album);
   }
@@ -221,6 +218,9 @@ Future<Album?> renameAlbum(
     return null;
   }
   await ref.read(albumPrefsProvider.notifier).rekey(album.id, renamed.id);
+  await ref
+      .read(readModesProvider.notifier)
+      .follow(readingKey(from), readingKey(target));
   await ref.read(galleriesProvider.notifier).rekey(album.id, renamed.id);
   // Home screen widgets set to this album follow it too.
   await ref.read(nativeChannelProvider).rekeyWidgetAlbum(album.id, renamed.id);
@@ -261,6 +261,14 @@ Future<Album?> _renameCaseOnly(
     } on FileSystemException {
       ok = false;
     }
+  }
+  if (ok) {
+    await ref
+        .read(readModesProvider.notifier)
+        .follow(
+          readingKey(relativePath),
+          readingKey(renamedFolder(relativePath, name)),
+        );
   }
   ref.invalidate(libraryProvider);
   ref.invalidate(albumsProvider);
@@ -360,34 +368,6 @@ Future<void> showSortSheet(
   await (next.forAll
       ? prefs.setSortForAll(album.id, sort)
       : prefs.setSort(album.id, sort));
-}
-
-/// Chooses how [album] is read: as photos, as pages turned by a tap on
-/// either edge, or as one long strip.
-Future<void> showReadAsSheet(
-  BuildContext context,
-  WidgetRef ref,
-  Album album,
-) async {
-  final ReadMode now =
-      (ref.read(albumPrefsProvider).value ?? const AlbumPrefs()).readingFor(
-        album.id,
-      );
-  final ReadMode? mode = await showActionSheet<ReadMode>(
-    context,
-    title: 'Read ${album.name} as',
-    message: 'Now: ${now.label}',
-    choices: const <SheetChoice<ReadMode>>[
-      SheetChoice<ReadMode>(ReadMode.photos, 'Photos'),
-      SheetChoice<ReadMode>(ReadMode.pages, 'Pages: tap the edges to turn'),
-      SheetChoice<ReadMode>(ReadMode.strip, 'Strip: one long scroll'),
-    ],
-  );
-  if (mode == null || mode == now) return;
-  await ref.read(albumPrefsProvider.notifier).setReading(album.id, mode);
-  if (context.mounted) {
-    showToast(context, '${album.name} reads as ${mode.label.toLowerCase()}');
-  }
 }
 
 /// Chooses the order of the albums on the Albums tab.
