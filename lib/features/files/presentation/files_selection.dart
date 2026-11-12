@@ -85,6 +85,13 @@ FolderBar folderBar(WidgetRef ref, String dir, {Widget? leading}) {
       barTitle: null,
       leading: leading,
       trailing: <Widget>[
+        BarButton.icon(
+          icon: CupertinoIcons.arrow_up_arrow_down,
+          tooltip: 'Sort',
+          onPressed: entries.isEmpty
+              ? null
+              : () => showFolderSortSheet(ref.context, ref, dir),
+        ),
         const FilesViewButton(),
         BarButton.text(
           label: 'Select',

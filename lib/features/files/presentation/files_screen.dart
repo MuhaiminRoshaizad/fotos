@@ -485,8 +485,12 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
       data: (List<FileEntry> entries) {
         final String q = _query.text.trim();
         final Set<String> pins = <String>{...?ref.watch(topPinsProvider).value};
+        final FileSort sort =
+            (ref.watch(fileSortsProvider).value ?? const FileSorts()).sortFor(
+              dir,
+            );
         final List<FileEntry> shown = pinnedFirst(
-          filterByName(entries, q),
+          sort.apply(filterByName(entries, q)),
           pins,
         );
         _shown = <String>[for (final FileEntry e in shown) e.path];
@@ -576,7 +580,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                                 ? () => ref
                                       .read(selectionProvider.notifier)
                                       .toggle(e.path)
-                                : () => openEntry(context, ref, e, entries),
+                                : () => openEntry(context, ref, e, shown),
                             onLongPress: () => _startSelecting(e.path),
                             onMore: () => showEntryActions(context, ref, e),
                           );
@@ -607,7 +611,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                               ? () => ref
                                     .read(selectionProvider.notifier)
                                     .toggle(e.path)
-                              : () => openEntry(context, ref, e, entries),
+                              : () => openEntry(context, ref, e, shown),
                           onLongPress: () => _startSelecting(e.path),
                           onSweepStart: (_) => _sweepStart(e.path),
                           onSweepUpdate: _sweepUpdate,

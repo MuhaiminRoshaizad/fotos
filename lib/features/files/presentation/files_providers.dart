@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show listEquals, mapEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -175,6 +176,99 @@ class TopPinsNotifier extends PathPinsNotifier {
 
 final topPinsProvider = AsyncNotifierProvider<TopPinsNotifier, List<String>>(
   TopPinsNotifier.new,
+);
+
+/// How folders in Files are sorted: one default, and the folders given
+/// their own order, by path.
+class FileSorts {
+  const FileSorts({
+    this.defaultSort = FileSort.standard,
+    this.folders = const <String, FileSort>{},
+  });
+
+  final FileSort defaultSort;
+  final Map<String, FileSort> folders;
+
+  FileSort sortFor(String dir) => folders[dir] ?? defaultSort;
+}
+
+class FileSortsNotifier extends AsyncNotifier<FileSorts> {
+  static const String _key = 'files.sort';
+
+  @override
+  Future<FileSorts> build() async {
+    final String? raw = await ref.watch(preferencesProvider).getString(_key);
+    if (raw == null) return const FileSorts();
+    final Map<String, Object?> m = jsonDecode(raw) as Map<String, Object?>;
+    return FileSorts(
+      defaultSort: FileSort.decode(m['default']! as String),
+      folders: <String, FileSort>{
+        for (final MapEntry<String, Object?> e
+            in (m['folders'] as Map<String, Object?>? ?? <String, Object?>{})
+                .entries)
+          e.key: FileSort.decode(e.value! as String),
+      },
+    );
+  }
+
+  Future<void> _save(FileSorts s) async {
+    state = AsyncData<FileSorts>(s);
+    await ref
+        .read(preferencesProvider)
+        .setString(
+          _key,
+          jsonEncode(<String, Object>{
+            'default': s.defaultSort.encode(),
+            'folders': <String, String>{
+              for (final MapEntry<String, FileSort> e in s.folders.entries)
+                e.key: e.value.encode(),
+            },
+          }),
+        );
+  }
+
+  FileSorts get _now => state.value ?? const FileSorts();
+
+  /// Sorts [dir] by [sort]; with [forAll], makes it the default instead and
+  /// lets [dir] follow it.
+  Future<void> set(String dir, FileSort sort, {bool forAll = false}) {
+    final FileSorts s = _now;
+    return _save(
+      forAll
+          ? FileSorts(
+              defaultSort: sort,
+              folders: <String, FileSort>{
+                for (final MapEntry<String, FileSort> e in s.folders.entries)
+                  if (e.key != dir) e.key: e.value,
+              },
+            )
+          : FileSorts(
+              defaultSort: s.defaultSort,
+              folders: <String, FileSort>{...s.folders, dir: sort},
+            ),
+    );
+  }
+
+  /// Keeps folders' own sorts through a rename or move of [from] to [to].
+  Future<void> follow(String from, String to) async {
+    final FileSorts s = _now;
+    String moved(String path) => path == from
+        ? to
+        : path.startsWith('$from/')
+        ? '$to${path.substring(from.length)}'
+        : path;
+    final Map<String, FileSort> next = <String, FileSort>{
+      for (final MapEntry<String, FileSort> e in s.folders.entries)
+        moved(e.key): e.value,
+    };
+    if (!mapEquals(next, s.folders)) {
+      await _save(FileSorts(defaultSort: s.defaultSort, folders: next));
+    }
+  }
+}
+
+final fileSortsProvider = AsyncNotifierProvider<FileSortsNotifier, FileSorts>(
+  FileSortsNotifier.new,
 );
 
 /// What is typed in a folder's search field, by folder path. Held here, not

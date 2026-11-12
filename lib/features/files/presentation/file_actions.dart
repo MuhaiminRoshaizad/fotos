@@ -19,6 +19,7 @@ import '../../../core/validation/validators.dart';
 import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/batch_progress.dart';
 import '../../../core/widgets/dialogs.dart';
+import '../../../core/widgets/sort_sheet.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/data/album_prefs.dart';
 import '../../albums/presentation/albums_providers.dart';
@@ -211,10 +212,40 @@ Future<void> showEntryActions(
   }
 }
 
-/// Pins stay with what was pinned when it is renamed or moved.
-Future<void> followPins(WidgetRef ref, String from, String to) async {
+/// Pins and a folder's own sort stay with what was renamed or moved.
+Future<void> followRenamed(WidgetRef ref, String from, String to) async {
   await ref.read(topPinsProvider.notifier).follow(from, to);
   await ref.read(filesTabPinsProvider.notifier).follow(from, to);
+  await ref.read(fileSortsProvider.notifier).follow(from, to);
+}
+
+/// Chooses how the folder at [dir] is sorted, or the default for all.
+Future<void> showFolderSortSheet(
+  BuildContext context,
+  WidgetRef ref,
+  String dir,
+) async {
+  final FileSort current =
+      (ref.read(fileSortsProvider).value ?? const FileSorts()).sortFor(dir);
+  final SortPick? next = await pickSort(
+    context,
+    title: 'Sort',
+    labels: <String>[for (final FileSortBy b in FileSortBy.values) b.label],
+    directions: <(String, String)>[
+      for (final FileSortBy b in FileSortBy.values) b.directions,
+    ],
+    by: current.by.index,
+    reversed: current.reversed,
+    forAllLabel: 'Use for all folders',
+  );
+  if (next == null) return;
+  await ref
+      .read(fileSortsProvider.notifier)
+      .set(
+        dir,
+        FileSort(FileSortBy.values[next.by], reversed: next.reversed),
+        forAll: next.forAll,
+      );
 }
 
 Future<void> _rename(
@@ -241,7 +272,7 @@ Future<void> _rename(
     final String to = await ref
         .read(filesRepositoryProvider)
         .rename(entry, name);
-    await followPins(ref, entry.path, to);
+    await followRenamed(ref, entry.path, to);
     _refresh(ref);
     if (context.mounted) showToast(context, 'Renamed to $name');
   } on FileSystemException {
@@ -321,7 +352,7 @@ Future<bool> transferEntries(
         return;
       }
       final String to = await repo.moveTo(e, dir, taken: taken);
-      await followPins(ref, e.path, to);
+      await followRenamed(ref, e.path, to);
     },
   );
   _refresh(ref);

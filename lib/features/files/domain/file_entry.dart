@@ -58,6 +58,71 @@ int compareEntries(FileEntry a, FileEntry b) {
   return naturalCompare(a.name, b.name);
 }
 
+enum FileSortBy {
+  name('Name'),
+  // Android keeps no date a file arrived, only when it last changed; for a
+  // download or an extracted comic that is the day it came.
+  modified('Date modified'),
+  size('Size'),
+  type('Type');
+
+  const FileSortBy(this.label);
+  final String label;
+
+  /// Labels for the two directions, first being the default.
+  (String, String) get directions => switch (this) {
+    FileSortBy.name => ('A to Z', 'Z to A'),
+    FileSortBy.modified => ('Newest first', 'Oldest first'),
+    FileSortBy.size => ('Largest first', 'Smallest first'),
+    FileSortBy.type => ('A to Z', 'Z to A'),
+  };
+}
+
+/// How a folder in Files is ordered. Folders always come before files;
+/// each part is sorted by [by], ties broken by name.
+class FileSort {
+  const FileSort(this.by, {this.reversed = false});
+
+  final FileSortBy by;
+
+  /// False means the first of [FileSortBy.directions].
+  final bool reversed;
+
+  static const FileSort standard = FileSort(FileSortBy.name);
+
+  String encode() => '${by.name}:${reversed ? 1 : 0}';
+
+  static FileSort decode(String s) {
+    final List<String> p = s.split(':');
+    return FileSort(
+      FileSortBy.values.firstWhere(
+        (FileSortBy b) => b.name == p.first,
+        orElse: () => FileSortBy.name,
+      ),
+      reversed: p.length > 1 && p[1] == '1',
+    );
+  }
+
+  List<FileEntry> apply(List<FileEntry> entries) {
+    int byName(FileEntry a, FileEntry b) => naturalCompare(a.name, b.name);
+    int key(FileEntry a, FileEntry b) => switch (by) {
+      FileSortBy.name => byName(a, b),
+      FileSortBy.modified => b.modified.compareTo(a.modified),
+      FileSortBy.size => b.size.compareTo(a.size),
+      FileSortBy.type => extensionOf(a.name).compareTo(extensionOf(b.name)),
+    };
+    int compare(FileEntry a, FileEntry b) {
+      final int c = reversed ? key(b, a) : key(a, b);
+      return c != 0 ? c : byName(a, b);
+    }
+
+    return <FileEntry>[
+      ...entries.where((FileEntry e) => e.isFolder).toList()..sort(compare),
+      ...entries.where((FileEntry e) => !e.isFolder).toList()..sort(compare),
+    ];
+  }
+}
+
 /// [entries] with the pinned ones moved to the top, each part keeping its
 /// order (folders first, then A to Z).
 List<FileEntry> pinnedFirst(List<FileEntry> entries, Set<String> pinned) {
