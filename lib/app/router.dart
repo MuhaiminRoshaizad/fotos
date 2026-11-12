@@ -20,6 +20,7 @@ import '../features/takeout_import/presentation/takeout_home_screen.dart';
 import '../features/takeout_import/presentation/takeout_import_screen.dart';
 import '../features/viewer/presentation/viewer_screen.dart';
 import 'shell.dart';
+import 'tab_order.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
@@ -28,7 +29,7 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   final GoRouter router = GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: '/photos',
+    initialLocation: tabPaths[ref.read(initialTabOrderProvider).first],
     routes: <RouteBase>[
       GoRoute(
         path: '/viewer',

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/haptics/app_haptics.dart';
 import '../core/selection/selection.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/bottom_bar_space.dart';
+import 'edit_tabs_sheet.dart';
 import 'floating_nav.dart';
+import 'tab_order.dart';
 
 /// Hosts the four tabs and the floating bar. The tabs show only on the four
 /// main pages; a pushed page (an album, a folder) has the screen to itself.
@@ -79,7 +82,12 @@ class AppShell extends ConsumerWidget {
                     ? FloatingNav(
                         key: const ValueKey<String>('nav'),
                         index: shell.currentIndex,
+                        order: ref.watch(tabOrderProvider),
                         onSelect: (int i) => _select(ref, i),
+                        onLongPress: () {
+                          AppHaptics.longPress();
+                          showEditTabs(context, ref);
+                        },
                       )
                     : const SizedBox.shrink(key: ValueKey<String>('none')),
               ),

@@ -40,10 +40,25 @@ const double _indicatorWidth = 56;
 /// destinations fit a phone width. The indicator springs to a newly opened
 /// tab, passing it a little before it settles, and the tab's icon bounces.
 class FloatingNav extends StatefulWidget {
-  const FloatingNav({super.key, required this.index, required this.onSelect});
+  const FloatingNav({
+    super.key,
+    required this.index,
+    required this.order,
+    required this.onSelect,
+    this.onLongPress,
+  });
 
+  /// The open tab, as an index into [navDestinations].
   final int index;
+
+  /// The tabs from left to right, as indices into [navDestinations].
+  final List<int> order;
+
+  /// Called with the chosen tab's index into [navDestinations].
   final ValueChanged<int> onSelect;
+
+  /// Pressing and holding the bar: opens the tab editor.
+  final VoidCallback? onLongPress;
 
   @override
   State<FloatingNav> createState() => _FloatingNavState();
@@ -54,14 +69,18 @@ class _FloatingNavState extends State<FloatingNav>
   /// Where the indicator is, in tabs from the left.
   late final AnimationController _at = AnimationController.unbounded(
     vsync: this,
-    value: widget.index.toDouble(),
+    value: _slot(widget).toDouble(),
   );
+
+  /// The open tab's place in the bar.
+  static int _slot(FloatingNav w) => w.order.indexOf(w.index);
 
   @override
   void didUpdateWidget(FloatingNav old) {
     super.didUpdateWidget(old);
-    if (old.index == widget.index) return;
-    final double to = widget.index.toDouble();
+    // A new tab, or the open tab moved by a new order.
+    if (_slot(old) == _slot(widget)) return;
+    final double to = _slot(widget).toDouble();
     if (MediaQuery.disableAnimationsOf(context)) {
       _at.value = to;
     } else {
@@ -86,45 +105,49 @@ class _FloatingNavState extends State<FloatingNav>
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    return _Pill(
-      child: SizedBox(
-        width: _itemWidth * navDestinations.length,
-        height: AppNavMetrics.height - 12,
-        child: Stack(
-          children: <Widget>[
-            AnimatedBuilder(
-              animation: _at,
-              builder: (BuildContext context, Widget? child) {
-                final (double left, double width) = indicatorSpan(
-                  _at.value,
-                  navDestinations.length,
-                );
-                return Positioned(
-                  left: left,
-                  top: 4,
-                  width: width,
-                  height: 30,
-                  child: child!,
-                );
-              },
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: cs.onSurface.withValues(alpha: 0.09),
-                  borderRadius: BorderRadius.circular(AppRadii.pill),
+    return GestureDetector(
+      onLongPress: widget.onLongPress,
+      child: _Pill(
+        child: SizedBox(
+          width: _itemWidth * navDestinations.length,
+          height: AppNavMetrics.height - 12,
+          child: Stack(
+            children: <Widget>[
+              AnimatedBuilder(
+                animation: _at,
+                builder: (BuildContext context, Widget? child) {
+                  final (double left, double width) = indicatorSpan(
+                    _at.value,
+                    navDestinations.length,
+                  );
+                  return Positioned(
+                    left: left,
+                    top: 4,
+                    width: width,
+                    height: 30,
+                    child: child!,
+                  );
+                },
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: 0.09),
+                    borderRadius: BorderRadius.circular(AppRadii.pill),
+                  ),
                 ),
               ),
-            ),
-            Row(
-              children: <Widget>[
-                for (int i = 0; i < navDestinations.length; i++)
-                  _NavItem(
-                    destination: navDestinations[i],
-                    selected: i == widget.index,
-                    onTap: () => widget.onSelect(i),
-                  ),
-              ],
-            ),
-          ],
+              Row(
+                children: <Widget>[
+                  for (final int i in widget.order)
+                    _NavItem(
+                      key: ValueKey<int>(i),
+                      destination: navDestinations[i],
+                      selected: i == widget.index,
+                      onTap: () => widget.onSelect(i),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -153,6 +176,7 @@ class _FloatingNavState extends State<FloatingNav>
 /// the tap.
 class _NavItem extends StatefulWidget {
   const _NavItem({
+    super.key,
     required this.destination,
     required this.selected,
     required this.onTap,
