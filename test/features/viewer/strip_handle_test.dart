@@ -45,6 +45,7 @@ void main() {
       await g.moveBy(const Offset(0, 15));
       await tester.pump();
     }
+    await tester.pump();
     // The label names the page under the middle of the screen.
     final int page = ((pos.pixels + 400) / 560).floor() + 1;
     expect(pos.pixels, greaterThan(5000));

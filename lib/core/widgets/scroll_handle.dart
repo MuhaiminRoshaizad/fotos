@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../haptics/app_haptics.dart';
 import '../theme/app_tokens.dart';
@@ -88,11 +89,25 @@ class _ScrollHandleState extends State<ScrollHandle> {
     final double thumbTop = (_startTop + globalY - _startY).clamp(0, travel);
     final double offset = thumbTop / travel * p.maxScrollExtent;
     widget.controller.jumpTo(offset);
-    final String label = widget.labelAt(offset);
-    if (label != _label) {
-      if (_label.isNotEmpty) AppHaptics.tick();
-      setState(() => _label = label);
-    }
+    _relabel();
+  }
+
+  bool _relabelling = false;
+
+  /// Reads the label once the jump has been laid out, so a list can name
+  /// the row it actually landed on rather than the one it left.
+  void _relabel() {
+    if (_relabelling) return;
+    _relabelling = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _relabelling = false;
+      if (!mounted || !_dragging || !widget.controller.hasClients) return;
+      final String label = widget.labelAt(widget.controller.offset);
+      if (label != _label) {
+        if (_label.isNotEmpty) AppHaptics.tick();
+        setState(() => _label = label);
+      }
+    });
   }
 
   @override

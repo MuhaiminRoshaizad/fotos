@@ -5,7 +5,12 @@ import 'package:flutter/cupertino.dart'
 import 'package:flutter/gestures.dart'
     show HitTestEntry, HitTestResult, HitTestTarget;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderMetaData, SliverConstraints;
+import 'package:flutter/rendering.dart'
+    show
+        RenderAbstractViewport,
+        RenderMetaData,
+        RenderSliverMultiBoxAdaptor,
+        SliverConstraints;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
@@ -32,6 +37,8 @@ import 'files_providers.dart';
 import 'files_selection.dart';
 import '../../../core/widgets/bottom_bar_space.dart';
 import '../../../core/widgets/glide_back_physics.dart';
+import '../domain/folder_handle.dart';
+import '../../../core/widgets/scroll_handle.dart';
 
 /// The Files tab root: asks for All files access in context, then shows
 /// storage use and the top-level folders.
@@ -281,6 +288,16 @@ class FolderBody extends ConsumerStatefulWidget {
 class _FolderBodyState extends ConsumerState<FolderBody> {
   final TextEditingController _query = TextEditingController();
   final FocusNode _focus = FocusNode();
+  final ScrollController _scroll = ScrollController();
+
+  /// The grid or list of rows, read by the scroll handle to find the row
+  /// it has landed on.
+  final GlobalKey _rowsKey = GlobalKey();
+
+  /// What the handle labels: the rows as shown, their sort and pins.
+  List<FileEntry> _handleRows = const <FileEntry>[];
+  FileSort _handleSort = FileSort.standard;
+  Set<String> _handlePins = const <String>{};
 
   @override
   void initState() {
@@ -412,7 +429,29 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
     _settle?.cancel();
     _query.dispose();
     _focus.dispose();
+    _scroll.dispose();
     super.dispose();
+  }
+
+  /// The label for the row at the top of the screen, under the bar.
+  String _handleLabel(double offset) {
+    final RenderObject? r = _rowsKey.currentContext?.findRenderObject();
+    if (r is! RenderSliverMultiBoxAdaptor || _handleRows.isEmpty) return '';
+    final RenderAbstractViewport viewport = RenderAbstractViewport.of(r);
+    final double y = offset + MediaQuery.paddingOf(context).top + kBarHeight;
+    int index = 0;
+    for (RenderBox? c = r.firstChild; c != null; c = r.childAfter(c)) {
+      index = r.indexOf(c);
+      // The scroll offset that would put this row at the top.
+      final double top = viewport.getOffsetToReveal(c, 0).offset;
+      if (top + c.size.height > y) break;
+    }
+    return folderHandleLabel(
+      rows: _handleRows,
+      index: index,
+      sort: _handleSort,
+      pins: _handlePins,
+    );
   }
 
   @override
@@ -467,114 +506,84 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
         );
         _shown = <String>[for (final FileEntry e in shown) e.path];
         final List<FileEntry> rows = _withLeaving(shown, q);
-        return EntranceScope(
-          child: CustomScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: GlideBackPhysics(),
+        _handleRows = grid ? shown : rows;
+        _handleSort = sort;
+        _handlePins = pins;
+        final Widget scroll = CustomScrollView(
+          controller: _scroll,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: GlideBackPhysics(),
+          ),
+          slivers: <Widget>[
+            SliverToBoxAdapter(child: header),
+            CupertinoSliverRefreshControl(
+              onRefresh: () => ref.refresh(folderProvider(dir).future),
             ),
-            slivers: <Widget>[
-              SliverToBoxAdapter(child: header),
-              CupertinoSliverRefreshControl(
-                onRefresh: () => ref.refresh(folderProvider(dir).future),
+            if (entries.isNotEmpty)
+              SliverToBoxAdapter(
+                child: SearchField(
+                  placeholder: 'Search this folder',
+                  controller: _query,
+                  focus: _focus,
+                  active: _focus.hasFocus || _query.text.isNotEmpty,
+                ),
               ),
-              if (entries.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: SearchField(
-                    placeholder: 'Search this folder',
-                    controller: _query,
-                    focus: _focus,
-                    active: _focus.hasFocus || _query.text.isNotEmpty,
+            if (widget.preface != null && q.isEmpty)
+              SliverToBoxAdapter(child: widget.preface),
+            if (entries.isEmpty)
+              const SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 360,
+                  child: EmptyState(
+                    icon: CupertinoIcons.folder,
+                    title: 'This folder is empty',
+                    message:
+                        'Files you save or extract here appear in this list.',
                   ),
                 ),
-              if (widget.preface != null && q.isEmpty)
-                SliverToBoxAdapter(child: widget.preface),
-              if (entries.isEmpty)
-                const SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: 360,
-                    child: EmptyState(
-                      icon: CupertinoIcons.folder,
-                      title: 'This folder is empty',
-                      message:
-                          'Files you save or extract here appear in this list.',
+              )
+            else if (shown.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xxl),
+                  child: Text(
+                    'Nothing in this folder matches “${_query.text.trim()}”.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                )
-              else if (shown.isEmpty)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xxl),
-                    child: Text(
-                      'Nothing in this folder matches “${_query.text.trim()}”.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              )
+            else if (grid)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                sliver: SliverLayoutBuilder(
+                  builder: (BuildContext context, SliverConstraints c) {
+                    // Three across on a phone, more as the page widens.
+                    final int columns = (c.crossAxisExtent / 118).floor().clamp(
+                      3,
+                      8,
+                    );
+                    final double width =
+                        (c.crossAxisExtent - AppSpacing.md * (columns - 1)) /
+                        columns;
+                    return SliverGrid.builder(
+                      key: _rowsKey,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: AppSpacing.md,
+                        mainAxisSpacing: AppSpacing.md,
+                        mainAxisExtent:
+                            width / FileTile.coverAspect +
+                            FileTile.labelHeight(context),
                       ),
-                    ),
-                  ),
-                )
-              else if (grid)
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                  ),
-                  sliver: SliverLayoutBuilder(
-                    builder: (BuildContext context, SliverConstraints c) {
-                      // Three across on a phone, more as the page widens.
-                      final int columns = (c.crossAxisExtent / 118)
-                          .floor()
-                          .clamp(3, 8);
-                      final double width =
-                          (c.crossAxisExtent - AppSpacing.md * (columns - 1)) /
-                          columns;
-                      return SliverGrid.builder(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          crossAxisSpacing: AppSpacing.md,
-                          mainAxisSpacing: AppSpacing.md,
-                          mainAxisExtent:
-                              width / FileTile.coverAspect +
-                              FileTile.labelHeight(context),
-                        ),
-                        itemCount: shown.length,
-                        itemBuilder: (BuildContext context, int i) {
-                          final FileEntry e = shown[i];
-                          final Widget tile = FileTile(
-                            key: ValueKey<String>(e.path),
-                            entry: e,
-                            selected: selecting
-                                ? sel.ids.contains(e.path)
-                                : null,
-                            pinned: pins.contains(e.path),
-                            onTap: selecting
-                                ? () => ref
-                                      .read(selectionProvider.notifier)
-                                      .toggle(e.path)
-                                : () => openEntry(context, ref, e, shown),
-                            onLongPress: () => _startSelecting(e.path),
-                            onMore: () => showEntryActions(context, ref, e),
-                          );
-                          return widget.animateIn
-                              ? SlideUpIn(index: i ~/ columns, child: tile)
-                              : tile;
-                        },
-                      );
-                    },
-                  ),
-                )
-              else
-                SliverList.builder(
-                  itemCount: rows.length,
-                  itemBuilder: (BuildContext context, int i) {
-                    final FileEntry e = rows[i];
-                    final Widget row = InsetGroupItem(
-                      first: i == 0,
-                      last: i == rows.length - 1,
-                      child: MetaData(
-                        metaData: _RowTag(e.path),
-                        child: FileRow(
+                      itemCount: shown.length,
+                      itemBuilder: (BuildContext context, int i) {
+                        final FileEntry e = shown[i];
+                        final Widget tile = FileTile(
                           key: ValueKey<String>(e.path),
                           entry: e,
                           selected: selecting ? sel.ids.contains(e.path) : null,
@@ -585,27 +594,80 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                                     .toggle(e.path)
                               : () => openEntry(context, ref, e, shown),
                           onLongPress: () => _startSelecting(e.path),
-                          onSweepStart: (_) => _sweepStart(e.path),
-                          onSweepUpdate: _sweepUpdate,
                           onMore: () => showEntryActions(context, ref, e),
-                          onDelete: () => deleteEntry(context, ref, e),
-                        ),
-                      ),
+                        );
+                        return widget.animateIn
+                            ? SlideUpIn(index: i ~/ columns, child: tile)
+                            : tile;
+                      },
                     );
-                    final Widget present = _RowPresence(
-                      key: ValueKey<String>('row:${e.path}'),
-                      entering: _entering.contains(e.path),
-                      leaving: _leaving.containsKey(e.path),
-                      child: row,
-                    );
-                    return widget.animateIn
-                        ? SlideUpIn(index: i, child: present)
-                        : present;
                   },
                 ),
-              SliverToBoxAdapter(child: SizedBox(height: bottom)),
-            ],
-          ),
+              )
+            else
+              SliverList.builder(
+                key: _rowsKey,
+                itemCount: rows.length,
+                itemBuilder: (BuildContext context, int i) {
+                  final FileEntry e = rows[i];
+                  final Widget row = InsetGroupItem(
+                    first: i == 0,
+                    last: i == rows.length - 1,
+                    child: MetaData(
+                      metaData: _RowTag(e.path),
+                      child: FileRow(
+                        key: ValueKey<String>(e.path),
+                        entry: e,
+                        selected: selecting ? sel.ids.contains(e.path) : null,
+                        pinned: pins.contains(e.path),
+                        onTap: selecting
+                            ? () => ref
+                                  .read(selectionProvider.notifier)
+                                  .toggle(e.path)
+                            : () => openEntry(context, ref, e, shown),
+                        onLongPress: () => _startSelecting(e.path),
+                        onSweepStart: (_) => _sweepStart(e.path),
+                        onSweepUpdate: _sweepUpdate,
+                        onMore: () => showEntryActions(context, ref, e),
+                        onDelete: () => deleteEntry(context, ref, e),
+                      ),
+                    ),
+                  );
+                  final Widget present = _RowPresence(
+                    key: ValueKey<String>('row:${e.path}'),
+                    entering: _entering.contains(e.path),
+                    leaving: _leaving.containsKey(e.path),
+                    child: row,
+                  );
+                  return widget.animateIn
+                      ? SlideUpIn(index: i, child: present)
+                      : present;
+                },
+              ),
+            SliverToBoxAdapter(child: SizedBox(height: bottom)),
+          ],
+        );
+        // The Files tab's own list stays plain; a folder opened from it
+        // can run to hundreds of comics.
+        final bool root = dir == ref.watch(storageRootProvider).value;
+        return EntranceScope(
+          child: root
+              ? scroll
+              : Stack(
+                  children: <Widget>[
+                    Positioned.fill(child: scroll),
+                    Positioned(
+                      top: MediaQuery.paddingOf(context).top + kBarHeight,
+                      right: 0,
+                      bottom: bottom,
+                      child: ScrollHandle(
+                        controller: _scroll,
+                        semanticLabel: 'Scroll through this folder',
+                        labelAt: _handleLabel,
+                      ),
+                    ),
+                  ],
+                ),
         );
       },
     );
