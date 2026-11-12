@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fotos/core/media/date_scrubber.dart';
+import 'package:fotos/core/widgets/scroll_handle.dart';
 
 void main() {
   testWidgets('the handle follows the finger 1:1', (WidgetTester tester) async {
@@ -21,7 +21,11 @@ void main() {
                 top: 0,
                 right: 0,
                 bottom: 0,
-                child: DateScrubber(controller: c, labelAt: (double o) => '$o'),
+                child: ScrollHandle(
+                  controller: c,
+                  labelAt: (double o) => '$o',
+                  semanticLabel: 'Scroll',
+                ),
               ),
             ],
           ),

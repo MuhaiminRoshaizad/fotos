@@ -13,11 +13,11 @@ import '../selection/selection.dart';
 import '../theme/app_tokens.dart';
 import '../widgets/entrance.dart';
 import '../widgets/lift_menu.dart';
-import 'date_scrubber.dart';
 import 'grid_geometry.dart';
 import 'grouping.dart';
 import 'media_tile.dart';
 import '../widgets/bottom_bar_space.dart';
+import '../widgets/scroll_handle.dart';
 
 class _TileTag {
   const _TileTag(this.index);
@@ -463,8 +463,9 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
                   top: widget.overlayTop,
                   right: 0,
                   bottom: bottom - AppSpacing.lg,
-                  child: DateScrubber(
+                  child: ScrollHandle(
                     controller: _scroll,
+                    semanticLabel: 'Scroll by date',
                     labelAt: (double offset) => groups.isEmpty
                         ? ''
                         : groups[geo.groupAt(_gridOffset(offset))].label,

@@ -6,23 +6,30 @@ import 'package:flutter/material.dart';
 import '../haptics/app_haptics.dart';
 import '../theme/app_tokens.dart';
 
-/// The handle on the right edge for jumping through a long grid. It appears
-/// while scrolling and, when dragged, shows the month (or year) under it.
-class DateScrubber extends StatefulWidget {
-  const DateScrubber({
+/// The handle on the right edge for jumping through a long list. It appears
+/// while scrolling and, when dragged, shows a label for what is under it:
+/// the month on Photos, the page in a comic, the letter in a folder.
+class ScrollHandle extends StatefulWidget {
+  const ScrollHandle({
     super.key,
     required this.controller,
     required this.labelAt,
+    required this.semanticLabel,
   });
 
   final ScrollController controller;
+
+  /// The label for the content at a scroll offset; empty shows none.
   final String Function(double offset) labelAt;
 
+  /// What the handle scrolls by, for screen readers ("Scroll by date").
+  final String semanticLabel;
+
   @override
-  State<DateScrubber> createState() => _DateScrubberState();
+  State<ScrollHandle> createState() => _ScrollHandleState();
 }
 
-class _DateScrubberState extends State<DateScrubber> {
+class _ScrollHandleState extends State<ScrollHandle> {
   static const double _thumbHeight = 48;
   bool _visible = false;
   bool _dragging = false;
@@ -36,7 +43,7 @@ class _DateScrubberState extends State<DateScrubber> {
   }
 
   @override
-  void didUpdateWidget(DateScrubber old) {
+  void didUpdateWidget(ScrollHandle old) {
     super.didUpdateWidget(old);
     if (old.controller != widget.controller) {
       old.controller.removeListener(_onScroll);
@@ -140,7 +147,7 @@ class _DateScrubberState extends State<DateScrubber> {
                             ),
                           ),
                         Semantics(
-                          label: 'Scroll by date',
+                          label: widget.semanticLabel,
                           slider: true,
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
