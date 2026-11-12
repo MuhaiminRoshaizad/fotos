@@ -14,29 +14,29 @@ void main() {
   test('pinning puts the newest first, and pinning again unpins', () async {
     final ProviderContainer c = ProviderContainer();
     addTearDown(c.dispose);
-    expect(await c.read(pinnedProvider.future), isEmpty);
+    expect(await c.read(topPinsProvider.future), isEmpty);
 
-    final PinnedNotifier pins = c.read(pinnedProvider.notifier);
+    final TopPinsNotifier pins = c.read(topPinsProvider.notifier);
     await pins.toggle('/root/Download');
     await pins.toggle('/root/Download/Comics');
-    expect(c.read(pinnedProvider).value, <String>[
+    expect(c.read(topPinsProvider).value, <String>[
       '/root/Download/Comics',
       '/root/Download',
     ]);
 
     await pins.toggle('/root/Download');
-    expect(c.read(pinnedProvider).value, <String>['/root/Download/Comics']);
+    expect(c.read(topPinsProvider).value, <String>['/root/Download/Comics']);
   });
 
   test('pins are still there the next time the app starts', () async {
     final ProviderContainer first = ProviderContainer();
-    await first.read(pinnedProvider.future);
-    await first.read(pinnedProvider.notifier).toggle('/root/Comics');
+    await first.read(topPinsProvider.future);
+    await first.read(topPinsProvider.notifier).toggle('/root/Comics');
     first.dispose();
 
     final ProviderContainer second = ProviderContainer();
     addTearDown(second.dispose);
-    expect(await second.read(pinnedProvider.future), <String>['/root/Comics']);
+    expect(await second.read(topPinsProvider.future), <String>['/root/Comics']);
   });
 }
 
@@ -47,8 +47,8 @@ void _followTests() {
         InMemorySharedPreferencesAsync.empty();
     final ProviderContainer c = ProviderContainer();
     addTearDown(c.dispose);
-    await c.read(pinnedProvider.future);
-    final PinnedNotifier pins = c.read(pinnedProvider.notifier);
+    await c.read(topPinsProvider.future);
+    final TopPinsNotifier pins = c.read(topPinsProvider.notifier);
     await pins.toggle('/root/Comic/Album/Moonlit Harbor');
     await pins.toggle('/root/Comic/Album');
     await pins.toggle('/root/Comic/Albums of 2025');
@@ -59,7 +59,7 @@ void _followTests() {
     );
     await pins.follow('/root/Comic/Album', '/root/Comic/Read');
 
-    expect(c.read(pinnedProvider).value, <String>[
+    expect(c.read(topPinsProvider).value, <String>[
       // A folder that only starts with the same name is left alone.
       '/root/Comic/Albums of 2025',
       '/root/Comic/Read',

@@ -87,7 +87,7 @@ void main() {
       'and in the grid', (WidgetTester tester) async {
     final ProviderContainer c = await open(tester);
     await c
-        .read(pinnedProvider.notifier)
+        .read(topPinsProvider.notifier)
         .toggle('/root/Moonlit Harbor Vol. 03.zip');
     await tester.pumpAndSettle();
 

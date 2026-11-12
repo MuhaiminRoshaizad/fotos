@@ -151,9 +151,10 @@ class _PinnedGroup extends ConsumerWidget {
     final FilesRepository repo = ref.watch(filesRepositoryProvider);
     final List<FileEntry> pins = <FileEntry>[
       for (final String path
-          in ref.watch(pinnedProvider).value ?? const <String>[])
-        // One deleted, moved or renamed since it was pinned has gone.
-        ?repo.entryAtSync(path),
+          in ref.watch(filesTabPinsProvider).value ?? const <String>[])
+        // One deleted since it was added has gone; files belong to Pin to
+        // top, not here.
+        if (repo.entryAtSync(path) case final FileEntry e when e.isFolder) e,
     ];
     if (pins.isEmpty) return const SizedBox.shrink();
     String where(String path) {
@@ -171,8 +172,9 @@ class _PinnedGroup extends ConsumerWidget {
             actions: <SwipeAction>[
               SwipeAction(
                 icon: CupertinoIcons.pin_slash,
-                label: 'Unpin',
-                onTap: () => ref.read(pinnedProvider.notifier).toggle(e.path),
+                label: 'Remove',
+                onTap: () =>
+                    ref.read(filesTabPinsProvider.notifier).toggle(e.path),
               ),
             ],
             // Opaque, or the Unpin action behind the row shows through.
@@ -482,7 +484,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
       ),
       data: (List<FileEntry> entries) {
         final String q = _query.text.trim();
-        final Set<String> pins = <String>{...?ref.watch(pinnedProvider).value};
+        final Set<String> pins = <String>{...?ref.watch(topPinsProvider).value};
         final List<FileEntry> shown = pinnedFirst(
           filterByName(entries, q),
           pins,

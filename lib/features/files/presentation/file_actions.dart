@@ -101,7 +101,9 @@ Future<void> showEntryActions(
     }
     if (!context.mounted) return;
   }
-  final bool pinned = (ref.read(pinnedProvider).value ?? const <String>[])
+  final bool onTop = (ref.read(topPinsProvider).value ?? const <String>[])
+      .contains(entry.path);
+  final bool onTab = (ref.read(filesTabPinsProvider).value ?? const <String>[])
       .contains(entry.path);
   final String? choice = await showActionSheet<String>(
     context,
@@ -125,7 +127,12 @@ Future<void> showEntryActions(
         SheetChoice<String>('openWith', 'Open with another app'),
         SheetChoice<String>('share', 'Share'),
       ],
-      SheetChoice<String>('pin', pinned ? 'Unpin from Files' : 'Pin to Files'),
+      SheetChoice<String>('top', onTop ? 'Unpin from top' : 'Pin to top'),
+      if (entry.isFolder)
+        SheetChoice<String>(
+          'tab',
+          onTab ? 'Remove from Files tab' : 'Add to Files tab',
+        ),
       const SheetChoice<String>('rename', 'Rename'),
       const SheetChoice<String>('move', 'Move to…'),
       const SheetChoice<String>('copy', 'Copy to…'),
@@ -174,12 +181,22 @@ Future<void> showEntryActions(
       }
     case 'share':
       await shareEntries(context, <FileEntry>[entry]);
-    case 'pin':
-      await ref.read(pinnedProvider.notifier).toggle(entry.path);
+    case 'top':
+      await ref.read(topPinsProvider.notifier).toggle(entry.path);
       if (context.mounted) {
         showToast(
           context,
-          pinned ? 'Unpinned ${entry.name}' : 'Pinned ${entry.name} to Files',
+          onTop ? 'Unpinned ${entry.name}' : 'Pinned ${entry.name} to the top',
+        );
+      }
+    case 'tab':
+      await ref.read(filesTabPinsProvider.notifier).toggle(entry.path);
+      if (context.mounted) {
+        showToast(
+          context,
+          onTab
+              ? 'Removed ${entry.name} from the Files tab'
+              : 'Added ${entry.name} to the Files tab',
         );
       }
     case 'rename':
@@ -192,6 +209,12 @@ Future<void> showEntryActions(
     case 'delete':
       await deleteEntry(context, ref, entry);
   }
+}
+
+/// Pins stay with what was pinned when it is renamed or moved.
+Future<void> followPins(WidgetRef ref, String from, String to) async {
+  await ref.read(topPinsProvider.notifier).follow(from, to);
+  await ref.read(filesTabPinsProvider.notifier).follow(from, to);
 }
 
 Future<void> _rename(
@@ -218,8 +241,7 @@ Future<void> _rename(
     final String to = await ref
         .read(filesRepositoryProvider)
         .rename(entry, name);
-    // A pin stays with what was pinned.
-    await ref.read(pinnedProvider.notifier).follow(entry.path, to);
+    await followPins(ref, entry.path, to);
     _refresh(ref);
     if (context.mounted) showToast(context, 'Renamed to $name');
   } on FileSystemException {
@@ -299,7 +321,7 @@ Future<bool> transferEntries(
         return;
       }
       final String to = await repo.moveTo(e, dir, taken: taken);
-      await ref.read(pinnedProvider.notifier).follow(e.path, to);
+      await followPins(ref, e.path, to);
     },
   );
   _refresh(ref);

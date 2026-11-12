@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/format/natural_sort.dart';
 import '../../../core/platform/native_channel.dart';
@@ -97,25 +98,29 @@ Future<String?> _firstImageIn(String dir) async {
   return images.first;
 }
 
-/// Files and folders the user pinned, newest pin first. They are listed at
-/// the top of the Files tab and first in their own folder. Paths, kept in
-/// preferences under the key folder pins always used; one that has since
-/// been deleted or moved is left out by the pages that show them.
-class PinnedNotifier extends AsyncNotifier<List<String>> {
-  static const String _key = 'files.pinned';
+/// Paths kept in preferences under [key], newest first, that follow their
+/// files and folders through renames and moves. A path that has since been
+/// deleted is left out by the pages that show it.
+abstract class PathPinsNotifier extends AsyncNotifier<List<String>> {
+  String get key;
 
   @override
   Future<List<String>> build() async =>
-      await ref.watch(preferencesProvider).getStringList(_key) ??
+      await ref.watch(preferencesProvider).getStringList(key) ??
       const <String>[];
 
-  Future<void> toggle(String path) async {
-    final List<String> now = state.value ?? const <String>[];
-    final List<String> next = now.contains(path)
-        ? (List<String>.of(now)..remove(path))
-        : <String>[path, ...now];
+  Future<void> _save(List<String> next) async {
     state = AsyncData<List<String>>(next);
-    await ref.read(preferencesProvider).setStringList(_key, next);
+    await ref.read(preferencesProvider).setStringList(key, next);
+  }
+
+  Future<void> toggle(String path) {
+    final List<String> now = state.value ?? const <String>[];
+    return _save(
+      now.contains(path)
+          ? (List<String>.of(now)..remove(path))
+          : <String>[path, ...now],
+    );
   }
 
   /// Keeps pins on something renamed or moved from [from] to [to]: its own
@@ -128,14 +133,48 @@ class PinnedNotifier extends AsyncNotifier<List<String>> {
         ? '$to${path.substring(from.length)}'
         : path;
     final List<String> next = <String>[for (final String p in now) moved(p)];
-    if (listEquals(next, now)) return;
-    state = AsyncData<List<String>>(next);
-    await ref.read(preferencesProvider).setStringList(_key, next);
+    if (!listEquals(next, now)) await _save(next);
   }
 }
 
-final pinnedProvider = AsyncNotifierProvider<PinnedNotifier, List<String>>(
-  PinnedNotifier.new,
+/// Folders added to the Files tab ("Add to Files tab"), shown in its Pinned
+/// section wherever they sit. Kept under the key folder pins always used.
+class FilesTabPinsNotifier extends PathPinsNotifier {
+  @override
+  String get key => 'files.pinned';
+}
+
+final filesTabPinsProvider =
+    AsyncNotifierProvider<FilesTabPinsNotifier, List<String>>(
+      FilesTabPinsNotifier.new,
+    );
+
+/// Files and folders pinned to the top of their own folder ("Pin to top").
+/// They never reach the Files tab, so fifty favourite comics stay in their
+/// folder.
+class TopPinsNotifier extends PathPinsNotifier {
+  @override
+  String get key => 'files.top';
+
+  @override
+  Future<List<String>> build() async {
+    final SharedPreferencesAsync prefs = ref.watch(preferencesProvider);
+    final List<String>? saved = await prefs.getStringList(key);
+    if (saved != null) return saved;
+    // Until 12/11/2026 a pinned file sat with the Files tab's folders; it
+    // was a favourite to keep at the top of its folder, so it moves here.
+    final List<String> files = <String>[
+      for (final String path
+          in await prefs.getStringList('files.pinned') ?? const <String>[])
+        if (FileSystemEntity.isFileSync(path)) path,
+    ];
+    await prefs.setStringList(key, files);
+    return files;
+  }
+}
+
+final topPinsProvider = AsyncNotifierProvider<TopPinsNotifier, List<String>>(
+  TopPinsNotifier.new,
 );
 
 /// What is typed in a folder's search field, by folder path. Held here, not
