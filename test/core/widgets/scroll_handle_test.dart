@@ -176,4 +176,48 @@ void main() {
       expect(exclusions.last, isEmpty);
     });
   });
+
+  testWidgets('with Remove animations on, the bubble does not grow in', (
+    WidgetTester tester,
+  ) async {
+    final ScrollController c = ScrollController();
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(400, 600),
+            disableAnimations: true,
+          ),
+          child: Stack(
+            children: <Widget>[
+              ListView(
+                controller: c,
+                children: <Widget>[const SizedBox(height: 600 * 20)],
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                bottom: 0,
+                child: ScrollHandle(
+                  controller: c,
+                  semanticLabel: 'Scroll',
+                  labelAt: (double o) => const HandleLabel('March'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    c.jumpTo(1);
+    await tester.pump();
+    for (final AnimatedScale s in tester.widgetList<AnimatedScale>(
+      find.byType(AnimatedScale),
+    )) {
+      expect(s.scale, 1);
+      expect(s.duration, Duration.zero);
+    }
+    await tester.pump(const Duration(seconds: 2));
+  });
 }

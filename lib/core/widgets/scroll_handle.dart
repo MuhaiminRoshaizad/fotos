@@ -246,6 +246,7 @@ class _ScrollHandleState extends State<ScrollHandle>
     final TextScaler scaler = MediaQuery.textScalerOf(
       context,
     ).clamp(maxScaleFactor: 1.4);
+    final bool still = MediaQuery.disableAnimationsOf(context);
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints c) {
         final double travel = c.maxHeight - _slotHeight;
@@ -298,9 +299,13 @@ class _ScrollHandleState extends State<ScrollHandle>
                     child: IgnorePointer(
                       child: Align(
                         alignment: Alignment.centerRight,
+                        // With Remove animations on it only fades: nothing
+                        // grows or overshoots.
                         child: AnimatedScale(
-                          scale: _dragging && !_label.isEmpty ? 1 : 0.9,
-                          duration: AppMotion.short,
+                          scale: (_dragging && !_label.isEmpty) || still
+                              ? 1
+                              : 0.9,
+                          duration: still ? Duration.zero : AppMotion.short,
                           curve: Curves.easeOutBack,
                           alignment: Alignment.centerRight,
                           child: AnimatedOpacity(
