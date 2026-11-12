@@ -456,7 +456,7 @@ Future<void> _extract(
 /// Sets the cover of the album Android forms from a freshly extracted comic to
 /// its first page — the first image by natural name, the page the ZIP showed —
 /// unless the user has already chosen a cover for it. Best-effort: a comic
-/// Android has not finished indexing simply keeps its default cover.
+/// Android has not indexed simply keeps its default cover.
 Future<void> _coverExtractedComic(WidgetRef ref, String target) async {
   try {
     // Every image under the extracted folder; a comic's pages may be flat or
@@ -471,23 +471,19 @@ Future<void> _coverExtractedComic(WidgetRef ref, String target) async {
     if (pageOne == null) return;
     final String folder = p.dirname(pageOne); // the album's folder on disk
     final String name = p.basename(folder);
-    // Let MediaStore see the new pages so they form an album.
+    // Let MediaStore see the new pages so they form an album. The scan
+    // returns once Android has indexed every page, so one look is enough.
     await ref.read(nativeChannelProvider).scan(images);
     final String root = await ref.read(storageRootProvider.future);
     final String rel = _trimSlashes(p.relative(folder, from: root));
-    // Android indexes in the background; give the album a few tries to appear.
+    ref.invalidate(albumsProvider);
     Album? album;
-    for (int tries = 0; tries < 12 && album == null; tries++) {
-      if (tries > 0) {
-        await Future<void>.delayed(const Duration(milliseconds: 250));
-      }
-      ref.invalidate(albumsProvider);
-      for (final Album a in await ref.read(albumsProvider.future)) {
-        final String? r = await a.path.relativePathAsync;
-        if (a.name == name && r != null && _trimSlashes(r) == rel) {
-          album = a;
-          break;
-        }
+    for (final Album a in await ref.read(albumsProvider.future)) {
+      if (a.name != name) continue;
+      final String? r = await a.path.relativePathAsync;
+      if (r != null && _trimSlashes(r) == rel) {
+        album = a;
+        break;
       }
     }
     if (album == null) return;
@@ -509,8 +505,9 @@ Future<void> _coverExtractedComic(WidgetRef ref, String target) async {
               .first,
     );
     await ref.read(albumPrefsProvider.notifier).setCover(album.id, first.id);
-  } on Object {
-    // A cover is a nicety; never let it break an extraction that worked.
+  } on Exception {
+    // A cover is a nicety: a folder or library that can't be read leaves
+    // the default cover, and never breaks an extraction that worked.
   }
 }
 
