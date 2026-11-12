@@ -22,6 +22,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executors
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -299,31 +300,44 @@ object FilesNative {
 
     /**
      * [count] frames spread evenly through the video at [path], each a JPEG
-     * about [px] across, or null where one can't be read. One reader opens
-     * the file once and takes each frame from the keyframe nearest its slot:
-     * a long video may have one keyframe every few seconds, and decoding up
-     * to an exact time would cost hundreds of frames per slot.
+     * about [px] across, or null where one can't be read. Each is the
+     * keyframe nearest its slot. Four readers share the slots, as Glide's
+     * four decode threads did: reading them one after another took over
+     * three seconds on a 500 MB 1080p file.
      */
     fun videoFrames(path: String, count: Int, px: Int): List<ByteArray?> {
-        val retriever = MediaMetadataRetriever()
-        return try {
-            retriever.setDataSource(path)
-            val ms = retriever.extractMetadata(
-                MediaMetadataRetriever.METADATA_KEY_DURATION,
-            )?.toLongOrNull() ?: 0L
-            List(count) { i ->
-                val us = (ms * 1000.0 * (i + 0.5) / count).toLong()
-                try {
-                    frameAt(retriever, us, px)
-                } catch (_: Exception) {
-                    null
+        val frames = arrayOfNulls<ByteArray>(count)
+        val readers = minOf(4, count)
+        val pool = Executors.newFixedThreadPool(readers)
+        try {
+            (0 until readers).map { r ->
+                pool.submit {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(path)
+                        val ms = retriever.extractMetadata(
+                            MediaMetadataRetriever.METADATA_KEY_DURATION,
+                        )?.toLongOrNull() ?: 0L
+                        for (i in r until count step readers) {
+                            val us = (ms * 1000.0 * (i + 0.5) / count).toLong()
+                            frames[i] = try {
+                                frameAt(retriever, us, px)
+                            } catch (_: Exception) {
+                                null
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // This reader's slots stay empty; the strip shows the
+                        // cover there.
+                    } finally {
+                        retriever.release()
+                    }
                 }
-            }
-        } catch (_: Exception) {
-            List(count) { null }
+            }.forEach { it.get() }
         } finally {
-            retriever.release()
+            pool.shutdown()
         }
+        return frames.toList()
     }
 
     private fun frameAt(retriever: MediaMetadataRetriever, us: Long, px: Int): ByteArray? {
