@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/app/app.dart';
 import 'package:fotos/app/floating_nav.dart';
 import 'package:fotos/core/media/media_providers.dart';
+import 'package:fotos/core/widgets/toast.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -75,14 +76,73 @@ void main() {
 
     await back(tester);
     expect(closes, 1);
-
-    // Once the toast has gone, Back asks again rather than closing.
-    await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
+  });
+
+  Future<void> openOnPhotos(WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [
+          mediaRepositoryProvider.overrideWithValue(FakeMediaRepository()),
+        ],
+        child: const FotosApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  const String hint = 'Press back again to close fotos';
+
+  testWidgets('the hint shows for 2 s with a draining bar; once it has gone, '
+      'Back asks again, every time', (WidgetTester tester) async {
+    await openOnPhotos(tester);
+    for (int round = 0; round < 3; round++) {
+      await back(tester);
+      expect(find.text(hint), findsOneWidget, reason: 'round $round');
+      // Still armed just before the 2 s are up.
+      await tester.pump(const Duration(milliseconds: 1500));
+      expect(find.text(hint), findsOneWidget);
+      // Gone after them.
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(find.text(hint), findsNothing);
+    }
+    expect(closes, 0);
+  });
+
+  testWidgets('another message replacing the hint disarms it', (
+    WidgetTester tester,
+  ) async {
+    await openOnPhotos(tester);
     await back(tester);
-    expect(closes, 1);
-    expect(find.text('Press back again to close fotos'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 4));
+    expect(find.text(hint), findsOneWidget);
+    showToast(tester.element(find.byType(FloatingNav)), 'Moved 3 items');
+    await tester.pump();
+    await back(tester);
+    expect(closes, 0);
+    expect(find.text(hint), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('opening another tab while the hint shows takes it down', (
+    WidgetTester tester,
+  ) async {
+    await openOnPhotos(tester);
+    await back(tester);
+    expect(find.text(hint), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Files').last);
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text(hint), findsNothing);
+    // Back from Files goes to Photos, then asks again rather than closing.
+    await back(tester);
+    expect(tab(tester), 0);
+    await back(tester);
+    expect(closes, 0);
+    expect(find.text(hint), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
   });
 

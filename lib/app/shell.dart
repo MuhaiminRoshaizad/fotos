@@ -9,6 +9,7 @@ import '../core/widgets/bottom_bar_space.dart';
 import 'edit_tabs_sheet.dart';
 import 'floating_nav.dart';
 import 'tab_order.dart';
+import 'tab_root.dart';
 
 /// Hosts the four tabs and the floating bar. The tabs show only on the four
 /// main pages; a pushed page (an album, a folder) has the screen to itself.
@@ -31,6 +32,8 @@ class AppShell extends ConsumerWidget {
 
   void _select(WidgetRef ref, int i) {
     ref.read(selectionProvider.notifier).clear();
+    // A tab change ends a "press back again" that was waiting.
+    ref.read(backToCloseProvider).disarm();
     // Tapping the current tab returns it to its first screen.
     shell.goBranch(i, initialLocation: i == shell.currentIndex);
   }

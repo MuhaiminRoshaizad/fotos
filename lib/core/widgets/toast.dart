@@ -15,6 +15,12 @@ OverlayEntry? _showing;
 /// [failed] marks a message about something that did not work. A message
 /// that reports nothing done, such as a hint, passes its own [icon] in
 /// place of the tick.
+///
+/// [duration] overrides how long it stays (3 s, or 5 s with an action);
+/// [countdown] draws a bar along its foot that drains over that time, for a
+/// message that stops applying when it goes. [onHidden] is called once,
+/// the moment it stops showing for any reason: its time ran out, it was
+/// flicked away, or another toast replaced it.
 void showToast(
   BuildContext context,
   String message, {
@@ -22,6 +28,9 @@ void showToast(
   VoidCallback? onAction,
   bool failed = false,
   IconData? icon,
+  Duration? duration,
+  bool countdown = false,
+  VoidCallback? onHidden,
 }) {
   final OverlayState overlay = Overlay.of(context, rootOverlay: true);
   _dismiss(_showing);
@@ -33,12 +42,18 @@ void showToast(
       onAction: onAction,
       failed: failed,
       icon: icon,
+      duration: duration ?? Duration(seconds: actionLabel == null ? 3 : 5),
+      countdown: countdown,
+      onHidden: onHidden,
       onGone: () => _dismiss(entry),
     ),
   );
   _showing = entry;
   overlay.insert(entry);
 }
+
+/// Takes down the toast showing, if any, at once.
+void hideToast() => _dismiss(_showing);
 
 void _dismiss(OverlayEntry? entry) {
   if (entry == null) return;
@@ -53,6 +68,9 @@ class _Toast extends StatefulWidget {
     required this.onAction,
     required this.failed,
     required this.icon,
+    required this.duration,
+    required this.countdown,
+    required this.onHidden,
     required this.onGone,
   });
 
@@ -61,39 +79,61 @@ class _Toast extends StatefulWidget {
   final VoidCallback? onAction;
   final bool failed;
   final IconData? icon;
+  final Duration duration;
+  final bool countdown;
+  final VoidCallback? onHidden;
   final VoidCallback onGone;
 
   @override
   State<_Toast> createState() => _ToastState();
 }
 
-class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
+class _ToastState extends State<_Toast> with TickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: AppMotion.long,
     reverseDuration: AppMotion.short,
   );
+
+  /// The countdown bar: full at 1, empty at 0 when the time is up.
+  late final AnimationController _left = AnimationController(
+    vsync: this,
+    duration: widget.duration,
+    value: 1,
+  );
   Timer? _timer;
+  bool _hidden = false;
 
   @override
   void initState() {
     super.initState();
     _c.forward();
     // Long enough to read, and to reach Undo when there is one.
-    _timer = Timer(Duration(seconds: widget.actionLabel == null ? 3 : 5), _go);
+    _timer = Timer(widget.duration, _go);
+    if (widget.countdown) _left.animateTo(0, curve: Curves.linear);
+  }
+
+  void _hide() {
+    if (_hidden) return;
+    _hidden = true;
+    widget.onHidden?.call();
   }
 
   Future<void> _go() async {
     _timer?.cancel();
     if (!mounted) return;
+    // It no longer applies from the moment it starts to leave.
+    _hide();
     await _c.reverse();
     if (mounted) widget.onGone();
   }
 
   @override
   void dispose() {
+    _hide();
     _timer?.cancel();
     _c.dispose();
+    _left.dispose();
     super.dispose();
   }
 
@@ -190,11 +230,47 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
                       ),
                     ],
                   ),
-                  child: pill,
+                  child: widget.countdown
+                      ? Stack(
+                          children: <Widget>[
+                            pill,
+                            Positioned(
+                              left: AppSpacing.lg,
+                              right: AppSpacing.lg,
+                              bottom: 3,
+                              height: 2,
+                              child: _Countdown(left: _left, color: cs.primary),
+                            ),
+                          ],
+                        )
+                      : pill,
                 ),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A thin bar that empties as the toast's time runs out.
+class _Countdown extends StatelessWidget {
+  const _Countdown({required this.left, required this.color});
+
+  final Animation<double> left;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(1),
+      child: AnimatedBuilder(
+        animation: left,
+        builder: (BuildContext context, _) => FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: left.value.clamp(0.0, 1.0),
+          child: ColoredBox(color: color.withValues(alpha: 0.7)),
         ),
       ),
     );

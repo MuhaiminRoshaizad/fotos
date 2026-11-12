@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -59,14 +57,15 @@ class TabRoot extends ConsumerWidget {
   }
 }
 
-/// Remembers, across the four tabs, whether Back has just asked to be
-/// pressed again.
+/// Whether Back has just asked to be pressed again, shared by the four
+/// tabs. It is armed exactly while that hint shows: the hint's own leaving,
+/// for any reason, disarms it, so a Back after it has gone asks again.
 class BackToClose {
-  /// How long a second Back still closes the app: as long as the toast
-  /// asking for it shows.
-  static const Duration window = Duration(seconds: 3);
+  /// How long the hint shows, and so how long a second Back closes fotos:
+  /// Android's short toast, which is what this pattern has always used.
+  static const Duration window = Duration(seconds: 2);
 
-  Timer? _asking;
+  bool _armed = false;
 
   void back(
     BuildContext context, {
@@ -75,30 +74,34 @@ class BackToClose {
     required ValueChanged<int> goTo,
   }) {
     if (current != first) {
-      _asking?.cancel();
+      disarm();
       goTo(first);
       return;
     }
-    if (_asking?.isActive ?? false) {
-      _asking!.cancel();
+    if (_armed) {
+      _armed = false;
       SystemNavigator.pop();
       return;
     }
-    _asking = Timer(window, () {});
+    _armed = true;
     showToast(
       context,
       'Press back again to close fotos',
       icon: CupertinoIcons.info_circle,
+      duration: window,
+      countdown: true,
+      onHidden: () => _armed = false,
     );
   }
 
-  void dispose() => _asking?.cancel();
+  /// Takes the hint down if it is showing, as when another tab is opened.
+  void disarm() {
+    if (!_armed) return;
+    hideToast();
+    _armed = false;
+  }
 }
 
-final Provider<BackToClose> backToCloseProvider = Provider<BackToClose>((
-  Ref ref,
-) {
-  final BackToClose b = BackToClose();
-  ref.onDispose(b.dispose);
-  return b;
-});
+final Provider<BackToClose> backToCloseProvider = Provider<BackToClose>(
+  (Ref ref) => BackToClose(),
+);
