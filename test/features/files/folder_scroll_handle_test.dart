@@ -68,10 +68,13 @@ void main() {
       await tester.pump();
     }
     await tester.pump();
-    // The row under the bar now starts with the letter shown.
-    final String letter = 'ABCDEFGHIJKLMNOPQRSTUVW'
-        .split('')
-        .firstWhere((String l) => find.text(l).evaluate().isNotEmpty);
+    // The bubble's large text (20 pt) names the letter; the track's marks
+    // list every letter, the one under the handle brightest.
+    final String letter = tester
+        .widgetList<Text>(find.byType(Text))
+        .firstWhere((Text t) => t.style?.fontSize == 20)
+        .data!;
+    expect(find.text('W'), findsWidgets);
     final Iterable<String> visible = tester
         .widgetList<Text>(find.textContaining(' comic '))
         .map((Text t) => t.data!)

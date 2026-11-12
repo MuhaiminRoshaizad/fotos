@@ -294,10 +294,8 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
   /// it has landed on.
   final GlobalKey _rowsKey = GlobalKey();
 
-  /// What the handle labels: the rows as shown, their sort and pins.
-  List<FileEntry> _handleRows = const <FileEntry>[];
-  FileSort _handleSort = FileSort.standard;
-  Set<String> _handlePins = const <String>{};
+  /// The handle's label for each row as shown, in the rows' order.
+  List<FolderHandleLabel> _handleLabels = const <FolderHandleLabel>[];
 
   @override
   void initState() {
@@ -433,14 +431,17 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
     super.dispose();
   }
 
-  /// The label for the row at the top of the screen, under the bar.
+  /// How far the bar covers the top of the list.
+  double get _underBar => MediaQuery.paddingOf(context).top + kBarHeight;
+
+  /// The handle's label for the row at the top of the screen, under the bar.
   HandleLabel _handleLabel(double offset) {
     final RenderObject? r = _rowsKey.currentContext?.findRenderObject();
-    if (r is! RenderSliverMultiBoxAdaptor || _handleRows.isEmpty) {
+    if (r is! RenderSliverMultiBoxAdaptor || _handleLabels.isEmpty) {
       return HandleLabel.none;
     }
     final RenderAbstractViewport viewport = RenderAbstractViewport.of(r);
-    final double y = offset + MediaQuery.paddingOf(context).top + kBarHeight;
+    final double y = offset + _underBar;
     int index = 0;
     for (RenderBox? c = r.firstChild; c != null; c = r.childAfter(c)) {
       index = r.indexOf(c);
@@ -448,14 +449,44 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
       final double top = viewport.getOffsetToReveal(c, 0).offset;
       if (top + c.size.height > y) break;
     }
-    return HandleLabel(
-      folderHandleLabel(
-        rows: _handleRows,
-        index: index,
-        sort: _handleSort,
-        pins: _handlePins,
-      ),
-    );
+    final FolderHandleLabel l =
+        _handleLabels[index.clamp(0, _handleLabels.length - 1)];
+    return HandleLabel(l.primary, secondary: l.secondary, mark: l.mark);
+  }
+
+  /// Where each step (letter, year, size band) starts. Rows and grid lines
+  /// all have one height, so a row's place follows from the laid-out ones.
+  List<HandleMark> _handleMarks() {
+    final RenderObject? r = _rowsKey.currentContext?.findRenderObject();
+    if (r is! RenderSliverMultiBoxAdaptor) return const <HandleMark>[];
+    final RenderBox? first = r.firstChild;
+    if (first == null) return const <HandleMark>[];
+    final RenderAbstractViewport viewport = RenderAbstractViewport.of(r);
+    double revealOf(RenderBox c) => viewport.getOffsetToReveal(c, 0).offset;
+    final double firstTop = revealOf(first);
+    final int firstIndex = r.indexOf(first);
+    // Tiles in one grid line share a top; the next top gives the stride.
+    int perLine = 1;
+    double stride = first.size.height;
+    for (RenderBox? c = r.childAfter(first); c != null; c = r.childAfter(c)) {
+      final double top = revealOf(c);
+      if (top == firstTop) {
+        perLine++;
+      } else {
+        stride = top - firstTop;
+        break;
+      }
+    }
+    final List<HandleMark> marks = <HandleMark>[];
+    final Set<String> seen = <String>{};
+    for (int i = 0; i < _handleLabels.length; i++) {
+      final String? mark = _handleLabels[i].mark;
+      if (mark == null || !seen.add(mark)) continue;
+      final double top =
+          firstTop + (i ~/ perLine - firstIndex ~/ perLine) * stride;
+      marks.add(HandleMark(top - _underBar, mark));
+    }
+    return marks;
   }
 
   @override
@@ -510,9 +541,11 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
         );
         _shown = <String>[for (final FileEntry e in shown) e.path];
         final List<FileEntry> rows = _withLeaving(shown, q);
-        _handleRows = grid ? shown : rows;
-        _handleSort = sort;
-        _handlePins = pins;
+        _handleLabels = folderHandleLabels(
+          rows: grid ? shown : rows,
+          sort: sort,
+          pins: pins,
+        );
         final Widget scroll = CustomScrollView(
           controller: _scroll,
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -668,6 +701,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                         controller: _scroll,
                         semanticLabel: 'Scroll through this folder',
                         labelAt: _handleLabel,
+                        marks: _handleMarks,
                       ),
                     ),
                   ],

@@ -11,51 +11,70 @@ FileEntry _e(String name, {int size = 0, DateTime? modified}) => FileEntry(
 );
 
 void main() {
-  String at(List<FileEntry> rows, int i, FileSortBy by, {Set<String>? pins}) =>
-      folderHandleLabel(
-        rows: rows,
-        index: i,
-        sort: FileSort(by),
-        pins: pins ?? const <String>{},
-      );
+  List<FolderHandleLabel> labels(
+    List<FileEntry> rows,
+    FileSortBy by, {
+    Set<String> pins = const <String>{},
+  }) => folderHandleLabels(rows: rows, sort: FileSort(by), pins: pins);
 
-  test('by name it shows the first letter, # for a digit or symbol', () {
-    final List<FileEntry> rows = <FileEntry>[
+  test('by name: the first letter, # for a digit, marked by letter', () {
+    final List<FolderHandleLabel> l = labels(<FileEntry>[
       _e('Extras'),
       _e('2 Moons.zip'),
       _e('akira.zip'),
       _e('Blame.zip'),
-    ];
-    expect(at(rows, 0, FileSortBy.name), 'Folders');
-    expect(at(rows, 1, FileSortBy.name), '#');
-    expect(at(rows, 2, FileSortBy.name), 'A');
-    expect(at(rows, 3, FileSortBy.name), 'B');
+    ], FileSortBy.name);
+    expect(l.map((FolderHandleLabel x) => x.primary), <String>[
+      'Folders',
+      '#',
+      'A',
+      'B',
+    ]);
+    expect(l.map((FolderHandleLabel x) => x.mark), <String>[
+      'Folders',
+      '#',
+      'A',
+      'B',
+    ]);
   });
 
   test('pinned rows say Pinned whatever the sort', () {
-    final List<FileEntry> rows = <FileEntry>[_e('Blame.zip'), _e('Akira.zip')];
-    expect(at(rows, 0, FileSortBy.size, pins: {'/s/Blame.zip'}), 'Pinned');
+    final List<FolderHandleLabel> l = labels(
+      <FileEntry>[_e('Blame.zip'), _e('Akira.zip')],
+      FileSortBy.size,
+      pins: <String>{'/s/Blame.zip'},
+    );
+    expect(l.first, (primary: 'Pinned', secondary: null, mark: 'Pinned'));
   });
 
-  test('by date the month, by size a band, by type the extension', () {
-    final List<FileEntry> rows = <FileEntry>[
-      _e('a.zip', size: 2500000000, modified: DateTime(2025, 3, 4)),
+  test('by date: month over year, marked by year, or by month in one year', () {
+    final List<FolderHandleLabel> years = labels(<FileEntry>[
+      _e('a.zip', modified: DateTime(2026, 3, 4)),
+      _e('b.zip', modified: DateTime(2025, 7, 1)),
+    ], FileSortBy.modified);
+    expect(years.first, (primary: 'March', secondary: '2026', mark: '2026'));
+    final List<FolderHandleLabel> oneYear = labels(<FileEntry>[
+      _e('a.zip', modified: DateTime(2026, 3, 4)),
+      _e('b.zip', modified: DateTime(2026, 7, 1)),
+    ], FileSortBy.modified);
+    expect(oneYear.last.mark, 'July');
+  });
+
+  test('by size: the band; by type: the extension, unmarked past 12 types', () {
+    final List<FolderHandleLabel> size = labels(<FileEntry>[
+      _e('a.zip', size: 2500000000),
       _e('b.pdf', size: 150000000),
-      _e('c', size: 0),
       _e('d.cbz', size: 4000000),
       _e('notes.txt', size: 200),
-      _e('README', size: 200),
-    ]..removeAt(2);
-    expect(at(rows, 0, FileSortBy.modified), 'March 2025');
-    expect(at(rows, 0, FileSortBy.size), 'Over 1 GB');
-    expect(at(rows, 1, FileSortBy.size), '100 MB – 1 GB');
-    expect(at(rows, 2, FileSortBy.size), '1 – 10 MB');
-    expect(at(rows, 3, FileSortBy.size), 'Under 1 MB');
-    expect(at(rows, 2, FileSortBy.type), 'CBZ');
-  });
-
-  test('a file with no extension is No type', () {
-    final List<FileEntry> rows = <FileEntry>[
+    ], FileSortBy.size);
+    expect(size.map((FolderHandleLabel x) => x.primary), <String>[
+      'Over 1 GB',
+      '100 MB – 1 GB',
+      '1 – 10 MB',
+      'Under 1 MB',
+    ]);
+    final List<FolderHandleLabel> types = labels(<FileEntry>[
+      _e('a.cbz'),
       FileEntry(
         path: '/s/README',
         name: 'README',
@@ -63,16 +82,24 @@ void main() {
         size: 1,
         modified: DateTime(2026),
       ),
-    ];
-    expect(at(rows, 0, FileSortBy.type), 'No type');
+    ], FileSortBy.type);
+    expect(types.map((FolderHandleLabel x) => x.primary), <String>[
+      'CBZ',
+      'No type',
+    ]);
+    final List<FolderHandleLabel> many = labels(<FileEntry>[
+      for (int i = 0; i < 13; i++) _e('f.x$i'),
+    ], FileSortBy.type);
+    expect(many.first.mark, isNull);
   });
 
-  test('an extracted comic counts pages instead, stray info file and all', () {
+  test('an extracted comic counts pages, with no marks', () {
     final List<FileEntry> rows = <FileEntry>[
       for (int i = 1; i <= 40; i++) _e('${'$i'.padLeft(3, '0')}.jpg'),
       _e('ComicInfo.xml'),
     ];
-    expect(at(rows, 36, FileSortBy.name), '37 of 41');
+    final FolderHandleLabel l = labels(rows, FileSortBy.name)[36];
+    expect(l, (primary: '37', secondary: 'of 41', mark: null));
     expect(isPictureFolder(<FileEntry>[_e('Ch 1'), ...rows]), isFalse);
   });
 }
