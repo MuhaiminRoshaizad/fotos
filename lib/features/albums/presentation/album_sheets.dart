@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
@@ -16,6 +19,9 @@ import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/sort_sheet.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/toast.dart';
+import '../../files/data/files_repository.dart';
+import '../../files/domain/file_entry.dart';
+import '../../files/presentation/files_providers.dart';
 import '../data/album_prefs.dart';
 import '../data/galleries.dart';
 import 'albums_providers.dart';
@@ -171,6 +177,9 @@ Future<Album?> renameAlbum(
 
   final String? from = await album.path.relativePathAsync;
   if (from == null || !context.mounted) return null;
+  if (name.toLowerCase() == album.name.toLowerCase()) {
+    return _renameCaseOnly(context, ref, album, from, name);
+  }
   final String target = renamedFolder(from, name);
   final MediaRepository repo = ref.read(mediaRepositoryProvider);
   final List<AssetEntity> items = await repo.albumItems(album);
@@ -203,15 +212,67 @@ Future<Album?> renameAlbum(
       break;
     }
   }
-  if (renamed != null) {
-    await ref.read(albumPrefsProvider.notifier).rekey(album.id, renamed.id);
-    await ref.read(galleriesProvider.notifier).rekey(album.id, renamed.id);
-    // Home screen widgets set to this album follow it too.
-    await ref
-        .read(nativeChannelProvider)
-        .rekeyWidgetAlbum(album.id, renamed.id);
+  if (renamed == null) {
+    // Nothing reached a folder of the new name; say so rather than claim
+    // a rename that didn't happen.
+    if (context.mounted) {
+      showToast(context, 'Couldn\'t rename ${album.name}.', failed: true);
+    }
+    return null;
   }
+  await ref.read(albumPrefsProvider.notifier).rekey(album.id, renamed.id);
+  await ref.read(galleriesProvider.notifier).rekey(album.id, renamed.id);
+  // Home screen widgets set to this album follow it too.
+  await ref.read(nativeChannelProvider).rekeyWidgetAlbum(album.id, renamed.id);
   if (context.mounted) showToast(context, 'Renamed to $name');
+  return renamed;
+}
+
+/// Changes only the capital letters of [album]'s name. Moving its items
+/// can't do that: shared storage ignores letter case, so they land back in
+/// the folder they came from. The folder itself is renamed instead, which
+/// needs All files access. The album keeps its id, since Android derives it
+/// from the folder's path in lower case.
+Future<Album?> _renameCaseOnly(
+  BuildContext context,
+  WidgetRef ref,
+  Album album,
+  String relativePath,
+  String name,
+) async {
+  if (!await ref.read(nativeChannelProvider).hasAllFilesAccess()) {
+    if (context.mounted) {
+      showToast(
+        context,
+        'Changing only capital letters needs All files access. Open Files '
+        'once to allow it.',
+        failed: true,
+      );
+    }
+    return null;
+  }
+  final String root = await ref.read(storageRootProvider.future);
+  final FilesRepository files = ref.read(filesRepositoryProvider);
+  final FileEntry? folder = files.entryAtSync(p.join(root, relativePath));
+  bool ok = folder != null;
+  if (folder != null) {
+    try {
+      await files.rename(folder, name);
+    } on FileSystemException {
+      ok = false;
+    }
+  }
+  ref.invalidate(libraryProvider);
+  ref.invalidate(albumsProvider);
+  Album? renamed;
+  for (final Album a in await ref.read(albumsProvider.future)) {
+    if (a.id == album.id && a.name == name) renamed = a;
+  }
+  if (context.mounted) {
+    renamed != null && ok
+        ? showToast(context, 'Renamed to $name')
+        : showToast(context, 'Couldn\'t rename ${album.name}.', failed: true);
+  }
   return renamed;
 }
 

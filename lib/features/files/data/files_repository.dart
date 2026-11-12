@@ -68,9 +68,16 @@ class FilesRepository {
 
   Future<String> rename(FileEntry e, String newName) async {
     final String target = p.join(p.dirname(e.path), newName);
-    final FileSystemEntity moved = e.isFolder
-        ? await Directory(e.path).rename(target)
-        : await File(e.path).rename(target);
+    Future<FileSystemEntity> to(String from, String path) =>
+        e.isFolder ? Directory(from).rename(path) : File(from).rename(path);
+    // Shared storage ignores letter case, so "CVR clips" to "cvr clips" in
+    // one step finds the old name already there and changes nothing. A
+    // stop at a temporary name in between makes the case change stick.
+    final bool caseOnly =
+        newName != e.name && newName.toLowerCase() == e.name.toLowerCase();
+    final FileSystemEntity moved = caseOnly
+        ? await to((await to(e.path, '$target.fotos-renaming')).path, target)
+        : await to(e.path, target);
     await _native.scan(<String>[e.path, moved.path]);
     return moved.path;
   }
