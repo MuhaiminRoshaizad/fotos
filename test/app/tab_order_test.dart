@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/app/app.dart';
@@ -108,5 +108,44 @@ void main() {
       await SharedPreferencesAsync().getStringList(TabOrderNotifier.key),
       <String>['/videos', '/albums', '/photos', '/files'],
     );
+  });
+
+  testWidgets('holding a row picks it up with a tick, and it can be dragged', (
+    WidgetTester tester,
+  ) async {
+    final List<Object?> haptics = <Object?>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (
+          MethodCall call,
+        ) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            haptics.add(call.arguments);
+          }
+          return null;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await open(tester, defaultTabOrder);
+    await tester.longPress(find.byType(FloatingNav));
+    await tester.pumpAndSettle();
+    haptics.clear();
+
+    // Hold the Files row (not its grip), then drag it to the top.
+    final TestGesture g = await tester.startGesture(
+      tester.getCenter(find.text('Files').last),
+    );
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(haptics, contains('HapticFeedbackType.selectionClick'));
+    for (int i = 0; i < 20; i++) {
+      await g.moveBy(const Offset(0, -10));
+      await tester.pump();
+    }
+    await g.up();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(barLabels(tester).first, 'Files');
   });
 }

@@ -49,7 +49,7 @@ class _EditTabsState extends State<_EditTabs> {
           children: <Widget>[
             const SheetTitle(
               'Edit tabs',
-              subtitle: 'Drag to reorder. fotos opens on the first tab.',
+              subtitle: 'Hold a tab and drag it. fotos opens on the first.',
             ),
             Positioned(
               right: AppSpacing.sm,
@@ -92,10 +92,15 @@ class _EditTabsState extends State<_EditTabs> {
                 key: ValueKey<int>(_order[i]),
                 first: i == 0,
                 last: i == _order.length - 1,
-                child: _TabRow(
-                  tab: navDestinations[_order[i]],
+                // Press and hold anywhere on a row to pick it up; its grip
+                // picks it up at once.
+                child: ReorderableDelayedDragStartListener(
                   index: i,
-                  opensFirst: i == 0,
+                  child: _TabRow(
+                    tab: navDestinations[_order[i]],
+                    index: i,
+                    opensFirst: i == 0,
+                  ),
                 ),
               ),
           ],
