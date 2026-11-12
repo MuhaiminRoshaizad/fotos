@@ -21,6 +21,7 @@ import '../features/takeout_import/presentation/takeout_import_screen.dart';
 import '../features/viewer/presentation/viewer_screen.dart';
 import 'shell.dart';
 import 'tab_order.dart';
+import 'tab_root.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
@@ -88,8 +89,9 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/photos',
-                builder: (_, _) =>
-                    const LibraryScreen(kind: LibraryKind.photos),
+                builder: (_, _) => const TabRoot(
+                  child: LibraryScreen(kind: LibraryKind.photos),
+                ),
               ),
             ],
           ),
@@ -97,8 +99,9 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/videos',
-                builder: (_, _) =>
-                    const LibraryScreen(kind: LibraryKind.videos),
+                builder: (_, _) => const TabRoot(
+                  child: LibraryScreen(kind: LibraryKind.videos),
+                ),
               ),
             ],
           ),
@@ -106,7 +109,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/albums',
-                builder: (_, _) => const AlbumsScreen(),
+                builder: (_, _) => const TabRoot(child: AlbumsScreen()),
                 routes: <RouteBase>[
                   GoRoute(
                     path: 'folder/:id',
@@ -143,7 +146,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/files',
-                builder: (_, _) => const FilesScreen(),
+                builder: (_, _) => const TabRoot(child: FilesScreen()),
                 routes: <RouteBase>[
                   GoRoute(
                     path: 'folder',
