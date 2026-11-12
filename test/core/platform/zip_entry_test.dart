@@ -16,13 +16,26 @@ void main() {
 
   test('entries sort into reading order by natural name', () {
     final List<ZipEntry> entries = <ZipEntry>[
-      ZipEntry.fromMap(<Object?, Object?>{'name': '10.jpg', 'size': 1, 'isImage': true}),
-      ZipEntry.fromMap(<Object?, Object?>{'name': '2.jpg', 'size': 1, 'isImage': true}),
-      ZipEntry.fromMap(<Object?, Object?>{'name': '1.jpg', 'size': 1, 'isImage': true}),
+      ZipEntry.fromMap(<Object?, Object?>{
+        'name': '10.jpg',
+        'size': 1,
+        'isImage': true,
+      }),
+      ZipEntry.fromMap(<Object?, Object?>{
+        'name': '2.jpg',
+        'size': 1,
+        'isImage': true,
+      }),
+      ZipEntry.fromMap(<Object?, Object?>{
+        'name': '1.jpg',
+        'size': 1,
+        'isImage': true,
+      }),
     ]..sort((ZipEntry a, ZipEntry b) => naturalCompare(a.name, b.name));
-    expect(
-      entries.map((ZipEntry e) => e.name),
-      <String>['1.jpg', '2.jpg', '10.jpg'],
-    );
+    expect(entries.map((ZipEntry e) => e.name), <String>[
+      '1.jpg',
+      '2.jpg',
+      '10.jpg',
+    ]);
   });
 }

@@ -15,19 +15,21 @@ void main() {
   });
 
   test('a number anywhere in the name is read as a number', () {
-    expect(
-      sorted(<String>['page 10', 'page 2', 'page 1']),
-      <String>['page 1', 'page 2', 'page 10'],
-    );
+    expect(sorted(<String>['page 10', 'page 2', 'page 1']), <String>[
+      'page 1',
+      'page 2',
+      'page 10',
+    ]);
   });
 
   test('leading zeros do not change the value but keep a stable order', () {
     // 001, 01 and 1 are the same page; the shorter spelling sorts first.
     expect(sorted(<String>['01', '1', '001']), <String>['1', '01', '001']);
-    expect(
-      sorted(<String>['img_009', 'img_010', 'img_008']),
-      <String>['img_008', 'img_009', 'img_010'],
-    );
+    expect(sorted(<String>['img_009', 'img_010', 'img_008']), <String>[
+      'img_008',
+      'img_009',
+      'img_010',
+    ]);
   });
 
   test('digit runs compare by value past the 64-bit range', () {
@@ -35,10 +37,11 @@ void main() {
   });
 
   test('letters compare ignoring case', () {
-    expect(
-      sorted(<String>['beach.mp4', 'Alley.mp4', 'cake.mp4']),
-      <String>['Alley.mp4', 'beach.mp4', 'cake.mp4'],
-    );
+    expect(sorted(<String>['beach.mp4', 'Alley.mp4', 'cake.mp4']), <String>[
+      'Alley.mp4',
+      'beach.mp4',
+      'cake.mp4',
+    ]);
   });
 
   test('a shorter name sorts before the one it prefixes', () {

@@ -40,10 +40,9 @@ void main() {
       _a('p2', '2.jpg', 1),
       _a('p1', '1.jpg', 1),
     ];
-    final List<String> order = const AlbumSort(AlbumSortBy.name)
-        .apply(pages)
-        .map((AssetEntity e) => e.id)
-        .toList();
+    final List<String> order = const AlbumSort(
+      AlbumSortBy.name,
+    ).apply(pages).map((AssetEntity e) => e.id).toList();
     expect(order, <String>['p1', 'p2', 'p10']);
   });
 
