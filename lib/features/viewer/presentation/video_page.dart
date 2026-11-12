@@ -13,11 +13,12 @@ import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/motion.dart';
+import '../../albums/presentation/albums_providers.dart'
+    show nativeChannelProvider;
 import '../data/viewer_settings.dart';
 import 'video_session.dart';
 import 'viewer_glass.dart';
-import '../../albums/presentation/albums_providers.dart'
-    show nativeChannelProvider;
+import 'viewer_metrics.dart';
 
 /// One video in the viewer.
 ///
@@ -465,8 +466,11 @@ class _Controls extends ConsumerWidget {
         AppSpacing.lg,
         0,
         AppSpacing.lg,
-        // Clear of the viewer's thumbnail strip and action bar.
-        MediaQuery.paddingOf(context).bottom + 192,
+        // Just above the viewer's thumbnail strip and action bar, as one
+        // group with them.
+        MediaQuery.paddingOf(context).bottom +
+            ViewerMetrics.bottomBars +
+            AppSpacing.md,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

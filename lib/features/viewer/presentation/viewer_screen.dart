@@ -21,6 +21,7 @@ import 'video_page.dart';
 import 'motion_photo.dart';
 import 'strip_viewer.dart';
 import 'viewer_glass.dart';
+import 'viewer_metrics.dart';
 
 /// What the viewer opens with: the list it pages through, where to start,
 /// and the hero tag prefix of the grid it came from.
@@ -513,7 +514,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
   Widget _thumbStrip() {
     return SizedBox(
-      height: 56,
+      height: ViewerMetrics.stripHeight,
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints c) {
           final double side = c.maxWidth / 2 - _thumbW / 2;
@@ -688,7 +689,7 @@ class _Actions extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget action(IconData icon, String label, VoidCallback onTap) => Pressable(
       label: label,
-      minSize: const Size(56, 48),
+      minSize: const Size(56, ViewerMetrics.actionButtonHeight),
       onTap: onTap,
       child: Icon(icon, color: Colors.white),
     );
@@ -711,7 +712,7 @@ class _Actions extends StatelessWidget {
               // The heart fills in place and swells once as it does.
               Pressable(
                 label: favourite ? 'Remove from Favourites' : 'Favourite',
-                minSize: const Size(56, 48),
+                minSize: const Size(56, ViewerMetrics.actionButtonHeight),
                 onTap: onFavourite,
                 child: Pop(
                   on: favourite,
