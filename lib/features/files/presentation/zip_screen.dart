@@ -1,245 +1,297 @@
-import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/format/natural_sort.dart';
-import '../../../core/haptics/app_haptics.dart';
 import '../../../core/platform/native_channel.dart';
+import '../../../core/selection/selection.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/batch_progress.dart';
 import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/entrance.dart';
+import '../../../core/widgets/large_title_scaffold.dart';
+import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
 import 'files_providers.dart';
 
-/// Shows the pages inside a comic ZIP as a grid and lets the reader delete the
-/// ones they don't want — ads, credits, duplicate covers — rewriting the
-/// archive in place so a later extraction is already clean.
-class ZipScreen extends ConsumerStatefulWidget {
+/// Shows the pages inside a comic ZIP as a grid. Tap a page to see it large;
+/// select pages to delete the ones you don't want (ads, credits, duplicate
+/// covers), which rewrites the archive in place so a later extraction is
+/// already clean.
+class ZipScreen extends ConsumerWidget {
   const ZipScreen({super.key, required this.path});
   final String path;
 
-  @override
-  ConsumerState<ZipScreen> createState() => _ZipScreenState();
-}
-
-class _ZipScreenState extends ConsumerState<ZipScreen> {
-  bool _selecting = false;
-  final Set<String> _selected = <String>{};
-
-  void _setSelecting(bool on) => setState(() {
-    _selecting = on;
-    if (!on) _selected.clear();
-  });
-
-  void _toggle(String name) => setState(() {
-    if (!_selected.remove(name)) _selected.add(name);
-  });
-
-  Future<void> _deleteSelected(int totalPages) async {
-    final int n = _selected.length;
-    if (n == 0) return;
-    final String name = p.basename(widget.path);
-    final bool ok = await confirmAction(
-      context,
-      title: 'Delete ${Fmt.count(n, 'page')}?',
-      message: n == totalPages
-          ? 'That is every page. $name is left empty, and this can\'t be undone.'
-          : 'The ${n == 1 ? 'page is' : 'pages are'} removed from $name for good. This can\'t be undone.',
-      confirmLabel: 'Delete',
-    );
-    if (!ok || !mounted) return;
-
-    final List<String> names = _selected.toList();
-    final NativeChannel native = ref.read(nativeChannelProvider);
-    final ValueNotifier<(int, int)> progress = ValueNotifier<(int, int)>((0, 0));
-    final StreamSubscription<(int, int)> sub = native.zipRemoveProgress.listen(
-      (v) => progress.value = v,
-    );
-    unawaited(
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        useRootNavigator: true,
-        builder: (BuildContext ctx) => PopScope(
-          canPop: false,
-          child: AlertDialog(
-            title: const Text('Removing pages'),
-            content: ValueListenableBuilder<(int, int)>(
-              valueListenable: progress,
-              builder: (_, (int, int) v, _) => LinearProgressIndicator(
-                value: v.$2 == 0 ? null : v.$1 / v.$2,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    String message;
-    bool failed = false;
-    try {
-      await native.zipRemove(widget.path, names);
-      message = 'Removed ${Fmt.count(n, 'page')}';
-      AppHaptics.success();
-    } on NotEnoughSpaceException catch (e) {
-      message = 'Not enough space. Cleaning up needs ${Fmt.size(e.needed)} free.';
-      failed = true;
-      AppHaptics.error();
-    } on Exception {
-      message = 'Couldn\'t remove the ${n == 1 ? 'page' : 'pages'}. The ZIP is unchanged.';
-      failed = true;
-      AppHaptics.error();
-    } finally {
-      await sub.cancel();
-      progress.dispose();
-    }
-
-    if (mounted) Navigator.of(context, rootNavigator: true).pop();
-    if (!failed) {
-      _setSelecting(false);
-      ref.invalidate(zipEntriesProvider(widget.path));
-    }
-    if (mounted) showToast(context, message, failed: failed);
-  }
+  String get _owner => 'zip:$path';
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<ZipEntry>> entries = ref.watch(
-      zipEntriesProvider(widget.path),
+      zipEntriesProvider(path),
     );
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _selecting
-              ? (_selected.isEmpty
-                    ? 'Select pages'
-                    : Fmt.count(_selected.length, 'selected', 'selected'))
-              : p.basename(widget.path),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+    final List<ZipEntry> pages = zipPagesInOrder(
+      entries.value ?? const <ZipEntry>[],
+    );
+    final SelectionState sel = ref.watch(selectionProvider);
+    final SelectionNotifier selection = ref.read(selectionProvider.notifier);
+    final bool selecting = sel.isActiveFor(_owner);
+    final bool all =
+        pages.isNotEmpty &&
+        pages.every((ZipEntry e) => sel.ids.contains(e.name));
+
+    void startSelecting([String? first]) => selection.start(
+      _owner,
+      <SelectionAction>[
+        SelectionAction(
+          icon: CupertinoIcons.trash,
+          label: 'Delete',
+          destructive: true,
+          run: (BuildContext context, Set<String> ids) async {
+            if (await removeZipPages(context, ref, path, ids, pages.length)) {
+              selection.clear();
+            }
+          },
         ),
-        actions: <Widget>[
-          if (entries.value?.isNotEmpty ?? false)
-            TextButton(
-              onPressed: () => _setSelecting(!_selecting),
-              child: Text(_selecting ? 'Cancel' : 'Select'),
+      ],
+      initial: <String>{?first},
+    );
+
+    return PopScope(
+      canPop: !selecting,
+      onPopInvokedWithResult: (bool didPop, _) {
+        if (!didPop) selection.clear();
+      },
+      child: LargeTitleScaffold(
+        title: p.basename(path),
+        subtitle: entries.hasValue
+            ? '${Fmt.count(pages.length, 'page')} · '
+                  '${Fmt.size(pages.fold(0, (int s, ZipEntry e) => s + e.size))}'
+            : null,
+        barTitle: selecting
+            ? (sel.ids.isEmpty ? 'Select pages' : '${sel.ids.length} selected')
+            : null,
+        leading: selecting
+            ? BarButton.text(
+                label: all ? 'Deselect all' : 'Select all',
+                onPressed: () => selection.setIds(
+                  all
+                      ? const <String>{}
+                      : <String>{for (final ZipEntry e in pages) e.name},
+                ),
+              )
+            : BackBarButton(label: p.basename(p.dirname(path))),
+        trailing: <Widget>[
+          if (selecting)
+            BarButton.text(
+              label: 'Done',
+              prominent: true,
+              onPressed: selection.clear,
+            )
+          else
+            BarButton.text(
+              label: 'Select',
+              onPressed: pages.isEmpty ? null : startSelecting,
             ),
         ],
-      ),
-      body: Stack(
-        children: <Widget>[
-          entries.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => const EmptyState(
+        body: (BuildContext context, Widget header) => entries.when(
+          skipLoadingOnRefresh: true,
+          loading: () => _Headed(header: header, child: const _PagesSkeleton()),
+          error: (_, _) => _Headed(
+            header: header,
+            child: const EmptyState(
               icon: CupertinoIcons.archivebox,
               title: 'This ZIP can\'t be opened',
               message: 'It may be damaged or protected with a password.',
             ),
-            data: (List<ZipEntry> items) {
-              if (items.isEmpty) {
-                return const EmptyState(
-                  icon: CupertinoIcons.archivebox,
-                  title: 'No files in this ZIP',
-                  message: 'There are no pages left to show.',
-                );
-              }
-              final List<ZipEntry> sorted = List<ZipEntry>.of(items)
-                ..sort((ZipEntry a, ZipEntry b) => naturalCompare(a.name, b.name));
-              return _Grid(
-                path: widget.path,
-                entries: sorted,
-                selecting: _selecting,
-                selected: _selected,
-                onToggle: _toggle,
-                onLongPressSelect: (String name) {
-                  if (!_selecting) _setSelecting(true);
-                  _toggle(name);
-                },
-              );
-            },
           ),
-          // Floats just above the app's persistent bottom nav: its top sits at
-          // height + gap + inset from the bottom, and clearance adds another
-          // AppSpacing.lg of air above that.
-          if (_selecting && _selected.isNotEmpty)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: AppNavMetrics.clearance(
-                MediaQuery.paddingOf(context).bottom,
-              ),
-              child: Center(
-                child: _DeleteBar(
-                  count: _selected.length,
-                  onDelete: () => _deleteSelected(entries.value?.length ?? 0),
+          data: (_) => pages.isEmpty
+              ? _Headed(
+                  header: header,
+                  child: const EmptyState(
+                    icon: CupertinoIcons.archivebox,
+                    title: 'No files in this ZIP',
+                    message: 'There are no pages left to show.',
+                  ),
+                )
+              : _PageGrid(
+                  header: header,
+                  path: path,
+                  pages: pages,
+                  selected: selecting ? sel.ids : null,
+                  onTap: (int i) => selecting
+                      ? selection.toggle(pages[i].name)
+                      : showZipPage(context, path, pages, i),
+                  onLongPress: (int i) => selecting
+                      ? selection.toggle(pages[i].name)
+                      : startSelecting(pages[i].name),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A ZIP's files in reading order: natural name order, so page 2 comes
+/// before page 10.
+List<ZipEntry> zipPagesInOrder(List<ZipEntry> entries) =>
+    List<ZipEntry>.of(entries)
+      ..sort((ZipEntry a, ZipEntry b) => naturalCompare(a.name, b.name));
+
+/// Asks, then removes [names] from the ZIP at [path] behind the shared
+/// progress dialog. [total] is how many pages it holds. Returns whether the
+/// pages were removed.
+Future<bool> removeZipPages(
+  BuildContext context,
+  WidgetRef ref,
+  String path,
+  Set<String> names,
+  int total,
+) async {
+  final int n = names.length;
+  if (n == 0) return false;
+  final String name = p.basename(path);
+  final bool ok = await confirmAction(
+    context,
+    title: 'Delete ${Fmt.count(n, 'page')}?',
+    message: n == total
+        ? 'That is every page. $name is left empty, and this can\'t be '
+              'undone.'
+        : 'The ${n == 1 ? 'page is' : 'pages are'} removed from $name for '
+              'good. This can\'t be undone.',
+    confirmLabel: 'Delete',
+  );
+  if (!ok || !context.mounted) return false;
+  final NativeChannel native = ref.read(nativeChannelProvider);
+  Exception? error;
+  final int failed = await runBatch<Set<String>>(
+    context,
+    verb: 'Removing',
+    doneVerb: 'Removed',
+    what: Fmt.count(n, 'page'),
+    items: <Set<String>>[names],
+    progress: native.zipRemoveProgress,
+    each: (Set<String> names) async {
+      try {
+        await native.zipRemove(path, names.toList());
+      } on Exception catch (e) {
+        error = e;
+        rethrow;
+      }
+    },
+  );
+  ref.invalidate(zipEntriesProvider(path));
+  ref.invalidate(folderProvider(p.dirname(path)));
+  if (!context.mounted) return failed == 0;
+  if (failed == 0) {
+    showToast(context, 'Removed ${Fmt.count(n, 'page')}');
+  } else {
+    final Exception? e = error;
+    showToast(
+      context,
+      e is NotEnoughSpaceException
+          ? 'Not enough space. Removing pages needs ${Fmt.size(e.needed)} '
+                'free.'
+          : 'Couldn\'t remove the ${n == 1 ? 'page' : 'pages'}. $name is '
+                'unchanged.',
+      failed: true,
+    );
+  }
+  return failed == 0;
+}
+
+class _Headed extends StatelessWidget {
+  const _Headed({required this.header, required this.child});
+  final Widget header;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      header,
+      Expanded(child: child),
+    ],
+  );
+}
+
+/// Three across on a phone, more as the page widens; pages are portrait.
+const double _pageAspect = 0.72;
+const double _pageMaxWidth = 130;
+
+SliverGridDelegate get _pageGrid =>
+    const SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: _pageMaxWidth,
+      mainAxisSpacing: AppSpacing.sm,
+      crossAxisSpacing: AppSpacing.sm,
+      childAspectRatio: _pageAspect,
+    );
+
+class _PageGrid extends StatelessWidget {
+  const _PageGrid({
+    required this.header,
+    required this.path,
+    required this.pages,
+    required this.selected,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  final Widget header;
+  final String path;
+  final List<ZipEntry> pages;
+
+  /// Null when not selecting.
+  final Set<String>? selected;
+  final ValueChanged<int> onTap;
+  final ValueChanged<int> onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    return EntranceScope(
+      child: CustomScrollView(
+        slivers: <Widget>[
+          SliverToBoxAdapter(child: header),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              AppNavMetrics.clearance(MediaQuery.paddingOf(context).bottom),
+            ),
+            sliver: SliverGrid.builder(
+              gridDelegate: _pageGrid,
+              itemCount: pages.length,
+              itemBuilder: (BuildContext context, int i) => SlideUpIn(
+                index: i ~/ 3,
+                child: _PageTile(
+                  key: ValueKey<String>(pages[i].name),
+                  path: path,
+                  entry: pages[i],
+                  selected: selected?.contains(pages[i].name),
+                  onTap: () => onTap(i),
+                  onLongPress: () => onLongPress(i),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _Grid extends StatelessWidget {
-  const _Grid({
-    required this.path,
-    required this.entries,
-    required this.selecting,
-    required this.selected,
-    required this.onToggle,
-    required this.onLongPressSelect,
-  });
-
-  final String path;
-  final List<ZipEntry> entries;
-  final bool selecting;
-  final Set<String> selected;
-  final void Function(String name) onToggle;
-  final void Function(String name) onLongPressSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.md,
-        AppNavMetrics.clearance(MediaQuery.paddingOf(context).bottom),
-      ),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 130,
-        mainAxisSpacing: AppSpacing.sm,
-        crossAxisSpacing: AppSpacing.sm,
-        childAspectRatio: 0.72,
-      ),
-      itemCount: entries.length,
-      itemBuilder: (BuildContext context, int i) {
-        final ZipEntry e = entries[i];
-        return _PageTile(
-          path: path,
-          entry: e,
-          selecting: selecting,
-          selected: selected.contains(e.name),
-          onTap: selecting ? () => onToggle(e.name) : null,
-          onLongPress: () => onLongPressSelect(e.name),
-        );
-      },
-    );
-  }
-}
-
-class _PageTile extends ConsumerWidget {
+class _PageTile extends StatelessWidget {
   const _PageTile({
+    super.key,
     required this.path,
     required this.entry,
-    required this.selecting,
     required this.selected,
     required this.onTap,
     required this.onLongPress,
@@ -247,143 +299,258 @@ class _PageTile extends ConsumerWidget {
 
   final String path;
   final ZipEntry entry;
-  final bool selecting;
-  final bool selected;
-  final VoidCallback? onTap;
+
+  /// Null when not selecting.
+  final bool? selected;
+  final VoidCallback onTap;
   final VoidCallback onLongPress;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final Widget thumb = entry.isImage
-        ? _Thumb(path: path, name: entry.name)
-        : Container(
-            color: cs.surfaceContainerHigh,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Icon(CupertinoIcons.doc, color: cs.onSurfaceVariant),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  p.basename(entry.name),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-                ),
-              ],
-            ),
-          );
+    final bool selecting = selected != null;
+    final bool on = selected ?? false;
+    final String name = p.basename(entry.name);
     return Semantics(
-      label: 'Page ${p.basename(entry.name)}',
-      selected: selecting ? selected : null,
       button: true,
+      checked: selecting ? on : null,
+      label: 'Page $name',
+      excludeSemantics: true,
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         onLongPress: onLongPress,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.sm),
-          child: Stack(
-            fit: StackFit.expand,
-            children: <Widget>[
-              DecoratedBox(
-                decoration: BoxDecoration(color: cs.surfaceContainerHigh),
-                child: thumb,
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            AnimatedScale(
+              scale: on ? 0.9 : 1,
+              duration: AppMotion.short,
+              curve: Curves.easeOut,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+                child: ColoredBox(
+                  color: cs.surfaceContainerHigh,
+                  child: entry.isImage
+                      ? _Thumb(path: path, name: entry.name, px: 300)
+                      : _NotAPicture(name: name),
+                ),
               ),
-              if (selecting)
-                AnimatedContainer(
-                  duration: AppMotion.short,
-                  color: selected
-                      ? Colors.transparent
-                      : Colors.black.withValues(alpha: 0.35),
+            ),
+            if (selecting)
+              Positioned(
+                right: 6,
+                top: 6,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: cs.surface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Pop(
+                    on: on,
+                    child: GlyphSwap(
+                      icon: on
+                          ? CupertinoIcons.checkmark_circle_fill
+                          : CupertinoIcons.circle,
+                      size: 24,
+                      color: on ? cs.primary : cs.onSurfaceVariant,
+                    ),
+                  ),
                 ),
-              if (selecting)
-                Positioned(
-                  top: AppSpacing.xs,
-                  right: AppSpacing.xs,
-                  child: _Check(on: selected),
-                ),
-            ],
-          ),
+              ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _NotAPicture extends StatelessWidget {
+  const _NotAPicture({required this.name});
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Icon(CupertinoIcons.doc, color: cs.onSurfaceVariant),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _Thumb extends ConsumerWidget {
-  const _Thumb({required this.path, required this.name});
+  const _Thumb({
+    required this.path,
+    required this.name,
+    required this.px,
+    this.fit = BoxFit.cover,
+  });
   final String path;
   final String name;
+  final int px;
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<Uint8List?> bytes = ref.watch(
-      zipPageThumbProvider((path, name)),
-    );
-    final Widget blank = const SizedBox.expand();
-    return bytes.when(
-      loading: () => blank,
-      error: (_, _) => blank,
-      data: (Uint8List? data) => data == null
-          ? blank
-          : Image.memory(data, fit: BoxFit.cover, gaplessPlayback: true),
-    );
+    final Uint8List? bytes = ref
+        .watch(zipPageThumbProvider((path, name, px)))
+        .value;
+    return bytes == null
+        ? const SizedBox.expand()
+        : Image.memory(bytes, fit: fit, gaplessPlayback: true);
   }
 }
 
-class _Check extends StatelessWidget {
-  const _Check({required this.on});
-  final bool on;
+/// Placeholder pages the size of real ones while the archive is read.
+class _PagesSkeleton extends StatelessWidget {
+  const _PagesSkeleton();
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: on ? cs.primary : Colors.black.withValues(alpha: 0.25),
-        border: Border.all(color: Colors.white, width: 1.5),
+    return Skeletonizer(
+      enabled: true,
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          0,
+        ),
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: _pageGrid,
+        itemCount: 12,
+        itemBuilder: (_, _) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+          ),
+        ),
       ),
-      child: on
-          ? const Icon(CupertinoIcons.check_mark, size: 14, color: Colors.white)
-          : null,
     );
   }
 }
 
-/// The floating "Delete (N)" pill shown while pages are selected.
-class _DeleteBar extends StatelessWidget {
-  const _DeleteBar({required this.count, required this.onDelete});
-  final int count;
-  final VoidCallback onDelete;
+/// Shows [pages] full screen from page [index], one at a time; swipe to
+/// turn, pinch to zoom.
+void showZipPage(
+  BuildContext context,
+  String path,
+  List<ZipEntry> pages,
+  int index,
+) {
+  Navigator.of(context, rootNavigator: true).push(
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.black,
+      transitionDuration: AppMotion.medium,
+      reverseTransitionDuration: AppMotion.short,
+      pageBuilder: (_, _, _) =>
+          _PageViewer(path: path, pages: pages, index: index),
+      transitionsBuilder: (_, Animation<double> a, _, Widget child) =>
+          FadeTransition(opacity: a, child: child),
+    ),
+  );
+}
+
+class _PageViewer extends StatefulWidget {
+  const _PageViewer({
+    required this.path,
+    required this.pages,
+    required this.index,
+  });
+
+  final String path;
+  final List<ZipEntry> pages;
+  final int index;
+
+  @override
+  State<_PageViewer> createState() => _PageViewerState();
+}
+
+class _PageViewerState extends State<_PageViewer> {
+  late final PageController _pages = PageController(initialPage: widget.index);
+  late int _at = widget.index;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadii.pill),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-            color: Colors.black.withValues(alpha: 0.28),
+    final ZipEntry e = widget.pages[_at];
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: <Widget>[
+          PageView.builder(
+            controller: _pages,
+            itemCount: widget.pages.length,
+            onPageChanged: (int i) => setState(() => _at = i),
+            itemBuilder: (BuildContext context, int i) {
+              final ZipEntry page = widget.pages[i];
+              return InteractiveViewer(
+                maxScale: 4,
+                child: Center(
+                  child: page.isImage
+                      ? _Thumb(
+                          path: widget.path,
+                          name: page.name,
+                          px: 1600,
+                          fit: BoxFit.contain,
+                        )
+                      : _NotAPicture(name: p.basename(page.name)),
+                ),
+              );
+            },
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Row(
+                children: <Widget>[
+                  BarButton.icon(
+                    icon: CupertinoIcons.xmark,
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      '${p.basename(e.name)} · ${_at + 1} of '
+                      '${widget.pages.length}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontFeatures: <FontFeature>[
+                          FontFeature.tabularFigures(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
-      ),
-      child: FilledButton.icon(
-        onPressed: onDelete,
-        style: FilledButton.styleFrom(
-          backgroundColor: cs.error,
-          foregroundColor: cs.onError,
-        ),
-        icon: const Icon(CupertinoIcons.delete, size: AppIconSize.dense),
-        label: Text('Delete ($count)'),
       ),
     );
   }

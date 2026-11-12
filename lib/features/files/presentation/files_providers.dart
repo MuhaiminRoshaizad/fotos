@@ -57,15 +57,16 @@ final zipCoverProvider = FutureProvider.family<Uint8List?, (String, int)>(
 /// delete so the grid reads the rewritten archive.
 final zipEntriesProvider = FutureProvider.autoDispose
     .family<List<ZipEntry>, String>(
-      (Ref ref, String path) => ref.read(nativeChannelProvider).zipEntries(path),
+      (Ref ref, String path) =>
+          ref.read(nativeChannelProvider).zipEntries(path),
     );
 
-/// A page thumbnail from inside a ZIP, keyed by archive path and entry name.
-/// Kept for the session: decoding one means opening the archive.
+/// A page from inside a ZIP as a JPEG about px across, keyed by archive
+/// path, entry name and px: small for the grid, large for the page viewer.
 final zipPageThumbProvider = FutureProvider.autoDispose
-    .family<Uint8List?, (String, String)>(
-      (Ref ref, (String, String) key) =>
-          ref.read(nativeChannelProvider).zipPageThumb(key.$1, key.$2, 300),
+    .family<Uint8List?, (String, String, int)>(
+      (Ref ref, (String, String, int) key) =>
+          ref.read(nativeChannelProvider).zipPageThumb(key.$1, key.$2, key.$3),
     );
 
 /// The first image inside a folder, by natural order (its first page for a
@@ -90,8 +91,9 @@ Future<String?> _firstImageUnder(
     final List<String> images = <String>[];
     final List<String> subdirs = <String>[];
     try {
-      await for (final FileSystemEntity e
-          in Directory(d).list(followLinks: false)) {
+      await for (final FileSystemEntity e in Directory(
+        d,
+      ).list(followLinks: false)) {
         if (e is File) {
           if (kindOf(p.basename(e.path), isDirectory: false) ==
               FileKind.image) {
