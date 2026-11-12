@@ -215,7 +215,11 @@ Future<void> _rename(
   );
   if (name == null || name == entry.name || !context.mounted) return;
   try {
-    await ref.read(filesRepositoryProvider).rename(entry, name);
+    final String to = await ref
+        .read(filesRepositoryProvider)
+        .rename(entry, name);
+    // A pin stays with what was pinned.
+    await ref.read(pinnedProvider.notifier).follow(entry.path, to);
     _refresh(ref);
     if (context.mounted) showToast(context, 'Renamed to $name');
   } on FileSystemException {
@@ -289,9 +293,14 @@ Future<bool> transferEntries(
     items: entries,
     nameOf: (FileEntry e) => e.name,
     show: shown,
-    each: (FileEntry e) => move
-        ? repo.moveTo(e, dir, taken: taken)
-        : repo.copyTo(e, dir, taken: taken),
+    each: (FileEntry e) async {
+      if (!move) {
+        await repo.copyTo(e, dir, taken: taken);
+        return;
+      }
+      final String to = await repo.moveTo(e, dir, taken: taken);
+      await ref.read(pinnedProvider.notifier).follow(e.path, to);
+    },
   );
   _refresh(ref);
   // The dialog gives its own tick and buzz when it is shown.

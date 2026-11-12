@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
@@ -139,6 +140,21 @@ class PinnedNotifier extends AsyncNotifier<List<String>> {
     final List<String> next = now.contains(path)
         ? (List<String>.of(now)..remove(path))
         : <String>[path, ...now];
+    state = AsyncData<List<String>>(next);
+    await ref.read(preferencesProvider).setStringList(_key, next);
+  }
+
+  /// Keeps pins on something renamed or moved from [from] to [to]: its own
+  /// pin, and the pins of anything inside it when it is a folder.
+  Future<void> follow(String from, String to) async {
+    final List<String> now = state.value ?? const <String>[];
+    String moved(String path) => path == from
+        ? to
+        : path.startsWith('$from/')
+        ? '$to${path.substring(from.length)}'
+        : path;
+    final List<String> next = <String>[for (final String p in now) moved(p)];
+    if (listEquals(next, now)) return;
     state = AsyncData<List<String>>(next);
     await ref.read(preferencesProvider).setStringList(_key, next);
   }

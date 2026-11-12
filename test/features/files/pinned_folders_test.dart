@@ -5,6 +5,7 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
+  _followTests();
   setUp(() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
@@ -36,5 +37,33 @@ void main() {
     final ProviderContainer second = ProviderContainer();
     addTearDown(second.dispose);
     expect(await second.read(pinnedProvider.future), <String>['/root/Comics']);
+  });
+}
+
+void _followTests() {
+  test('a pin follows its item through a rename or move, and so do pins '
+      'inside a renamed folder', () async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    final ProviderContainer c = ProviderContainer();
+    addTearDown(c.dispose);
+    await c.read(pinnedProvider.future);
+    final PinnedNotifier pins = c.read(pinnedProvider.notifier);
+    await pins.toggle('/root/Comic/Album/Moonlit Harbor');
+    await pins.toggle('/root/Comic/Album');
+    await pins.toggle('/root/Comic/Albums of 2025');
+
+    await pins.follow(
+      '/root/Comic/Album/Moonlit Harbor',
+      '/root/Comic/Album/Moonlit Harbor Vol. 03',
+    );
+    await pins.follow('/root/Comic/Album', '/root/Comic/Read');
+
+    expect(c.read(pinnedProvider).value, <String>[
+      // A folder that only starts with the same name is left alone.
+      '/root/Comic/Albums of 2025',
+      '/root/Comic/Read',
+      '/root/Comic/Read/Moonlit Harbor Vol. 03',
+    ]);
   });
 }
