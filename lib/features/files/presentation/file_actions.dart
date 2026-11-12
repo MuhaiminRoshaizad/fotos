@@ -276,7 +276,11 @@ Future<void> showFolderMenu(
       (ref.read(folderProvider(dir)).value ?? const <FileEntry>[]).isEmpty;
   final String? choice = await showActionSheet<String>(
     context,
-    title: p.basename(dir),
+    // The Files tab is storage's top folder, named "0" by Android; call it
+    // what the tab is called.
+    title: dir == ref.read(storageRootProvider).value
+        ? 'Files'
+        : p.basename(dir),
     choices: <SheetChoice<String>>[
       const SheetChoice<String>('new', 'New folder'),
       SheetChoice<String>('view', grid ? 'Show as list' : 'Show as grid'),
