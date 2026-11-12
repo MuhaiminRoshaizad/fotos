@@ -12,13 +12,16 @@ OverlayEntry? _showing;
 /// optional action such as Undo. It sits above every page and sheet, so it
 /// never covers the tab bar or a toolbar. A new toast replaces the last one.
 ///
-/// [failed] marks a message about something that did not work.
+/// [failed] marks a message about something that did not work. A message
+/// that reports nothing done, such as a hint, passes its own [icon] in
+/// place of the tick.
 void showToast(
   BuildContext context,
   String message, {
   String? actionLabel,
   VoidCallback? onAction,
   bool failed = false,
+  IconData? icon,
 }) {
   final OverlayState overlay = Overlay.of(context, rootOverlay: true);
   _dismiss(_showing);
@@ -29,6 +32,7 @@ void showToast(
       actionLabel: actionLabel,
       onAction: onAction,
       failed: failed,
+      icon: icon,
       onGone: () => _dismiss(entry),
     ),
   );
@@ -48,6 +52,7 @@ class _Toast extends StatefulWidget {
     required this.actionLabel,
     required this.onAction,
     required this.failed,
+    required this.icon,
     required this.onGone,
   });
 
@@ -55,6 +60,7 @@ class _Toast extends StatefulWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
   final bool failed;
+  final IconData? icon;
   final VoidCallback onGone;
 
   @override
@@ -115,9 +121,10 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Icon(
-                widget.failed
-                    ? CupertinoIcons.exclamationmark_triangle
-                    : CupertinoIcons.checkmark_alt,
+                widget.icon ??
+                    (widget.failed
+                        ? CupertinoIcons.exclamationmark_triangle
+                        : CupertinoIcons.checkmark_alt),
                 size: AppIconSize.dense,
                 color: widget.failed ? cs.error : cs.primary,
               ),

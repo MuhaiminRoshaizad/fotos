@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,7 +85,11 @@ class BackToClose {
       return;
     }
     _asking = Timer(window, () {});
-    showToast(context, 'Press back again to close fotos');
+    showToast(
+      context,
+      'Press back again to close fotos',
+      icon: CupertinoIcons.info_circle,
+    );
   }
 
   void dispose() => _asking?.cancel();

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,6 +68,9 @@ void main() {
 
     await back(tester);
     expect(find.text('Press back again to close fotos'), findsOneWidget);
+    // A hint, not a success: no tick.
+    expect(find.byIcon(CupertinoIcons.info_circle), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.checkmark_alt), findsNothing);
     expect(closes, 0);
 
     await back(tester);
