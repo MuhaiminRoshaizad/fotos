@@ -12,6 +12,7 @@ import '../../../core/widgets/large_title_scaffold.dart';
 import '../data/galleries.dart';
 import 'album_tiles.dart';
 import 'gallery_sheets.dart';
+import '../../../core/widgets/bottom_bar_space.dart';
 
 /// A gallery's albums, in the gallery's own order.
 class GalleryScreen extends ConsumerWidget {
@@ -28,9 +29,7 @@ class GalleryScreen extends ConsumerWidget {
     }
     final Gallery? g = gallery;
     final AsyncValue<List<Album>> albums = ref.watch(albumsProvider);
-    final double bottom = AppNavMetrics.clearance(
-      MediaQuery.paddingOf(context).bottom,
-    );
+    final double bottom = bottomClearance(context);
     return LargeTitleScaffold(
       title: g?.name ?? '',
       trailing: g == null

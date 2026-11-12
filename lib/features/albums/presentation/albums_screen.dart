@@ -20,6 +20,7 @@ import 'album_sheets.dart';
 import 'album_tiles.dart';
 import 'albums_providers.dart';
 import 'gallery_sheets.dart';
+import '../../../core/widgets/bottom_bar_space.dart';
 
 /// The Albums tab: pinned albums and galleries first, then galleries and
 /// every folder holding media that is not in a gallery, then Favourites,
@@ -93,8 +94,7 @@ class _AlbumsBodyState extends ConsumerState<_AlbumsBody> {
         ref.watch(emptyAlbumsProvider).value ?? const <String>[];
     // The page does not resize for the keyboard, so the list makes room.
     final double bottom =
-        AppNavMetrics.clearance(MediaQuery.paddingOf(context).bottom) +
-        MediaQuery.viewInsetsOf(context).bottom;
+        bottomClearance(context) + MediaQuery.viewInsetsOf(context).bottom;
     Widget headed(Widget state) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[

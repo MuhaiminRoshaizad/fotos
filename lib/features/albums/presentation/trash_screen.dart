@@ -19,6 +19,7 @@ import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/toast.dart';
 import 'albums_providers.dart';
+import '../../../core/widgets/bottom_bar_space.dart';
 
 /// Android's trash. Each item shows how long it has left; tap one to restore
 /// it or delete it for good.
@@ -28,9 +29,7 @@ class TrashScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<TrashedItem>> trash = ref.watch(trashProvider);
-    final double bottom = AppNavMetrics.clearance(
-      MediaQuery.paddingOf(context).bottom,
-    );
+    final double bottom = bottomClearance(context);
     final List<TrashedItem> loaded = trash.value ?? const <TrashedItem>[];
     return LargeTitleScaffold(
       title: 'Recently deleted',

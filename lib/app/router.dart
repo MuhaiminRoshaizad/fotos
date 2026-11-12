@@ -75,7 +75,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               BuildContext context,
               GoRouterState state,
               StatefulNavigationShell shell,
-            ) => AppShell(shell: shell),
+            ) => AppShell(shell: shell, location: state.uri.path),
         navigatorContainerBuilder:
             (
               BuildContext context,

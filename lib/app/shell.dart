@@ -4,14 +4,27 @@ import 'package:go_router/go_router.dart';
 
 import '../core/selection/selection.dart';
 import '../core/theme/app_tokens.dart';
+import '../core/widgets/bottom_bar_space.dart';
 import 'floating_nav.dart';
 
-/// Hosts the four tabs and the floating bar. While something is selected the
-/// navigation pill gives way to the selection bar.
+/// Hosts the four tabs and the floating bar. The tabs show only on the four
+/// main pages; a pushed page (an album, a folder) has the screen to itself.
+/// While something is selected the selection bar takes the tabs' place, on
+/// any page.
 class AppShell extends ConsumerWidget {
-  const AppShell({super.key, required this.shell});
+  const AppShell({super.key, required this.shell, required this.location});
 
   final StatefulNavigationShell shell;
+
+  /// The current address, to tell a main page from a pushed one.
+  final String location;
+
+  static const Set<String> _tabs = <String>{
+    '/photos',
+    '/videos',
+    '/albums',
+    '/files',
+  };
 
   void _select(WidgetRef ref, int i) {
     ref.read(selectionProvider.notifier).clear();
@@ -22,6 +35,7 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final SelectionState sel = ref.watch(selectionProvider);
+    final bool onTab = _tabs.contains(location);
     final double bottom =
         MediaQuery.paddingOf(context).bottom + AppNavMetrics.bottomGap;
     return Scaffold(
@@ -30,7 +44,9 @@ class AppShell extends ConsumerWidget {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: <Widget>[
-          Positioned.fill(child: shell),
+          Positioned.fill(
+            child: BottomBarSpace(shown: onTab || sel.active, child: shell),
+          ),
           Positioned(
             left: 0,
             right: 0,
@@ -59,11 +75,13 @@ class AppShell extends ConsumerWidget {
                         onAction: (SelectionAction a) =>
                             a.run(context, sel.ids),
                       )
-                    : FloatingNav(
+                    : onTab
+                    ? FloatingNav(
                         key: const ValueKey<String>('nav'),
                         index: shell.currentIndex,
                         onSelect: (int i) => _select(ref, i),
-                      ),
+                      )
+                    : const SizedBox.shrink(key: ValueKey<String>('none')),
               ),
             ),
           ),

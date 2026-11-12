@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -9,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../albums/presentation/albums_providers.dart';
+import '../../../core/widgets/bottom_bar_space.dart';
 
 final _pageCountProvider = FutureProvider.autoDispose.family<int, String>(
   (Ref ref, String path) => ref.read(nativeChannelProvider).pdfPageCount(path),
@@ -87,9 +89,7 @@ class _PdfScreenState extends ConsumerState<PdfScreen> {
                       AppSpacing.lg,
                       AppSpacing.sm,
                       AppSpacing.lg,
-                      AppNavMetrics.clearance(
-                        MediaQuery.paddingOf(context).bottom,
-                      ),
+                      bottomClearance(context),
                     ),
                     itemCount: pages,
                     itemBuilder: (BuildContext context, int i) => Padding(
@@ -106,11 +106,10 @@ class _PdfScreenState extends ConsumerState<PdfScreen> {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom:
-                      AppNavMetrics.clearance(
-                        MediaQuery.paddingOf(context).bottom,
-                      ) -
-                      AppSpacing.xl,
+                  bottom: math.max(
+                    bottomClearance(context) - AppSpacing.xl,
+                    MediaQuery.paddingOf(context).bottom + AppSpacing.sm,
+                  ),
                   child: Center(
                     child: ValueListenableBuilder<int>(
                       valueListenable: _page,

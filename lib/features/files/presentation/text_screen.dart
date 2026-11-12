@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/bottom_bar_space.dart';
 
 /// Shows a plain-text file. Large files show their first megabyte.
 class TextScreen extends StatelessWidget {
@@ -47,7 +48,7 @@ class TextScreen extends StatelessWidget {
               AppSpacing.lg,
               AppSpacing.sm,
               AppSpacing.lg,
-              AppNavMetrics.clearance(MediaQuery.paddingOf(context).bottom),
+              bottomClearance(context),
             ),
             child: SelectableText(
               cut ? '$text\n\n… Showing the first 1 MB.' : text,

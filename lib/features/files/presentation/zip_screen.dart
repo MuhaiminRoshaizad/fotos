@@ -20,6 +20,7 @@ import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
 import 'files_providers.dart';
+import '../../../core/widgets/bottom_bar_space.dart';
 
 /// Shows the pages inside a comic ZIP as a grid. Tap a page to see it large;
 /// select pages to delete the ones you don't want (ads, credits, duplicate
@@ -275,7 +276,7 @@ class _PageGrid extends StatelessWidget {
               AppSpacing.lg,
               AppSpacing.sm,
               AppSpacing.lg,
-              AppNavMetrics.clearance(MediaQuery.paddingOf(context).bottom),
+              bottomClearance(context),
             ),
             sliver: SliverGrid.builder(
               gridDelegate: _pageGrid,

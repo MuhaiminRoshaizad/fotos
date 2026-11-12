@@ -18,6 +18,7 @@ import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../../files/presentation/files_providers.dart';
 import '../data/takeout_repository.dart';
+import '../../../core/widgets/bottom_bar_space.dart';
 
 /// Takeout ZIPs found in Download, newest first.
 final _takeoutZipsProvider = FutureProvider.autoDispose<List<File>>((
@@ -187,11 +188,7 @@ class _Body extends ConsumerWidget {
                   ),
                 ],
               ),
-              SizedBox(
-                height: AppNavMetrics.clearance(
-                  MediaQuery.paddingOf(context).bottom,
-                ),
-              ),
+              SizedBox(height: bottomClearance(context)),
             ]),
           ),
         ],

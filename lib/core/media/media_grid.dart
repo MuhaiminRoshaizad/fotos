@@ -17,6 +17,7 @@ import 'date_scrubber.dart';
 import 'grid_geometry.dart';
 import 'grouping.dart';
 import 'media_tile.dart';
+import '../widgets/bottom_bar_space.dart';
 
 class _TileTag {
   const _TileTag(this.index);
@@ -311,9 +312,7 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
         widget.selectionOwner != null &&
         sel.isActiveFor(widget.selectionOwner!);
     final List<MediaGroup<AssetEntity>> groups = _groups;
-    final double bottom = AppNavMetrics.clearance(
-      MediaQuery.paddingOf(context).bottom,
-    );
+    final double bottom = bottomClearance(context);
     final TextScaler headingScaler = MediaQuery.textScalerOf(
       context,
     ).clamp(maxScaleFactor: 1.4);

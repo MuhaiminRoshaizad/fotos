@@ -33,6 +33,7 @@ import 'file_row.dart';
 import 'file_tile.dart';
 import 'files_providers.dart';
 import 'files_selection.dart';
+import '../../../core/widgets/bottom_bar_space.dart';
 
 /// The Files tab root: asks for All files access in context, then shows
 /// storage use and the top-level folders.
@@ -457,8 +458,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
     // The page does not resize for the keyboard, so the list makes room for
     // it itself and the last match can scroll clear.
     final double bottom =
-        AppNavMetrics.clearance(MediaQuery.paddingOf(context).bottom) +
-        MediaQuery.viewInsetsOf(context).bottom;
+        bottomClearance(context) + MediaQuery.viewInsetsOf(context).bottom;
     Widget headed(Widget state) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
