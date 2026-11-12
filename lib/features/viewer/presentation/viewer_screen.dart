@@ -9,6 +9,7 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
+import '../../../core/media/animated.dart';
 import '../../../core/media/media_actions.dart';
 import '../../../core/media/media_flight.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -259,11 +260,15 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
   Widget _photo(AssetEntity e, int i) {
     return ExtendedImage(
-      image: AssetEntityImageProvider(
-        e,
-        isOriginal: false,
-        thumbnailSize: const ThumbnailSize(2560, 2560),
-      ),
+      // A moving page plays from its original file; a still preview would
+      // show only its first frame.
+      image: mayAnimate(e)
+          ? AssetEntityImageProvider(e)
+          : AssetEntityImageProvider(
+              e,
+              isOriginal: false,
+              thumbnailSize: const ThumbnailSize(2560, 2560),
+            ),
       fit: BoxFit.contain,
       mode: ExtendedImageMode.gesture,
       enableSlideOutPage: true,

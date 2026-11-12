@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
+import '../../../core/media/animated.dart';
 import '../../../core/media/read_mode.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
@@ -26,15 +27,22 @@ class StripPage {
     return StripPage(
       // An item whose size Android doesn't know reads as a comic page.
       aspect: s.width > 0 && s.height > 0 ? s.width / s.height : 0.7,
-      image: (int width) => AssetEntityImageProvider(
-        e,
-        isOriginal: false,
-        thumbnailSize: ThumbnailSize(
-          width,
-          (width * (s.height > 0 && s.width > 0 ? s.height / s.width : 1.43))
-              .round(),
-        ),
-      ),
+      // A moving page plays from its original file; a still preview would
+      // show only its first frame.
+      image: (int width) => mayAnimate(e)
+          ? AssetEntityImageProvider(e)
+          : AssetEntityImageProvider(
+              e,
+              isOriginal: false,
+              thumbnailSize: ThumbnailSize(
+                width,
+                (width *
+                        (s.height > 0 && s.width > 0
+                            ? s.height / s.width
+                            : 1.43))
+                    .round(),
+              ),
+            ),
     );
   }
 }
