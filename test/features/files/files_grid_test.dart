@@ -51,7 +51,9 @@ void main() {
         ],
         child: MaterialApp(
           home: Scaffold(
-            appBar: AppBar(actions: const <Widget>[FilesViewButton()]),
+            appBar: AppBar(
+              actions: const <Widget>[FolderMoreButton(dir: '/root')],
+            ),
             body: Builder(
               builder: (BuildContext context) {
                 container = ProviderScope.containerOf(context);
@@ -69,6 +71,18 @@ void main() {
     return container;
   }
 
+  testWidgets('the folder bar keeps Select beside one menu holding New '
+      'folder, the view and Sort', (WidgetTester tester) async {
+    await open(tester);
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    expect(find.text('New folder'), findsOneWidget);
+    expect(find.text('Show as grid'), findsOneWidget);
+    expect(find.text('Sort…'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('the view button switches rows for a grid, and back', (
     WidgetTester tester,
   ) async {
@@ -76,7 +90,7 @@ void main() {
     expect(find.byType(FileRow), findsNWidgets(8));
     expect(find.byType(FileTile), findsNothing);
 
-    await tester.tap(find.byTooltip('Show as grid'));
+    await chooseFromMenu(tester, 'Show as grid');
     await tester.pumpAndSettle();
     expect(find.byType(FileRow), findsNothing);
     expect(find.byType(FileTile), findsWidgets);
@@ -88,7 +102,7 @@ void main() {
       greaterThan(first),
     );
 
-    await tester.tap(find.byTooltip('Show as list'));
+    await chooseFromMenu(tester, 'Show as list');
     await tester.pumpAndSettle();
     expect(find.byType(FileRow), findsNWidgets(8));
   });
@@ -97,7 +111,7 @@ void main() {
     WidgetTester tester,
   ) async {
     final ProviderContainer c = await open(tester);
-    await tester.tap(find.byTooltip('Show as grid'));
+    await chooseFromMenu(tester, 'Show as grid');
     await tester.pumpAndSettle();
     expect(c.read(filesGridProvider).value, isTrue);
 
@@ -110,7 +124,7 @@ void main() {
     WidgetTester tester,
   ) async {
     final ProviderContainer c = await open(tester);
-    await tester.tap(find.byTooltip('Show as grid'));
+    await chooseFromMenu(tester, 'Show as grid');
     await tester.pumpAndSettle();
 
     await tester.longPress(find.text('chapter-1.zip'));
@@ -129,8 +143,15 @@ void main() {
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await open(tester);
-    await tester.tap(find.byTooltip('Show as grid'));
+    await chooseFromMenu(tester, 'Show as grid');
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+}
+
+/// Opens the folder bar's ⋯ menu and taps [label] in it.
+Future<void> chooseFromMenu(WidgetTester tester, String label) async {
+  await tester.tap(find.byTooltip('More'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label));
 }

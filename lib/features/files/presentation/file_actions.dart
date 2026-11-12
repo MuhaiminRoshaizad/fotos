@@ -241,6 +241,59 @@ Future<void> followRenamed(WidgetRef ref, String from, String to) async {
   }
 }
 
+/// Asks for a name and makes a folder of it in [dir].
+Future<void> createFolderIn(
+  BuildContext context,
+  WidgetRef ref,
+  String dir,
+) async {
+  final List<FileEntry> here =
+      ref.read(folderProvider(dir)).value ?? const <FileEntry>[];
+  final String? name = await promptName(
+    context,
+    title: 'New folder',
+    label: 'Folder name',
+    hint: 'e.g. Receipts',
+    confirmLabel: 'Create',
+    validate: (String v) =>
+        validateFolderName(v, here.map((FileEntry e) => e.name)),
+  );
+  if (name == null) return;
+  await ref.read(filesRepositoryProvider).createFolder(dir, name);
+  ref.invalidate(folderProvider(dir));
+  if (context.mounted) showToast(context, 'Created $name');
+}
+
+/// The ⋯ menu of a folder's bar: New folder, grid or list, and Sort, so
+/// the bar keeps only Select beside it.
+Future<void> showFolderMenu(
+  BuildContext context,
+  WidgetRef ref,
+  String dir,
+) async {
+  final bool grid = ref.read(filesGridProvider).value ?? false;
+  final bool empty =
+      (ref.read(folderProvider(dir)).value ?? const <FileEntry>[]).isEmpty;
+  final String? choice = await showActionSheet<String>(
+    context,
+    title: p.basename(dir),
+    choices: <SheetChoice<String>>[
+      const SheetChoice<String>('new', 'New folder'),
+      SheetChoice<String>('view', grid ? 'Show as list' : 'Show as grid'),
+      if (!empty) const SheetChoice<String>('sort', 'Sort…'),
+    ],
+  );
+  if (choice == null || !context.mounted) return;
+  switch (choice) {
+    case 'new':
+      await createFolderIn(context, ref, dir);
+    case 'view':
+      await ref.read(filesGridProvider.notifier).toggle();
+    case 'sort':
+      await showFolderSortSheet(context, ref, dir);
+  }
+}
+
 /// Chooses how the folder at [dir] is sorted, or the default for all.
 Future<void> showFolderSortSheet(
   BuildContext context,

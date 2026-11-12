@@ -65,7 +65,9 @@ void main() {
         ],
         child: MaterialApp(
           home: Scaffold(
-            appBar: AppBar(actions: const <Widget>[FilesViewButton()]),
+            appBar: AppBar(
+              actions: const <Widget>[FolderMoreButton(dir: '/root')],
+            ),
             body: Builder(
               builder: (BuildContext context) {
                 container = ProviderScope.containerOf(context);
@@ -96,7 +98,7 @@ void main() {
     expect(top.pinned, isTrue);
     expect(find.textContaining('Pinned'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Show as grid'));
+    await chooseFromMenu(tester, 'Show as grid');
     await tester.pumpAndSettle();
     final FileTile first = tester.widget(find.byType(FileTile).first);
     expect(first.entry.name, 'Moonlit Harbor Vol. 03.zip');
@@ -106,4 +108,11 @@ void main() {
       findsOneWidget,
     );
   });
+}
+
+/// Opens the folder bar's ⋯ menu and taps [label] in it.
+Future<void> chooseFromMenu(WidgetTester tester, String label) async {
+  await tester.tap(find.byTooltip('More'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label));
 }

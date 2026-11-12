@@ -16,15 +16,12 @@ import '../../../core/haptics/app_haptics.dart';
 import '../../../core/platform/native_channel.dart';
 import '../../../core/selection/selection.dart';
 import '../../../core/theme/app_tokens.dart';
-import '../../../core/validation/validators.dart';
-import '../../../core/widgets/dialogs.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/search_field.dart';
 import '../../../core/widgets/swipe_actions.dart';
-import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../data/files_repository.dart';
 import '../domain/file_entry.dart';
@@ -249,36 +246,6 @@ class _StorageGroup extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class NewFolderButton extends ConsumerWidget {
-  const NewFolderButton({super.key, required this.dir});
-  final String dir;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return BarButton.icon(
-      icon: CupertinoIcons.folder_badge_plus,
-      tooltip: 'New folder',
-      onPressed: () async {
-        final List<FileEntry> here =
-            ref.read(folderProvider(dir)).value ?? const <FileEntry>[];
-        final String? name = await promptName(
-          context,
-          title: 'New folder',
-          label: 'Folder name',
-          hint: 'e.g. Receipts',
-          confirmLabel: 'Create',
-          validate: (String v) =>
-              validateFolderName(v, here.map((FileEntry e) => e.name)),
-        );
-        if (name == null) return;
-        await ref.read(filesRepositoryProvider).createFolder(dir, name);
-        ref.invalidate(folderProvider(dir));
-        if (context.mounted) showToast(context, 'Created $name');
-      },
     );
   }
 }

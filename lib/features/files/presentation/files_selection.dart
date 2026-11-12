@@ -7,7 +7,6 @@ import '../../../core/widgets/large_title_scaffold.dart';
 import '../domain/file_entry.dart';
 import 'file_actions.dart';
 import 'files_providers.dart';
-import 'files_screen.dart';
 
 /// The selection owner for the folder at [dir]. Selected ids are paths.
 String filesSelectionOwner(String dir) => 'files:$dir';
@@ -85,21 +84,13 @@ FolderBar folderBar(WidgetRef ref, String dir, {Widget? leading}) {
       barTitle: null,
       leading: leading,
       trailing: <Widget>[
-        BarButton.icon(
-          icon: CupertinoIcons.arrow_up_arrow_down,
-          tooltip: 'Sort',
-          onPressed: entries.isEmpty
-              ? null
-              : () => showFolderSortSheet(ref.context, ref, dir),
-        ),
-        const FilesViewButton(),
         BarButton.text(
           label: 'Select',
           onPressed: entries.isEmpty
               ? null
               : () => selection.start(owner, filesSelectionActions(ref, dir)),
         ),
-        NewFolderButton(dir: dir),
+        FolderMoreButton(dir: dir),
       ],
     );
   }
@@ -131,18 +122,15 @@ FolderBar folderBar(WidgetRef ref, String dir, {Widget? leading}) {
   );
 }
 
-/// Switches every folder between rows and a grid of pictures. Shows the
-/// view it would switch to.
-class FilesViewButton extends ConsumerWidget {
-  const FilesViewButton({super.key});
+/// The ⋯ button of a folder's bar, opening [showFolderMenu].
+class FolderMoreButton extends ConsumerWidget {
+  const FolderMoreButton({super.key, required this.dir});
+  final String dir;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bool grid = ref.watch(filesGridProvider).value ?? false;
-    return BarButton.icon(
-      icon: grid ? CupertinoIcons.list_bullet : CupertinoIcons.square_grid_2x2,
-      tooltip: grid ? 'Show as list' : 'Show as grid',
-      onPressed: () => ref.read(filesGridProvider.notifier).toggle(),
-    );
-  }
+  Widget build(BuildContext context, WidgetRef ref) => BarButton.icon(
+    icon: CupertinoIcons.ellipsis,
+    tooltip: 'More',
+    onPressed: () => showFolderMenu(context, ref, dir),
+  );
 }
