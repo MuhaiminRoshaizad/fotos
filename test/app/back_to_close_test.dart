@@ -169,4 +169,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(handlesBack.last, isTrue);
   });
+
+  testWidgets('a sheet opening and closing never makes fotos tell Android it '
+      'does not handle Back', (WidgetTester tester) async {
+    // Logged on the phone: after the viewer or a sheet closed, a navigator
+    // that could not pop told Android "no", and the next Back on a tab
+    // closed fotos without the hint.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await openOnPhotos(tester);
+    handlesBack.clear();
+
+    await tester.longPress(find.byType(FloatingNav));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit tabs'), findsOneWidget);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Files').last);
+    await tester.pumpAndSettle();
+    await back(tester);
+    await tester.pumpAndSettle();
+
+    expect(handlesBack, isNotEmpty);
+    expect(handlesBack, everyElement(isTrue));
+  });
 }

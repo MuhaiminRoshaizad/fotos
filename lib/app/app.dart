@@ -5,6 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../core/widgets/stable_insets.dart';
 import '../core/widgets/tap_outside_closes_keyboard.dart';
 import '../features/viewer/presentation/view_intent_handler.dart';
+import 'handle_every_back.dart';
 import 'router.dart';
 import 'splash_pluck.dart';
 
@@ -20,11 +21,14 @@ class FotosApp extends ConsumerWidget {
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
       routerConfig: ref.watch(routerProvider),
-      builder: (BuildContext context, Widget? child) => StableInsets(
-        child: SplashPluck(
-          child: ViewIntentHandler(
-            child: TapOutsideClosesKeyboard(
-              child: child ?? const SizedBox.shrink(),
+      onNavigationNotification: handleEveryBack,
+      builder: (BuildContext context, Widget? child) => HandleEveryBack(
+        child: StableInsets(
+          child: SplashPluck(
+            child: ViewIntentHandler(
+              child: TapOutsideClosesKeyboard(
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         ),
