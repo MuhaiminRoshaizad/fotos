@@ -47,7 +47,7 @@ List<SelectionAction> albumSelectionActions(WidgetRef ref) {
   return <SelectionAction>[
     SelectionAction(
       icon: CupertinoIcons.rectangle_stack_badge_plus,
-      label: 'Add to gallery',
+      label: 'To gallery',
       run: (BuildContext context, Set<String> ids) async {
         final List<Album> albums = albumsIn(ids);
         if (albums.isEmpty) {
@@ -80,7 +80,7 @@ List<SelectionAction> albumSelectionActions(WidgetRef ref) {
     ),
     SelectionAction(
       icon: CupertinoIcons.rectangle_stack_badge_minus,
-      label: 'Remove from gallery',
+      label: 'Take out',
       run: (BuildContext context, Set<String> ids) async {
         final List<Gallery> galleries =
             ref.read(galleriesProvider).value ?? const <Gallery>[];

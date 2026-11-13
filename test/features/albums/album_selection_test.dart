@@ -77,7 +77,7 @@ void main() {
     expect(selected(), <String>{'1', '2'});
     expect(find.text('2 selected'), findsOneWidget);
 
-    await tester.tap(find.bySemanticsLabel('Add to gallery').last);
+    await tester.tap(find.bySemanticsLabel('To gallery').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('New gallery'));
     await tester.pumpAndSettle();
