@@ -13,6 +13,7 @@ import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/motion.dart';
+import '../../../core/widgets/zoom_view.dart';
 import '../../albums/presentation/albums_providers.dart'
     show nativeChannelProvider;
 import '../data/viewer_settings.dart';
@@ -246,7 +247,12 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                 },
                 child: Stack(
                   children: <Widget>[
-                    Center(child: picture),
+                    // Pinch zooms a playing video; a double-tap here keeps
+                    // skipping and playing, so it doesn't zoom.
+                    if (c == null)
+                      Center(child: picture)
+                    else
+                      ZoomView(doubleTap: false, child: Center(child: picture)),
                     if (_streakSide != 0)
                       _SeekBadge(side: _streakSide, count: _streakCount),
                     if (_fast)

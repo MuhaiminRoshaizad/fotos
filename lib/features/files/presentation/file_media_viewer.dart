@@ -286,10 +286,14 @@ class _FileVideoState extends State<_FileVideo> {
       onTap: () => v.isPlaying ? _c.pause() : _c.play(),
       child: Stack(
         children: <Widget>[
-          Center(
-            child: AspectRatio(
-              aspectRatio: v.aspectRatio,
-              child: VideoPlayer(_c),
+          // Pinch zooms; a tap still plays and pauses.
+          ZoomView(
+            doubleTap: false,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: v.aspectRatio,
+                child: VideoPlayer(_c),
+              ),
             ),
           ),
           if (!v.isPlaying)
