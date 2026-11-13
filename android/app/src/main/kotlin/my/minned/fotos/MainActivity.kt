@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.renderer.FlutterRenderer
 import io.flutter.plugin.common.MethodChannel
 import java.time.Duration
 import java.time.Instant
@@ -25,6 +26,13 @@ class MainActivity : FlutterActivity() {
         private set
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Videos play into an ImageReader by default, which hands Flutter
+        // the decoder's whole buffer: a decoder that pads 1080 to 1088
+        // shows the padding as a green line along an edge, and
+        // video_player does not crop it (flutter/flutter#159955). A
+        // SurfaceTexture's transform carries the crop, and Impeller on
+        // Vulkan still draws one, through a GL copy.
+        FlutterRenderer.debugForceSurfaceProducerGlTextures = true
         openedToView = viewUri(intent) != null
         // Android takes its launch screen down as soon as Flutter has drawn a
         // frame, which can be midway through the flower's pull-in. Hold it
