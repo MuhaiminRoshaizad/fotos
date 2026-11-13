@@ -32,12 +32,24 @@ enum ReadMode {
 String readingKey(String relativePath) =>
     relativePath.replaceAll(RegExp(r'^/+|/+$'), '');
 
-/// The mode [folder] is read in; Photos for none, or for a mixed view
-/// such as the Photos tab, which has no folder.
-ReadMode readModeFor(Map<String, ReadMode>? modes, String? folder) =>
-    folder == null ? ReadMode.photos : (modes?[folder] ?? ReadMode.photos);
+/// The key holding the mode last chosen for a folder inside [parent]: the
+/// parent's key with a slash after it, which no folder's own key can be.
+String _besideKey(String folder) {
+  final int slash = folder.lastIndexOf('/');
+  return '${slash < 0 ? '' : folder.substring(0, slash)}/';
+}
 
-/// Folders read other than as photos, by [readingKey].
+/// The mode [folder] is read in: its own if it has one, else the one last
+/// chosen for a folder beside it (the next comic in Comic/Album opens as
+/// the last one was read), else Photos. Photos too for a mixed view such
+/// as the Photos tab, which has no folder.
+ReadMode readModeFor(Map<String, ReadMode>? modes, String? folder) {
+  if (folder == null || modes == null) return ReadMode.photos;
+  return modes[folder] ?? modes[_besideKey(folder)] ?? ReadMode.photos;
+}
+
+/// Folders' reading modes by [readingKey], and for each parent the mode
+/// last chosen inside it.
 class ReadModesNotifier extends AsyncNotifier<Map<String, ReadMode>> {
   static const String _key = 'reading.folders';
 
@@ -65,12 +77,19 @@ class ReadModesNotifier extends AsyncNotifier<Map<String, ReadMode>> {
         );
   }
 
-  Future<void> set(String folder, ReadMode mode) => _save(<String, ReadMode>{
-    for (final MapEntry<String, ReadMode> e
-        in (state.value ?? const <String, ReadMode>{}).entries)
-      if (e.key != folder) e.key: e.value,
-    if (mode != ReadMode.photos) folder: mode,
-  });
+  /// Sets [folder]'s mode, and makes it the one the folders beside it start
+  /// in. The folder keeps it even as Photos, so a later choice beside it
+  /// doesn't change a folder already set.
+  Future<void> set(String folder, ReadMode mode) {
+    final String beside = _besideKey(folder);
+    return _save(<String, ReadMode>{
+      for (final MapEntry<String, ReadMode> e
+          in (state.value ?? const <String, ReadMode>{}).entries)
+        if (e.key != folder && e.key != beside) e.key: e.value,
+      folder: mode,
+      if (mode != ReadMode.photos) beside: mode,
+    });
+  }
 
   /// Keeps modes on a folder renamed or moved from [from] to [to], and on
   /// the folders inside it. Both are [readingKey]s.
