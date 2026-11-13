@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/format/natural_sort.dart';
 import '../../../core/haptics/app_haptics.dart';
+import '../../../core/media/album_id.dart';
 import '../../../core/media/media_providers.dart';
 import '../../../core/media/read_mode.dart';
 import '../../../core/media/media_repository.dart';
@@ -24,6 +25,7 @@ import '../../../core/widgets/sort_sheet.dart';
 import '../../../core/widgets/toast.dart';
 import '../../albums/data/album_prefs.dart';
 import '../../albums/presentation/albums_providers.dart';
+import '../../albums/presentation/follow_albums.dart';
 import '../domain/file_entry.dart';
 import 'files_providers.dart';
 import 'folder_picker.dart';
@@ -225,20 +227,52 @@ Future<void> showEntryActions(
   }
 }
 
-/// Pins and a folder's own sort stay with what was renamed or moved.
-Future<void> followRenamed(WidgetRef ref, String from, String to) async {
-  await ref.read(topPinsProvider.notifier).follow(from, to);
-  await ref.read(filesTabPinsProvider.notifier).follow(from, to);
-  await ref.read(fileSortsProvider.notifier).follow(from, to);
-  final String? root = ref.read(storageRootProvider).value;
+/// Pins and a folder's own sort stay with what was renamed or moved, and
+/// so do the albums of that folder and every folder inside it.
+///
+/// It takes [providers] rather than a ref: the row that started it can be
+/// gone by the time it runs.
+Future<void> followRenamed(
+  ProviderContainer providers,
+  String from,
+  String to,
+) async {
+  await providers.read(topPinsProvider.notifier).follow(from, to);
+  await providers.read(filesTabPinsProvider.notifier).follow(from, to);
+  await providers.read(fileSortsProvider.notifier).follow(from, to);
+  await followAlbums(providers, await _albumsMoved(from, to));
+  final String? root = providers.read(storageRootProvider).value;
   if (root != null) {
-    await ref
+    await providers
         .read(readModesProvider.notifier)
         .follow(
           readingKey(p.split(p.relative(from, from: root)).join('/')),
           readingKey(p.split(p.relative(to, from: root)).join('/')),
         );
   }
+}
+
+/// Old album id to new for a folder now at [to], once at [from], and every
+/// folder inside it; nothing for a file.
+Future<Map<String, String>> _albumsMoved(String from, String to) async {
+  if (!await FileSystemEntity.isDirectory(to)) return <String, String>{};
+  final Map<String, String> moved = <String, String>{
+    albumIdOf(from): albumIdOf(to),
+  };
+  try {
+    await for (final FileSystemEntity e in Directory(
+      to,
+    ).list(recursive: true, followLinks: false)) {
+      if (e is Directory) {
+        moved[albumIdOf(from + e.path.substring(to.length))] = albumIdOf(
+          e.path,
+        );
+      }
+    }
+  } on FileSystemException {
+    // A folder that can't be read keeps what was gathered before it.
+  }
+  return moved;
 }
 
 /// Asks for a name and makes a folder of it in [dir].
@@ -347,11 +381,15 @@ Future<void> _rename(
     validate: (String v) => validateFolderName(v, taken, current: entry.name),
   );
   if (name == null || name == entry.name || !context.mounted) return;
+  final ProviderContainer providers = ProviderScope.containerOf(
+    context,
+    listen: false,
+  );
   try {
     final String to = await ref
         .read(filesRepositoryProvider)
         .rename(entry, name);
-    await followRenamed(ref, entry.path, to);
+    await followRenamed(providers, entry.path, to);
     _refresh(ref);
     if (context.mounted) showToast(context, 'Renamed to $name');
   } on FileSystemException {
@@ -413,6 +451,10 @@ Future<bool> transferEntries(
   if (dir == null || !context.mounted) return false;
   if (move && dir == from) return false;
   final repo = ref.read(filesRepositoryProvider);
+  final ProviderContainer providers = ProviderScope.containerOf(
+    context,
+    listen: false,
+  );
   final Set<String> taken = await repo.namesIn(dir);
   if (!context.mounted) return false;
   // One file moves at once; a copy of any size is worth showing.
@@ -431,7 +473,7 @@ Future<bool> transferEntries(
         return;
       }
       final String to = await repo.moveTo(e, dir, taken: taken);
-      await followRenamed(ref, e.path, to);
+      await followRenamed(providers, e.path, to);
     },
   );
   _refresh(ref);
