@@ -36,30 +36,12 @@ class WidgetSetupScreen extends ConsumerStatefulWidget {
 
 class _WidgetSetupScreenState extends ConsumerState<WidgetSetupScreen> {
   late WidgetConfig _c = widget.initial ?? const WidgetConfig();
-  bool _defaultsApplied = false;
 
   void _set(WidgetConfig c) => setState(() => _c = c);
-
-  /// A new widget starts with screenshots and WhatsApp left out, once the
-  /// albums are known.
-  void _applyDefaults(List<Album> albums) {
-    if (_defaultsApplied || widget.initial != null) return;
-    _defaultsApplied = true;
-    final Set<String> out = <String>{
-      for (final Album a in albums)
-        if (leftOutByDefault(a.name)) a.id,
-    };
-    if (out.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _set(_c.copyWith(leaveOut: out)),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final AsyncValue<List<Album>> albums = ref.watch(albumsProvider);
-    albums.whenData(_applyDefaults);
     return LargeTitleScaffold(
       title: 'Photo widget',
       subtitle: 'Resize it on the home screen to change its size.',

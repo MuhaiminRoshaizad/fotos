@@ -73,16 +73,15 @@ void main() {
     expect(c.skip, isTrue);
   });
 
-  testWidgets(
-    'a new widget leaves out screenshots and WhatsApp to begin with',
-    (WidgetTester tester) async {
-      await open(tester);
-      await tester.tap(find.text('Done'));
-      await tester.pumpAndSettle();
-      expect(done.single.source, WidgetSource.all);
-      expect(done.single.leaveOut, <String>{'2', '3'});
-    },
-  );
+  testWidgets('a new widget leaves nothing out until albums are picked', (
+    WidgetTester tester,
+  ) async {
+    await open(tester);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(done.single.source, WidgetSource.all);
+    expect(done.single.leaveOut, isEmpty);
+  });
 
   testWidgets('chosen albums needs one before Done is allowed', (
     WidgetTester tester,

@@ -106,10 +106,3 @@ class WidgetConfig {
     );
   }
 }
-
-/// Albums a new widget leaves out of "Everything" to begin with: the ones
-/// almost nobody wants on their home screen.
-bool leftOutByDefault(String albumName) {
-  final String n = albumName.toLowerCase();
-  return n == 'screenshots' || n.startsWith('whatsapp');
-}
