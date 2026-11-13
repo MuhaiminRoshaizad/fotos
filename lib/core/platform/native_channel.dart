@@ -154,6 +154,22 @@ class NativeChannel {
       })) ??
       false;
 
+  /// Moves to Android's trash, or back out with [value] false, in one
+  /// request. Returns the ids that left (or came back to) the library,
+  /// rows whose file was already gone included; empty if the user
+  /// declined.
+  Future<List<String>> setTrashed(
+    List<String> ids,
+    List<bool> videos, {
+    required bool value,
+  }) async =>
+      (await _channel.invokeListMethod<String>('setTrashed', <String, Object>{
+        'ids': ids,
+        'videos': videos,
+        'value': value,
+      })) ??
+      <String>[];
+
   /// Deletes for good, trashed items included. True if the user agreed.
   Future<bool> deleteForever(List<String> ids, List<bool> videos) async =>
       (await _channel.invokeMethod<bool>('deleteForever', <String, Object>{

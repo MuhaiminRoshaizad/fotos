@@ -159,11 +159,21 @@ class PhotoManagerRepository implements MediaRepository {
 
   @override
   Future<List<String>> moveToTrash(List<AssetEntity> items) =>
-      PhotoManager.editor.android.moveToTrash(items);
+      // photo_manager looks each item up first and fails the whole request
+      // when one's file is missing; fotos builds the request itself.
+      _native.setTrashed(
+        items.map((AssetEntity e) => e.id).toList(),
+        items.map((AssetEntity e) => e.type == AssetType.video).toList(),
+        value: true,
+      );
 
   @override
   Future<List<String>> restoreFromTrash(List<AssetEntity> items) =>
-      PhotoManager.editor.android.restoreFromTrash(items);
+      _native.setTrashed(
+        items.map((AssetEntity e) => e.id).toList(),
+        items.map((AssetEntity e) => e.type == AssetType.video).toList(),
+        value: false,
+      );
 
   @override
   Future<String?> folderOf(Album album) => album.path.relativePathAsync;

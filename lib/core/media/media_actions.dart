@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
@@ -96,10 +97,22 @@ class MediaActions {
       );
       if (!ok) return <String>{};
     }
-    final List<String> ids = await _ref
-        .read(mediaRepositoryProvider)
-        .moveToTrash(items);
-    _refresh();
+    final List<String> ids;
+    try {
+      ids = await _ref.read(mediaRepositoryProvider).moveToTrash(items);
+    } on PlatformException catch (e) {
+      // Never silent: an item that stays put says why.
+      if (context.mounted) {
+        showToast(
+          context,
+          'Couldn\'t delete: ${e.message ?? 'Android refused'}',
+          failed: true,
+        );
+      }
+      return <String>{};
+    } finally {
+      _refresh();
+    }
     if (ids.isEmpty) return <String>{};
     final List<AssetEntity> trashed = items
         .where((AssetEntity e) => ids.contains(e.id))

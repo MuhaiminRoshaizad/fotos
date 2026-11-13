@@ -51,6 +51,12 @@ class NativeChannel(
                 call.argument<List<Boolean>>("videos")!!,
                 call.argument<Boolean>("value")!!,
             ) { ok -> result.success(ok) }
+            "setTrashed" -> setTrashed(
+                call.argument<List<String>>("ids")!!,
+                call.argument<List<Boolean>>("videos")!!,
+                call.argument<Boolean>("value")!!,
+                result,
+            )
             "deleteForever" -> MediaRequests.delete(
                 activity,
                 call.argument<List<String>>("ids")!!,
@@ -214,6 +220,43 @@ class NativeChannel(
                 result.success(null)
             }
             else -> result.notImplemented()
+        }
+    }
+
+    /**
+     * Trashes (or restores) what MediaStore can, after setting aside rows
+     * it cannot: a row whose file is gone is dropped when trashing, and a
+     * row that no longer exists is skipped. Replies with the ids that left
+     * (or came back to) the library.
+     */
+    private fun setTrashed(
+        ids: List<String>,
+        videos: List<Boolean>,
+        value: Boolean,
+        result: MethodChannel.Result,
+    ) {
+        io.execute {
+            try {
+                val paths = MediaRequests.paths(activity, ids)
+                val dropped = if (value) MediaRequests.dropMissing(activity, paths) else emptyList()
+                val ask = ids.indices.filter { ids[it] in paths && ids[it] !in dropped }
+                activity.runOnUiThread {
+                    if (ask.isEmpty()) {
+                        result.success(dropped)
+                        return@runOnUiThread
+                    }
+                    val askIds = ask.map { ids[it] }
+                    try {
+                        MediaRequests.trash(activity, askIds, ask.map { videos[it] }, value) { ok ->
+                            result.success(if (ok) dropped + askIds else dropped)
+                        }
+                    } catch (e: Exception) {
+                        result.error("trash_failed", e.message, null)
+                    }
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread { result.error("trash_failed", e.message, null) }
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/core/media/media_actions.dart';
@@ -13,8 +14,14 @@ import '../../support/fake_media_repository.dart';
 class _Repo extends FakeMediaRepository {
   final List<String> trashed = <String>[];
 
+  /// Fails as Android does for a request it cannot carry out.
+  bool refuse = false;
+
   @override
   Future<List<String>> moveToTrash(List<AssetEntity> items) async {
+    if (refuse) {
+      throw PlatformException(code: 'trash_failed', message: 'no such item');
+    }
     trashed.addAll(items.map((AssetEntity e) => e.id));
     return items.map((AssetEntity e) => e.id).toList();
   }
@@ -38,8 +45,12 @@ final AssetEntity _photo = AssetEntity(
 void main() {
   late _Repo repo;
 
-  Future<void> open(WidgetTester tester, {required bool allFiles}) async {
-    repo = _Repo();
+  Future<void> open(
+    WidgetTester tester, {
+    required bool allFiles,
+    _Repo? using,
+  }) async {
+    repo = using ?? _Repo();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -90,6 +101,16 @@ void main() {
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
     expect(repo.trashed, <String>['1']);
+    await finish(tester);
+  });
+
+  testWidgets('a delete Android refuses says so instead of doing nothing', (
+    WidgetTester tester,
+  ) async {
+    repo = _Repo();
+    repo.refuse = true;
+    await open(tester, allFiles: false, using: repo);
+    expect(find.text('Couldn\'t delete: no such item'), findsOneWidget);
     await finish(tester);
   });
 

@@ -140,7 +140,8 @@ class TrashScreen extends ConsumerWidget {
     WidgetRef ref,
     List<TrashedItem> items,
   ) async {
-    final List<String> back = await PhotoManager.editor.android
+    final List<String> back = await ref
+        .read(mediaRepositoryProvider)
         .restoreFromTrash(items.map(_entity).toList());
     ref.invalidate(trashProvider);
     ref.invalidate(libraryProvider);
