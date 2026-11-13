@@ -510,6 +510,7 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
     );
     return list.when(
       skipLoadingOnRefresh: true,
+      skipLoadingOnReload: true,
       loading: () =>
           _RowsSkeleton(header: header, grid: grid, preface: widget.preface),
       error: (_, _) => headed(

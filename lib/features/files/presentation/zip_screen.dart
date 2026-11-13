@@ -113,6 +113,7 @@ class ZipScreen extends ConsumerWidget {
         ],
         body: (BuildContext context, Widget header) => entries.when(
           skipLoadingOnRefresh: true,
+          skipLoadingOnReload: true,
           loading: () => _Headed(header: header, child: const _PagesSkeleton()),
           error: (_, _) => _Headed(
             header: header,

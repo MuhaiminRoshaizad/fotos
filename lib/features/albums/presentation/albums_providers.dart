@@ -7,6 +7,7 @@ import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/media/read_mode.dart';
 import '../../../core/platform/native_channel.dart';
+import '../data/album_prefs.dart';
 
 /// The album with [id], looked up fresh so renames and moves show at once.
 final albumProvider = FutureProvider.autoDispose.family<Album?, String>((
@@ -35,6 +36,18 @@ final albumItemsProvider = FutureProvider.autoDispose
       final Album? album = await ref.watch(albumProvider(id).future);
       if (album == null) return <AssetEntity>[];
       return ref.read(mediaRepositoryProvider).albumItems(album);
+    });
+
+/// The album's items in its sort order. Sorted here rather than in the
+/// screen: mapping the screen's value drops the old list while a new one
+/// loads, and the grid then gives way to the skeleton and loses its place.
+final sortedAlbumItemsProvider = FutureProvider.autoDispose
+    .family<List<AssetEntity>, String>((Ref ref, String id) async {
+      final AlbumPrefs prefs = await ref.watch(albumPrefsProvider.future);
+      final List<AssetEntity> items = await ref.watch(
+        albumItemsProvider(id).future,
+      );
+      return prefs.sortFor(id).apply(items);
     });
 
 final nativeChannelProvider = Provider<NativeChannel>(

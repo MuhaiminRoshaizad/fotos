@@ -74,6 +74,7 @@ class GalleryScreen extends ConsumerWidget {
         }
         return albums.when(
           skipLoadingOnRefresh: true,
+          skipLoadingOnReload: true,
           loading: () => headed(const AlbumGridSkeleton(top: AppSpacing.sm)),
           error: (_, _) => headed(
             EmptyState(

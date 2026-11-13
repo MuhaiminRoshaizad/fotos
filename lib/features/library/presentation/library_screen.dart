@@ -119,6 +119,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
     return items.when(
       skipLoadingOnRefresh: true,
+      skipLoadingOnReload: true,
       loading: () => headed(GridSkeleton(level: _level)),
       error: (_, _) => headed(
         EmptyState(

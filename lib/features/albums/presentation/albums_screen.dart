@@ -201,6 +201,7 @@ class _AlbumsBodyState extends ConsumerState<_AlbumsBody> {
     );
     return albums.when(
       skipLoadingOnRefresh: true,
+      skipLoadingOnReload: true,
       loading: () => headed(const _AlbumsSkeleton()),
       error: (_, _) => headed(
         EmptyState(

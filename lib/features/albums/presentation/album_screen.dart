@@ -33,9 +33,9 @@ class AlbumScreen extends ConsumerWidget {
         (ref.watch(albumPrefsProvider).value ?? const AlbumPrefs()).sortFor(
           albumId,
         );
-    final AsyncValue<List<AssetEntity>> items = ref
-        .watch(albumItemsProvider(albumId))
-        .whenData(sort.apply);
+    final AsyncValue<List<AssetEntity>> items = ref.watch(
+      sortedAlbumItemsProvider(albumId),
+    );
     return MediaListScreen(
       owner: 'album-$albumId',
       title: album?.name ?? '',
@@ -177,7 +177,10 @@ class MediaListScreen extends ConsumerWidget {
             ],
           );
           return items.when(
+            // A delete or move reads the library again, and the album with it;
+            // the skeleton would replace the grid and lose the scroll position.
             skipLoadingOnRefresh: true,
+            skipLoadingOnReload: true,
             loading: () => headed(const GridSkeleton(level: GridLevel.all)),
             error: (_, _) => headed(
               EmptyState(

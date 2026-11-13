@@ -58,6 +58,7 @@ class TrashScreen extends ConsumerWidget {
         );
         return trash.when(
           skipLoadingOnRefresh: true,
+          skipLoadingOnReload: true,
           loading: () => headed(const GridSkeleton(level: GridLevel.all)),
           error: (_, _) => headed(
             EmptyState(
