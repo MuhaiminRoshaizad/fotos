@@ -86,7 +86,7 @@ void main() {
         'others', () async {
       final String clips = await galleries.create('Clips', <String>['old']);
       await galleries.create('Chats', <String>['x']);
-      await galleries.rekey('old', 'new');
+      await galleries.rekey(<String, String>{'old': 'new'});
       expect(galleryOf(now(), 'new')!.id, clips);
 
       await galleries.rename(clips, 'Game clips');

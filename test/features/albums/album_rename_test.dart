@@ -50,7 +50,7 @@ void main() {
     final AlbumSort byName = AlbumSort(AlbumSortBy.values.last, reversed: true);
     await prefs.setSort('old', byName);
 
-    await prefs.rekey('old', 'new');
+    await prefs.rekey(<String, String>{'old': 'new'});
 
     final AlbumPrefs p = c.read(albumPrefsProvider).value!;
     // Keeps its place in the pinned order, under its new id.

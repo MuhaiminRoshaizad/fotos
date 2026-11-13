@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,8 @@ import 'package:fotos/core/media/media_providers.dart';
 import 'package:fotos/core/media/media_repository.dart';
 import 'package:fotos/features/albums/data/album_prefs.dart';
 import 'package:fotos/features/albums/presentation/album_sheets.dart';
+import 'package:fotos/features/files/presentation/files_providers.dart';
+import 'package:path/path.dart' as p;
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -72,8 +76,8 @@ class _Tile extends ConsumerWidget {
 }
 
 void main() {
-  testWidgets('renaming from a tile that goes away keeps the pin and says '
-      'so', (WidgetTester tester) async {
+  testWidgets('renaming from a tile that goes away keeps the pin, says '
+      'so and clears the emptied folder', (WidgetTester tester) async {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -89,8 +93,16 @@ void main() {
           ),
     );
     final _Library library = _Library()..folders['old'] = 'Pictures/Trip/';
+    // Android leaves the moved album's folder behind, empty.
+    final Directory storage = Directory.systemTemp.createTempSync('fotos');
+    addTearDown(() => storage.deleteSync(recursive: true));
+    final Directory old = Directory(p.join(storage.path, 'Pictures', 'Trip'))
+      ..createSync(recursive: true);
     final ProviderContainer c = ProviderContainer(
-      overrides: [mediaRepositoryProvider.overrideWithValue(library)],
+      overrides: [
+        mediaRepositoryProvider.overrideWithValue(library),
+        storageRootProvider.overrideWith((Ref ref) async => storage.path),
+      ],
     );
     addTearDown(c.dispose);
     await c.read(albumPrefsProvider.future);
@@ -111,6 +123,12 @@ void main() {
     for (int i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
+    // Clearing the old folder is real disk work, outside the test's clock.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(library.moves, <String>['Pictures/Holiday/']);
     expect(c.read(albumsProvider).value!.single.id, 'new');
@@ -118,6 +136,7 @@ void main() {
     expect(find.text('Rename Holiday'), findsOneWidget);
     expect(c.read(albumPrefsProvider).value!.pinned, <String>['new']);
     expect(find.text('Renamed to Holiday'), findsOneWidget);
+    expect(old.existsSync(), isFalse);
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
   });

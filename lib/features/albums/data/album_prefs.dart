@@ -256,11 +256,11 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
     );
   }
 
-  /// Moves [from]'s pin, cover and sort to [to], for an album whose folder
-  /// was renamed and so has a new id.
-  Future<void> rekey(String from, String to) {
+  /// Moves each old id's pin, cover and sort in [moved] to its new id, for
+  /// albums whose folders were renamed or moved and so have new ids.
+  Future<void> rekey(Map<String, String> moved) {
     final AlbumPrefs p = _now;
-    String swap(String id) => id == from ? to : id;
+    String swap(String id) => moved[id] ?? id;
     return _save(
       p.copyWith(
         pinned: <String>[for (final String id in p.pinned) swap(id)],

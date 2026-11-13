@@ -25,6 +25,7 @@ import '../../files/presentation/files_providers.dart';
 import '../data/album_prefs.dart';
 import '../data/galleries.dart';
 import 'albums_providers.dart';
+import 'follow_albums.dart';
 import 'gallery_sheets.dart';
 
 /// What can be done to an album from its menu.
@@ -224,15 +225,18 @@ Future<Album?> renameAlbum(
     say("Couldn't rename ${album.name}.", failed: true);
     return null;
   }
-  await providers.read(albumPrefsProvider.notifier).rekey(album.id, renamed.id);
+  await followAlbums(providers, <String, String>{album.id: renamed.id});
   await providers
       .read(readModesProvider.notifier)
       .follow(readingKey(from), readingKey(target));
-  await providers.read(galleriesProvider.notifier).rekey(album.id, renamed.id);
-  // Home screen widgets set to this album follow it too.
-  await providers
-      .read(nativeChannelProvider)
-      .rekeyWidgetAlbum(album.id, renamed.id);
+  // Android leaves the old folder behind, empty. A delete that isn't empty
+  // fails and keeps it, as when other files or subfolders are still there.
+  try {
+    final String root = await providers.read(storageRootProvider.future);
+    await Directory(p.join(root, from)).delete();
+  } on FileSystemException {
+    // Something else is in it, or there is no All files access to clear it.
+  }
   say('Renamed to $name');
   return renamed;
 }

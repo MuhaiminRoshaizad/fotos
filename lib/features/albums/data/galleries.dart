@@ -144,13 +144,12 @@ class GalleriesNotifier extends AsyncNotifier<List<Gallery>> {
       if (g.id != id) g,
   ]);
 
-  /// Follows an album whose folder was renamed and so has a new id.
-  Future<void> rekey(String from, String to) => _save(<Gallery>[
+  /// Follows albums whose folders were renamed or moved, from each old id
+  /// in [moved] to its new one.
+  Future<void> rekey(Map<String, String> moved) => _save(<Gallery>[
     for (final Gallery g in _now)
       g.copyWith(
-        albumIds: <String>[
-          for (final String id in g.albumIds) id == from ? to : id,
-        ],
+        albumIds: <String>[for (final String id in g.albumIds) moved[id] ?? id],
       ),
   ]);
 }
