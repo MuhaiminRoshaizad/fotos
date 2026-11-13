@@ -1,26 +1,32 @@
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/gestures.dart'
+    show HitTestEntry, HitTestResult, HitTestTarget;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderMetaData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/format/natural_sort.dart';
+import '../../../core/haptics/app_haptics.dart';
 import '../../../core/media/add_to_album.dart';
 import '../../../core/media/empty_albums.dart';
 import '../../../core/media/media_access_gate.dart';
 import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
+import '../../../core/selection/selection.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/bottom_bar_space.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/search_field.dart';
 import '../data/album_prefs.dart';
 import '../data/galleries.dart';
+import 'album_selection.dart';
 import 'album_sheets.dart';
 import 'album_tiles.dart';
 import 'albums_providers.dart';
 import 'gallery_sheets.dart';
-import '../../../core/widgets/bottom_bar_space.dart';
 
 /// The Albums tab: pinned albums and galleries first, then galleries and
 /// every folder holding media that is not in a gallery, then Favourites,
@@ -30,21 +36,47 @@ class AlbumsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final SelectionState sel = ref.watch(selectionProvider);
+    final SelectionNotifier selection = ref.read(selectionProvider.notifier);
+    final bool selecting = sel.isActiveFor(albumsSelectionOwner);
+    final int n = sel.ids.length;
+    final bool any =
+        (ref.watch(albumsProvider).value?.isNotEmpty ?? false) ||
+        (ref.watch(galleriesProvider).value?.isNotEmpty ?? false);
     return LargeTitleScaffold(
       title: 'Albums',
       grouped: true,
-      trailing: <Widget>[
-        BarButton.icon(
-          icon: CupertinoIcons.arrow_up_arrow_down,
-          tooltip: 'Sort albums',
-          onPressed: () => showAlbumsOrderSheet(context, ref),
-        ),
-        BarButton.icon(
-          icon: CupertinoIcons.plus,
-          tooltip: 'New album or gallery',
-          onPressed: () => showNewMenu(context, ref),
-        ),
-      ],
+      barTitle: selecting ? (n == 0 ? 'Select albums' : '$n selected') : null,
+      leading: selecting
+          ? BarButton.text(
+              label: 'Select all',
+              onPressed: () => selection.setIds(selectableAlbumIds(ref)),
+            )
+          : null,
+      trailing: selecting
+          ? <Widget>[
+              BarButton.text(
+                label: 'Done',
+                prominent: true,
+                onPressed: selection.clear,
+              ),
+            ]
+          : <Widget>[
+              BarButton.text(
+                label: 'Select',
+                onPressed: any ? () => startAlbumSelection(ref) : null,
+              ),
+              BarButton.icon(
+                icon: CupertinoIcons.arrow_up_arrow_down,
+                tooltip: 'Sort albums',
+                onPressed: () => showAlbumsOrderSheet(context, ref),
+              ),
+              BarButton.icon(
+                icon: CupertinoIcons.plus,
+                tooltip: 'New album or gallery',
+                onPressed: () => showNewMenu(context, ref),
+              ),
+            ],
       body: (BuildContext context, Widget header) => MediaAccessGate(
         header: header,
         builder: (Widget h) => _AlbumsBody(header: h),
@@ -80,6 +112,71 @@ class _AlbumsBodyState extends ConsumerState<_AlbumsBody> {
     _query.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  // ---- hold and drag across tiles while selecting -------------------------
+
+  /// The selectable tiles in the order they are laid out.
+  List<String> _order = const <String>[];
+  String? _anchor;
+  bool _sweepTo = true;
+  Set<String> _base = const <String>{};
+  int _swept = 0;
+
+  String? _idAt(Offset global) {
+    final HitTestResult result = HitTestResult();
+    WidgetsBinding.instance.hitTestInView(
+      result,
+      global,
+      View.of(context).viewId,
+    );
+    for (final HitTestEntry<HitTestTarget> e in result.path) {
+      final HitTestTarget t = e.target;
+      if (t is RenderMetaData && t.metaData is AlbumTag) {
+        return (t.metaData as AlbumTag).id;
+      }
+    }
+    return null;
+  }
+
+  void _sweepStart(LongPressStartDetails d) {
+    final String? id = _idAt(d.globalPosition);
+    if (id == null) return;
+    _anchor = id;
+    _base = Set<String>.of(ref.read(selectionProvider).ids);
+    // Starting on a selected tile takes tiles out; otherwise puts them in.
+    _sweepTo = !_base.contains(id);
+    _swept = 0;
+    _sweepOver(id);
+  }
+
+  void _sweepMove(LongPressMoveUpdateDetails d) {
+    if (_anchor == null) return;
+    final String? id = _idAt(d.globalPosition);
+    if (id != null) _sweepOver(id);
+  }
+
+  /// Sets every tile between the one the sweep began on and [id], so a
+  /// quick drag can't skip the tiles it passed.
+  void _sweepOver(String id) {
+    final int a = _order.indexOf(_anchor!);
+    final int b = _order.indexOf(id);
+    if (a < 0 || b < 0) return;
+    final List<String> range = _order.sublist(
+      a < b ? a : b,
+      (a < b ? b : a) + 1,
+    );
+    if (range.length != _swept) {
+      _swept = range.length;
+      AppHaptics.tick();
+    }
+    ref
+        .read(selectionProvider.notifier)
+        .setIds(
+          _sweepTo
+              ? <String>{..._base, ...range}
+              : (Set<String>.of(_base)..removeAll(range)),
+        );
   }
 
   @override
@@ -177,7 +274,18 @@ class _AlbumsBodyState extends ConsumerState<_AlbumsBody> {
             restGalleries.isEmpty &&
             rest.isEmpty &&
             pending.isEmpty;
-        return CustomScrollView(
+        _order = <String>[
+          for (final String id in prefs.pinned)
+            if (galleries.any((Gallery g) => g.id == id && matches(g.name)) ||
+                list.any((Album a) => a.id == id && matches(a.name)))
+              id,
+          for (final Gallery g in restGalleries) g.id,
+          for (final Album a in rest) a.id,
+        ];
+        final bool selecting = ref
+            .watch(selectionProvider)
+            .isActiveFor(albumsSelectionOwner);
+        final Widget scroll = CustomScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: <Widget>[
             SliverToBoxAdapter(child: header),
@@ -280,6 +388,14 @@ class _AlbumsBodyState extends ConsumerState<_AlbumsBody> {
             SliverToBoxAdapter(child: SizedBox(height: bottom)),
           ],
         );
+        return selecting
+            ? GestureDetector(
+                onLongPressStart: _sweepStart,
+                onLongPressMoveUpdate: _sweepMove,
+                onLongPressEnd: (_) => _anchor = null,
+                child: scroll,
+              )
+            : scroll;
       },
     );
   }

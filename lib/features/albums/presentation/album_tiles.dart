@@ -10,9 +10,12 @@ import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/selection/selection.dart';
 import '../../../core/widgets/lift_menu.dart';
+import '../../../core/widgets/select_check.dart';
 import '../data/album_prefs.dart';
 import '../data/galleries.dart';
+import 'album_selection.dart';
 import 'album_sheets.dart';
 import 'albums_providers.dart';
 import 'gallery_sheets.dart';
@@ -98,8 +101,22 @@ class _PinBadge extends StatelessWidget {
   }
 }
 
+/// The hold menu's Select, which starts selecting with that tile.
+const Object _select = 'select';
+
+/// Whose selection the Albums tab's tiles join.
+const String albumsSelectionOwner = 'albums';
+
+/// Marks a tile in the hit-test path, so a drag across tiles can tell which
+/// album or gallery it is over.
+class AlbumTag {
+  const AlbumTag(this.id);
+  final String id;
+}
+
 /// A square picture with a name and a count under it, as every album and
-/// gallery tile is laid out.
+/// gallery tile is laid out. While the Albums tab is selecting, [selected]
+/// is set: the picture shrinks a little and a check shows when selected.
 class _Tile extends StatelessWidget {
   const _Tile({
     required this.label,
@@ -108,6 +125,8 @@ class _Tile extends StatelessWidget {
     required this.count,
     required this.onTap,
     required this.onLongPress,
+    this.id,
+    this.selected,
   });
 
   final String label;
@@ -117,29 +136,55 @@ class _Tile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
+  /// The album or gallery, for a drag across tiles; none for a tile that
+  /// can't be selected.
+  final String? id;
+
+  /// Null when not selecting.
+  final bool? selected;
+
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    return Semantics(
+    final bool on = selected ?? false;
+    final Widget tile = Semantics(
       button: true,
+      selected: selected,
       label: label,
-      hint: 'Long-press for options',
+      hint: selected == null ? 'Long-press for options' : null,
       excludeSemantics: true,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.md),
         onTap: onTap,
-        onLongPress: onLongPress,
+        // While selecting, a hold starts a drag across tiles instead.
+        onLongPress: selected == null ? onLongPress : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             AspectRatio(
               aspectRatio: 1,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadii.md),
-                child: ColoredBox(
-                  color: cs.surfaceContainerHigh,
-                  child: picture,
-                ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  AnimatedScale(
+                    scale: on ? 0.9 : 1,
+                    duration: AppMotion.short,
+                    curve: AppMotion.emphasized,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      child: ColoredBox(
+                        color: cs.surfaceContainerHigh,
+                        child: picture,
+                      ),
+                    ),
+                  ),
+                  if (selected != null)
+                    Positioned(
+                      left: AppSpacing.sm,
+                      top: AppSpacing.sm,
+                      child: SelectCheck(selected: on),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -159,6 +204,7 @@ class _Tile extends StatelessWidget {
         ),
       ),
     );
+    return id == null ? tile : MetaData(metaData: AlbumTag(id!), child: tile);
   }
 }
 
@@ -188,7 +234,7 @@ class AlbumTile extends ConsumerWidget {
     final AssetEntity? cover = albumCover(ref, album, prefs);
     // The cover lifts out of its square with the album's menu under it.
     Future<void> hold() async {
-      final AlbumOption? choice = await showLiftMenu<AlbumOption>(
+      final Object? choice = await showLiftMenu<Object>(
         context,
         from: _square(context),
         fromRadius: AppRadii.md,
@@ -199,9 +245,14 @@ class AlbumTile extends ConsumerWidget {
               ? Icon(CupertinoIcons.rectangle_stack, color: cs.onSurfaceVariant)
               : _coverImage(cover),
         ),
-        actions: <LiftAction<AlbumOption>>[
+        actions: <LiftAction<Object>>[
+          const LiftAction<Object>(
+            _select,
+            'Select',
+            CupertinoIcons.checkmark_circle,
+          ),
           for (final AlbumOption o in albumOptionsFor(album))
-            LiftAction<AlbumOption>(
+            LiftAction<Object>(
               o,
               o.labelFor(pinned: pinned, inGallery: inGallery),
               o.iconFor(pinned: pinned, inGallery: inGallery),
@@ -210,16 +261,23 @@ class AlbumTile extends ConsumerWidget {
         ],
       );
       if (choice == null || !context.mounted) return;
-      await runAlbumOption(context, ref, album, choice);
+      if (choice == _select) return startAlbumSelection(ref, first: album.id);
+      await runAlbumOption(context, ref, album, choice as AlbumOption);
     }
 
+    final SelectionState sel = ref.watch(selectionProvider);
+    final bool selecting = sel.isActiveFor(albumsSelectionOwner);
     return _Tile(
+      id: album.id,
+      selected: selecting ? sel.ids.contains(album.id) : null,
       label:
           '${album.name}, ${Fmt.count(album.count, 'item')}'
           '${pinned ? ', pinned' : ''}',
       name: album.name,
       count: Fmt.count(album.count, 'item'),
-      onTap: () => context.push('/albums/folder/${album.id}'),
+      onTap: selecting
+          ? () => ref.read(selectionProvider.notifier).toggle(album.id)
+          : () => context.push('/albums/folder/${album.id}'),
       onLongPress: hold,
       picture: Stack(
         fit: StackFit.expand,
@@ -250,12 +308,20 @@ class EmptyAlbumTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    void open() => context.push(
-      Uri(
-        path: '/albums/empty',
-        queryParameters: <String, String>{'name': name},
-      ).toString(),
-    );
+    // A placeholder can't be selected; while selecting it does nothing.
+    final bool selecting = ref
+        .watch(selectionProvider)
+        .isActiveFor(albumsSelectionOwner);
+    void open() {
+      if (selecting) return;
+      context.push(
+        Uri(
+          path: '/albums/empty',
+          queryParameters: <String, String>{'name': name},
+        ).toString(),
+      );
+    }
+
     return _Tile(
       label: '$name, empty album',
       name: name,
@@ -325,15 +391,20 @@ class GalleryTile extends ConsumerWidget {
             .contains(gallery.id);
     final String count = Fmt.count(albums.length, 'album');
     Future<void> hold() async {
-      final GalleryOption? choice = await showLiftMenu<GalleryOption>(
+      final Object? choice = await showLiftMenu<Object>(
         context,
         from: _square(context),
         fromRadius: AppRadii.md,
         aspectRatio: 1,
         preview: GalleryMosaic(albums: albums),
-        actions: <LiftAction<GalleryOption>>[
+        actions: <LiftAction<Object>>[
+          const LiftAction<Object>(
+            _select,
+            'Select',
+            CupertinoIcons.checkmark_circle,
+          ),
           for (final GalleryOption o in GalleryOption.values)
-            LiftAction<GalleryOption>(
+            LiftAction<Object>(
               o,
               o.labelFor(pinned: pinned),
               o.iconFor(pinned: pinned),
@@ -341,14 +412,23 @@ class GalleryTile extends ConsumerWidget {
         ],
       );
       if (choice == null || !context.mounted) return;
-      await runGalleryOption(context, ref, gallery, choice);
+      if (choice == _select) {
+        return startAlbumSelection(ref, first: gallery.id);
+      }
+      await runGalleryOption(context, ref, gallery, choice as GalleryOption);
     }
 
+    final SelectionState sel = ref.watch(selectionProvider);
+    final bool selecting = sel.isActiveFor(albumsSelectionOwner);
     return _Tile(
+      id: gallery.id,
+      selected: selecting ? sel.ids.contains(gallery.id) : null,
       label: '${gallery.name}, gallery of $count${pinned ? ', pinned' : ''}',
       name: gallery.name,
       count: count,
-      onTap: () => context.push(galleryLocation(gallery.id)),
+      onTap: selecting
+          ? () => ref.read(selectionProvider.notifier).toggle(gallery.id)
+          : () => context.push(galleryLocation(gallery.id)),
       onLongPress: hold,
       picture: Stack(
         fit: StackFit.expand,
