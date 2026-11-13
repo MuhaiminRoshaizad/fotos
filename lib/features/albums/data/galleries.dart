@@ -48,7 +48,9 @@ class Gallery {
     id: m['id']! as String,
     name: m['name']! as String,
     albumIds: (m['albums'] as List<Object?>? ?? const <Object?>[])
-        .cast<String>(),
+        .cast<String>()
+        .toSet()
+        .toList(),
     order: m['order'] == null
         ? AlbumsOrder.standard
         : AlbumsOrder.decode(m['order']! as String),
@@ -149,7 +151,9 @@ class GalleriesNotifier extends AsyncNotifier<List<Gallery>> {
   Future<void> rekey(Map<String, String> moved) => _save(<Gallery>[
     for (final Gallery g in _now)
       g.copyWith(
-        albumIds: <String>[for (final String id in g.albumIds) moved[id] ?? id],
+        albumIds: <String>{
+          for (final String id in g.albumIds) moved[id] ?? id,
+        }.toList(),
       ),
   ]);
 }

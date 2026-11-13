@@ -176,7 +176,12 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
     if (raw == null) return const AlbumPrefs();
     final Map<String, Object?> m = jsonDecode(raw) as Map<String, Object?>;
     return AlbumPrefs(
-      pinned: (m['pinned'] as List<Object?>? ?? <Object?>[]).cast<String>(),
+      // Once in the list is enough: a rename used to leave an album's old id
+      // behind, and renaming back pinned that id twice (13/11/2026).
+      pinned: (m['pinned'] as List<Object?>? ?? <Object?>[])
+          .cast<String>()
+          .toSet()
+          .toList(),
       covers: (m['covers'] as Map<String, Object?>? ?? <String, Object?>{})
           .cast<String, String>(),
       sorts: <String, AlbumSort>{
@@ -260,18 +265,21 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
   /// albums whose folders were renamed or moved and so have new ids.
   Future<void> rekey(Map<String, String> moved) {
     final AlbumPrefs p = _now;
-    String swap(String id) => moved[id] ?? id;
+    // A new id can already be here, left by an album once at that folder;
+    // the album moving in keeps one pin, and its own cover and sort win.
+    Map<String, V> follow<V>(Map<String, V> m) => <String, V>{
+      for (final MapEntry<String, V> e in m.entries)
+        if (!moved.containsKey(e.key)) e.key: e.value,
+      for (final MapEntry<String, V> e in m.entries)
+        if (moved.containsKey(e.key)) moved[e.key]!: e.value,
+    };
     return _save(
       p.copyWith(
-        pinned: <String>[for (final String id in p.pinned) swap(id)],
-        covers: <String, String>{
-          for (final MapEntry<String, String> e in p.covers.entries)
-            swap(e.key): e.value,
-        },
-        sorts: <String, AlbumSort>{
-          for (final MapEntry<String, AlbumSort> e in p.sorts.entries)
-            swap(e.key): e.value,
-        },
+        pinned: <String>{
+          for (final String id in p.pinned) moved[id] ?? id,
+        }.toList(),
+        covers: follow(p.covers),
+        sorts: follow(p.sorts),
       ),
     );
   }
