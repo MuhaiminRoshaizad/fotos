@@ -33,9 +33,14 @@ class VideoPage extends ConsumerStatefulWidget {
     required this.active,
     required this.chrome,
     required this.onTap,
+    this.onZoomed,
   });
 
   final AssetEntity asset;
+
+  /// Called when the video is pinched in, or back to normal size, so the
+  /// viewer can stop paging while it is zoomed.
+  final ValueChanged<bool>? onZoomed;
 
   /// Only the page on screen plays.
   final bool active;
@@ -252,7 +257,11 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                     if (c == null)
                       Center(child: picture)
                     else
-                      ZoomView(doubleTap: false, child: Center(child: picture)),
+                      ZoomView(
+                        doubleTap: false,
+                        onZoomed: widget.onZoomed,
+                        child: Center(child: picture),
+                      ),
                     if (_streakSide != 0)
                       _SeekBadge(side: _streakSide, count: _streakCount),
                     if (_fast)

@@ -117,6 +117,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     });
   }
 
+  /// A video pinched in: the pages hold still so a finger pans it.
+  bool _videoZoomed = false;
+
   ReadMode get _mode =>
       readModeFor(ref.watch(readModesProvider).value, widget.args.folder);
 
@@ -406,7 +409,10 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                   key: ValueKey<int>(_generation),
                   controller: _pages,
                   itemCount: _items.length,
+                  // A pinched-in video pans instead of turning the page.
+                  canScrollPage: (_) => !_videoZoomed,
                   onPageChanged: (int i) {
+                    _videoZoomed = false;
                     if (_scrubbing) return;
                     setState(() => _index = i);
                     _centreStrip(true);
@@ -424,6 +430,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                           active: i == _index,
                           chrome: _chrome,
                           onTap: () => _setChrome(!_chrome),
+                          onZoomed: (bool z) =>
+                              setState(() => _videoZoomed = z),
                         ),
                       );
                     }

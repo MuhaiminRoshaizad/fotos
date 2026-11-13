@@ -43,9 +43,8 @@ void main() {
     await tester.tapAt(spot);
     await tester.pumpAndSettle();
     final Matrix4 m = tester
-        .widget<InteractiveViewer>(find.byType(InteractiveViewer))
-        .transformationController!
-        .value;
+        .state<ZoomViewState>(find.byType(ZoomView))
+        .transform;
     expect(m.getMaxScaleOnAxis(), closeTo(ZoomView.tapScale, 0.01));
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 2));

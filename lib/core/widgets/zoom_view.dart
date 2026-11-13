@@ -1,11 +1,17 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_tokens.dart';
 
 /// Pinch to zoom [child], and with [doubleTap] a double-tap zooms in at the
-/// spot tapped, or back out. One finger pans only while zoomed in, so at
-/// normal size a swipe still reaches the page around it (to turn pages, or
-/// to swipe down and close).
+/// spot tapped, or back out. At normal size it never takes a single finger,
+/// so a swipe still reaches what is around it: turning pages, scrolling a
+/// strip, or swiping a video down to close. Zoomed in, one finger pans;
+/// [onZoomed] lets a page view stop paging meanwhile.
+///
+/// It is not an InteractiveViewer: that one takes a one-finger drag even
+/// at normal size, and on a video it won the swipe-down that closes the
+/// viewer (found on the phone, 13/11/2026).
 class ZoomView extends StatefulWidget {
   const ZoomView({
     super.key,
@@ -29,10 +35,10 @@ class ZoomView extends StatefulWidget {
   static const double tapScale = 2.6;
 
   @override
-  State<ZoomView> createState() => _ZoomViewState();
+  State<ZoomView> createState() => ZoomViewState();
 }
 
-class _ZoomViewState extends State<ZoomView>
+class ZoomViewState extends State<ZoomView>
     with SingleTickerProviderStateMixin {
   final TransformationController _t = TransformationController();
   late final AnimationController _anim = AnimationController(
@@ -42,6 +48,17 @@ class _ZoomViewState extends State<ZoomView>
   Animation<Matrix4>? _to;
   Offset _tapAt = Offset.zero;
   bool _zoomed = false;
+  Size _size = Size.zero;
+
+  // Where a pinch began.
+  Matrix4 _startMatrix = Matrix4.identity();
+  Offset _startFocal = Offset.zero;
+  double _startScale = 1;
+
+  /// The transform drawn now: identity at normal size.
+  Matrix4 get transform => _t.value;
+
+  double get _scale => _t.value.getMaxScaleOnAxis();
 
   @override
   void initState() {
@@ -53,25 +70,25 @@ class _ZoomViewState extends State<ZoomView>
   }
 
   void _changed() {
-    final bool zoomed = _t.value.getMaxScaleOnAxis() > 1.01;
+    final bool zoomed = _scale > 1.01;
     if (zoomed == _zoomed) return;
     setState(() => _zoomed = zoomed);
     widget.onZoomed?.call(zoomed);
   }
 
-  /// In at the spot tapped, or back out to normal size.
-  void _toggle() {
-    final double s = ZoomView.tapScale;
-    final Matrix4 target = _zoomed
-        ? Matrix4.identity()
-        : (Matrix4.identity()
-            ..translateByDouble(
-              -_tapAt.dx * (s - 1),
-              -_tapAt.dy * (s - 1),
-              0,
-              1,
-            )
-            ..scaleByDouble(s, s, 1, 1));
+  /// [scale] about the top-left, moved by [offset], kept so the child
+  /// always covers the view.
+  Matrix4 _matrix(double scale, Offset offset) {
+    final Offset o = Offset(
+      offset.dx.clamp(_size.width * (1 - scale), 0.0),
+      offset.dy.clamp(_size.height * (1 - scale), 0.0),
+    );
+    return Matrix4.identity()
+      ..translateByDouble(o.dx, o.dy, 0, 1)
+      ..scaleByDouble(scale, scale, 1, 1);
+  }
+
+  void _animateTo(Matrix4 target) {
     if (MediaQuery.disableAnimationsOf(context)) {
       _t.value = target;
       return;
@@ -83,6 +100,33 @@ class _ZoomViewState extends State<ZoomView>
     _anim.forward(from: 0);
   }
 
+  /// In at the spot tapped, or back out to normal size.
+  void _toggle() {
+    const double s = ZoomView.tapScale;
+    _animateTo(_zoomed ? Matrix4.identity() : _matrix(s, -_tapAt * (s - 1)));
+  }
+
+  void _onStart(ScaleStartDetails d) {
+    _anim.stop();
+    _startMatrix = _t.value.clone();
+    _startFocal = d.localFocalPoint;
+    _startScale = _scale;
+  }
+
+  void _onUpdate(ScaleUpdateDetails d) {
+    final double s = (_startScale * d.scale).clamp(1.0, widget.maxScale);
+    // Keep the point of the picture that was under the fingers under them.
+    final Offset p = MatrixUtils.transformPoint(
+      Matrix4.inverted(_startMatrix),
+      _startFocal,
+    );
+    _t.value = _matrix(s, d.localFocalPoint - p * s);
+  }
+
+  void _onEnd(ScaleEndDetails d) {
+    if (_scale < 1.01) _animateTo(Matrix4.identity());
+  }
+
   @override
   void dispose() {
     _t.dispose();
@@ -92,11 +136,32 @@ class _ZoomViewState extends State<ZoomView>
 
   @override
   Widget build(BuildContext context) {
-    final Widget view = InteractiveViewer(
-      transformationController: _t,
-      maxScale: widget.maxScale,
-      panEnabled: _zoomed,
-      child: widget.child,
+    final Widget view = LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints c) {
+        _size = c.biggest;
+        return RawGestureDetector(
+          // The whole view, margins too: a tap beside a narrow page still
+          // reaches whatever turns the page.
+          behavior: HitTestBehavior.opaque,
+          gestures: <Type, GestureRecognizerFactory>{
+            _PinchFirst: GestureRecognizerFactoryWithHandlers<_PinchFirst>(
+              () => _PinchFirst(zoomed: () => _zoomed),
+              (_PinchFirst r) => r
+                ..onStart = _onStart
+                ..onUpdate = _onUpdate
+                ..onEnd = _onEnd,
+            ),
+          },
+          child: ClipRect(
+            child: ValueListenableBuilder<Matrix4>(
+              valueListenable: _t,
+              builder: (BuildContext context, Matrix4 m, Widget? child) =>
+                  Transform(transform: m, child: child),
+              child: widget.child,
+            ),
+          ),
+        );
+      },
     );
     if (!widget.doubleTap) return view;
     return GestureDetector(
@@ -104,5 +169,24 @@ class _ZoomViewState extends State<ZoomView>
       onDoubleTap: _toggle,
       child: view,
     );
+  }
+}
+
+/// A scale gesture that won't take a single finger at normal size, so a
+/// swipe goes to whatever is around it; two fingers, or any once zoomed in,
+/// it takes as usual.
+class _PinchFirst extends ScaleGestureRecognizer {
+  _PinchFirst({required this.zoomed});
+
+  final bool Function() zoomed;
+
+  @override
+  void resolve(GestureDisposition disposition) {
+    if (disposition == GestureDisposition.accepted &&
+        pointerCount < 2 &&
+        !zoomed()) {
+      return;
+    }
+    super.resolve(disposition);
   }
 }

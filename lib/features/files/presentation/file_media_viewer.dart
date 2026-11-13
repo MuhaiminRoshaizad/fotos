@@ -34,6 +34,13 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
   late int _index = widget.index;
   bool _chrome = true;
 
+  /// A picture or video zoomed in: the pages hold still so a finger pans.
+  bool _zoomed = false;
+
+  void _setZoomed(bool z) {
+    if (z != _zoomed) setState(() => _zoomed = z);
+  }
+
   /// Bumped when the pages are rebuilt at a new place.
   int _generation = 0;
 
@@ -168,8 +175,13 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
       body: PageView.builder(
         key: ValueKey<int>(_generation),
         controller: _pages,
+        // Zoomed in, a finger pans the picture instead of turning the page.
+        physics: _zoomed ? const NeverScrollableScrollPhysics() : null,
         itemCount: widget.items.length,
-        onPageChanged: (int i) => setState(() => _index = i),
+        onPageChanged: (int i) => setState(() {
+          _index = i;
+          _zoomed = false;
+        }),
         itemBuilder: (BuildContext context, int i) {
           final FileEntry item = widget.items[i];
           if (item.kind == FileKind.video) {
@@ -177,11 +189,13 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
               key: ValueKey<String>(item.path),
               file: File(item.path),
               active: i == _index,
+              onZoomed: _setZoomed,
             );
           }
           return GestureDetector(
             onTapUp: (TapUpDetails d) => _tapAt(d.globalPosition.dx, mode),
             child: ZoomView(
+              onZoomed: _setZoomed,
               child: Center(
                 child: Image.file(
                   File(item.path),
@@ -226,9 +240,15 @@ final pictureAspectsProvider = FutureProvider.autoDispose
     });
 
 class _FileVideo extends StatefulWidget {
-  const _FileVideo({super.key, required this.file, required this.active});
+  const _FileVideo({
+    super.key,
+    required this.file,
+    required this.active,
+    required this.onZoomed,
+  });
   final File file;
   final bool active;
+  final ValueChanged<bool> onZoomed;
 
   @override
   State<_FileVideo> createState() => _FileVideoState();
@@ -289,6 +309,7 @@ class _FileVideoState extends State<_FileVideo> {
           // Pinch zooms; a tap still plays and pauses.
           ZoomView(
             doubleTap: false,
+            onZoomed: widget.onZoomed,
             child: Center(
               child: AspectRatio(
                 aspectRatio: v.aspectRatio,
