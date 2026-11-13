@@ -13,6 +13,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../viewer/presentation/strip_viewer.dart';
 import '../domain/file_entry.dart';
 import 'files_providers.dart';
+import '../../../core/widgets/zoom_view.dart';
 
 /// Photos and videos opened from the Files tab, paged through in folder
 /// order. Pinch to zoom photos; tap a video to play or pause it. Read as in
@@ -180,8 +181,7 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
           }
           return GestureDetector(
             onTapUp: (TapUpDetails d) => _tapAt(d.globalPosition.dx, mode),
-            child: InteractiveViewer(
-              maxScale: 5,
+            child: ZoomView(
               child: Center(
                 child: Image.file(
                   File(item.path),
