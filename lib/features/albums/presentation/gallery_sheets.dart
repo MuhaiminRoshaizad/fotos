@@ -206,23 +206,35 @@ Future<void> addAlbumsTo(
 }
 
 /// From an album's menu: puts [album] in a gallery, or a new one.
-Future<void> addAlbumToGallery(
+Future<bool> addAlbumToGallery(
   BuildContext context,
   WidgetRef ref,
   Album album,
+) => addAlbumsToGallery(context, ref, <Album>[album]);
+
+/// Puts [albums] in a gallery the user picks, or a new one, taking them out
+/// of any gallery they were in. Returns whether they were added.
+Future<bool> addAlbumsToGallery(
+  BuildContext context,
+  WidgetRef ref,
+  List<Album> albums,
 ) async {
   final List<Gallery> galleries = await ref.read(galleriesProvider.future);
-  if (!context.mounted) return;
+  if (!context.mounted || albums.isEmpty) return false;
+  final String what = albums.length == 1
+      ? albums.single.name
+      : Fmt.count(albums.length, 'album');
   final String? choice = await showActionSheet<String>(
     context,
-    title: 'Add ${album.name} to',
+    title: 'Add $what to',
     choices: <SheetChoice<String>>[
       for (final Gallery g in galleries) SheetChoice<String>(g.id, g.name),
       const SheetChoice<String>('', 'New gallery'),
     ],
   );
-  if (choice == null || !context.mounted) return;
+  if (choice == null || !context.mounted) return false;
   final GalleriesNotifier notifier = ref.read(galleriesProvider.notifier);
+  final List<String> ids = <String>[for (final Album a in albums) a.id];
   String name;
   if (choice.isEmpty) {
     final String? n = await promptName(
@@ -235,14 +247,15 @@ Future<void> addAlbumToGallery(
         for (final Gallery g in galleries) g.name,
       ]),
     );
-    if (n == null) return;
-    await notifier.create(n, <String>[album.id]);
+    if (n == null) return false;
+    await notifier.create(n, ids);
     name = n;
   } else {
-    await notifier.add(choice, <String>[album.id]);
+    await notifier.add(choice, ids);
     name = galleries.firstWhere((Gallery g) => g.id == choice).name;
   }
-  if (context.mounted) showToast(context, 'Added ${album.name} to $name');
+  if (context.mounted) showToast(context, 'Added $what to $name');
+  return true;
 }
 
 /// Chooses albums from [albums]. Returns their ids in the order shown, or

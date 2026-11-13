@@ -223,6 +223,25 @@ class AlbumPrefsNotifier extends AsyncNotifier<AlbumPrefs> {
     return _save(p.copyWith(pinned: pinned));
   }
 
+  /// Pins [ids] to the top, or unpins them, in one change.
+  Future<void> setPinned(List<String> ids, {required bool pinned}) {
+    final AlbumPrefs p = _now;
+    return _save(
+      p.copyWith(
+        pinned: pinned
+            ? <String>[
+                for (final String id in ids)
+                  if (!p.pinned.contains(id)) id,
+                ...p.pinned,
+              ]
+            : <String>[
+                for (final String id in p.pinned)
+                  if (!ids.contains(id)) id,
+              ],
+      ),
+    );
+  }
+
   Future<void> setCover(String albumId, String assetId) {
     final AlbumPrefs p = _now;
     return _save(
