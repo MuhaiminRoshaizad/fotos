@@ -9,6 +9,7 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
+import '../../../core/media/add_to_album.dart';
 import '../../../core/media/animated.dart';
 import '../../../core/media/media_actions.dart';
 import '../../../core/media/media_flight.dart';
@@ -502,6 +503,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                               context,
                               <AssetEntity>[e],
                             ),
+                            onAddToAlbum: () =>
+                                addToAlbum(context, ref, <AssetEntity>[e]),
                             onFavourite: _toggleFavourite,
                             onDetails: _details,
                             onDelete: _delete,
@@ -681,6 +684,7 @@ class _Actions extends StatelessWidget {
   const _Actions({
     required this.favourite,
     required this.onShare,
+    required this.onAddToAlbum,
     required this.onFavourite,
     required this.onDetails,
     required this.onDelete,
@@ -688,6 +692,7 @@ class _Actions extends StatelessWidget {
 
   final bool favourite;
   final VoidCallback onShare;
+  final VoidCallback onAddToAlbum;
   final VoidCallback onFavourite;
   final VoidCallback onDetails;
   final VoidCallback onDelete;
@@ -716,6 +721,11 @@ class _Actions extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: <Widget>[
               action(CupertinoIcons.square_arrow_up, 'Share', onShare),
+              action(
+                CupertinoIcons.plus_rectangle_on_rectangle,
+                'Add to album',
+                onAddToAlbum,
+              ),
               // The heart fills in place and swells once as it does.
               Pressable(
                 label: favourite ? 'Remove from Favourites' : 'Favourite',
