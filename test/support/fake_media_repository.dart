@@ -80,8 +80,19 @@ class FakeMediaRepository implements MediaRepository {
       items.map((AssetEntity e) => e.id).toList();
 
   @override
-  Future<bool> moveTo(List<AssetEntity> items, String relativePath) async =>
-      true;
+  Future<bool> moveTo(List<AssetEntity> items, String relativePath) async {
+    moves.add(relativePath);
+    return true;
+  }
+
+  /// Where each [moveTo] sent its items.
+  final List<String> moves = <String>[];
+
+  /// Each album's folder, by album id.
+  Map<String, String> folders = <String, String>{};
+
+  @override
+  Future<String?> folderOf(Album album) async => folders[album.id];
 
   @override
   Future<int> copyTo(List<AssetEntity> items, String relativePath) async =>

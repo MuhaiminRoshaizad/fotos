@@ -172,13 +172,24 @@ Future<Album?> renameAlbum(
   );
   if (name == null || name == album.name || !context.mounted) return null;
 
-  final String? from = await album.path.relativePathAsync;
+  final MediaRepository repo = ref.read(mediaRepositoryProvider);
+  final String? from = await repo.folderOf(album);
   if (from == null || !context.mounted) return null;
   if (name.toLowerCase() == album.name.toLowerCase()) {
     return _renameCaseOnly(context, ref, album, from, name);
   }
+  // Opened from its tile on the Albums tab, the album's new id takes that
+  // tile away mid-rename, and its ref and context with it. The steps after
+  // the move use these instead, or the pin is lost and nothing is said.
+  final ProviderContainer providers = ProviderScope.containerOf(
+    context,
+    listen: false,
+  );
+  final OverlayState overlay = Overlay.of(context, rootOverlay: true);
+  void say(String message, {bool failed = false}) =>
+      showToast(context, message, failed: failed, overlay: overlay);
+
   final String target = renamedFolder(from, name);
-  final MediaRepository repo = ref.read(mediaRepositoryProvider);
   final List<AssetEntity> items = await repo.albumItems(album);
   if (!context.mounted) return null;
   // Android moves the whole set in one request, so the bar runs until it
@@ -193,18 +204,16 @@ Future<Album?> renameAlbum(
       if (!await repo.moveTo(all, target)) throw Exception('not moved');
     },
   );
-  ref.invalidate(libraryProvider);
-  ref.invalidate(albumsProvider);
+  providers.invalidate(libraryProvider);
+  providers.invalidate(albumsProvider);
   if (failed > 0) {
-    if (context.mounted) {
-      showToast(context, 'Couldn\'t rename ${album.name}.', failed: true);
-    }
+    say("Couldn't rename ${album.name}.", failed: true);
     return null;
   }
-  final List<Album> after = await ref.read(albumsProvider.future);
+  final List<Album> after = await providers.read(albumsProvider.future);
   Album? renamed;
   for (final Album a in after) {
-    if (a.name == name && await a.path.relativePathAsync == target) {
+    if (a.name == name && await repo.folderOf(a) == target) {
       renamed = a;
       break;
     }
@@ -212,19 +221,19 @@ Future<Album?> renameAlbum(
   if (renamed == null) {
     // Nothing reached a folder of the new name; say so rather than claim
     // a rename that didn't happen.
-    if (context.mounted) {
-      showToast(context, 'Couldn\'t rename ${album.name}.', failed: true);
-    }
+    say("Couldn't rename ${album.name}.", failed: true);
     return null;
   }
-  await ref.read(albumPrefsProvider.notifier).rekey(album.id, renamed.id);
-  await ref
+  await providers.read(albumPrefsProvider.notifier).rekey(album.id, renamed.id);
+  await providers
       .read(readModesProvider.notifier)
       .follow(readingKey(from), readingKey(target));
-  await ref.read(galleriesProvider.notifier).rekey(album.id, renamed.id);
+  await providers.read(galleriesProvider.notifier).rekey(album.id, renamed.id);
   // Home screen widgets set to this album follow it too.
-  await ref.read(nativeChannelProvider).rekeyWidgetAlbum(album.id, renamed.id);
-  if (context.mounted) showToast(context, 'Renamed to $name');
+  await providers
+      .read(nativeChannelProvider)
+      .rekeyWidgetAlbum(album.id, renamed.id);
+  say('Renamed to $name');
   return renamed;
 }
 

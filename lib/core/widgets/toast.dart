@@ -21,6 +21,9 @@ OverlayEntry? _showing;
 /// message that stops applying when it goes. [onHidden] is called once,
 /// the moment it stops showing for any reason: its time ran out, it was
 /// flicked away, or another toast replaced it.
+///
+/// [overlay], taken from [context] earlier, is for a caller whose widget may
+/// be gone by the time it reports; [context] is then not used.
 void showToast(
   BuildContext context,
   String message, {
@@ -32,8 +35,9 @@ void showToast(
   Duration? duration,
   bool countdown = false,
   VoidCallback? onHidden,
+  OverlayState? overlay,
 }) {
-  final OverlayState overlay = Overlay.of(context, rootOverlay: true);
+  final OverlayState into = overlay ?? Overlay.of(context, rootOverlay: true);
   _dismiss(_showing);
   late final OverlayEntry entry;
   entry = OverlayEntry(
@@ -51,7 +55,7 @@ void showToast(
     ),
   );
   _showing = entry;
-  overlay.insert(entry);
+  into.insert(entry);
 }
 
 /// Takes down the toast showing, if any, at once.

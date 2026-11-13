@@ -58,5 +58,8 @@ abstract interface class MediaRepository {
   Future<List<String>> moveToTrash(List<AssetEntity> items);
   Future<List<String>> restoreFromTrash(List<AssetEntity> items);
   Future<bool> moveTo(List<AssetEntity> items, String relativePath);
+
+  /// [album]'s folder inside shared storage, such as "Pictures/Trip/".
+  Future<String?> folderOf(Album album);
   Future<int> copyTo(List<AssetEntity> items, String relativePath);
 }

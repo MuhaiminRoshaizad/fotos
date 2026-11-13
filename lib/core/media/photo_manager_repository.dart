@@ -166,6 +166,9 @@ class PhotoManagerRepository implements MediaRepository {
       PhotoManager.editor.android.restoreFromTrash(items);
 
   @override
+  Future<String?> folderOf(Album album) => album.path.relativePathAsync;
+
+  @override
   Future<bool> moveTo(List<AssetEntity> items, String relativePath) =>
       PhotoManager.editor.android.moveAssetsToPath(
         entities: items,
