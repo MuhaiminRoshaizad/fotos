@@ -10,8 +10,9 @@ import '../../../core/media/animated.dart';
 import '../../../core/media/read_mode.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
-import 'viewer_glass.dart';
 import '../../../core/widgets/scroll_handle.dart';
+import '../../../core/widgets/zoom_view.dart';
+import 'viewer_glass.dart';
 
 /// One page of a strip: its shape, and its picture decoded [width] pixels
 /// across.
@@ -91,6 +92,7 @@ class StripViewer extends StatefulWidget {
 class _StripViewerState extends State<StripViewer> {
   ScrollController? _scroll;
   bool _chrome = true;
+  bool _zoomed = false;
   late int _page = widget.index;
 
   /// Where each page starts, at the current width, plus the strip's end.
@@ -159,29 +161,37 @@ class _StripViewerState extends State<StripViewer> {
           _scroll ??= ScrollController(initialScrollOffset: _tops[widget.index])
             ..addListener(_track);
           // Decoded at the screen's width, no larger: a long strip holds
-          // many pages in memory at once.
-          final int px = math.min((c.maxWidth * dpr).round(), 1440);
+          // many pages in memory at once. Zoomed in, the pages on screen are
+          // decoded at twice that so they stay sharp.
+          final int px = _zoomed
+              ? math.min((c.maxWidth * dpr * 2).round(), 2880)
+              : math.min((c.maxWidth * dpr).round(), 1440);
           return Stack(
             children: <Widget>[
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _toggle,
-                child: ListView.builder(
-                  controller: _scroll,
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.paddingOf(context).bottom,
-                  ),
-                  itemCount: widget.pages.length,
-                  itemExtentBuilder: (int i, _) => _tops[i + 1] - _tops[i],
-                  itemBuilder: (BuildContext context, int i) => Semantics(
-                    image: true,
-                    label: 'Page ${i + 1} of ${widget.pages.length}',
-                    child: ColoredBox(
-                      color: const Color(0xFF151517),
-                      child: Image(
-                        image: widget.pages[i].image(px),
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
+                // Pinch or double-tap to zoom into a panel; one finger
+                // still scrolls the strip.
+                child: ZoomView(
+                  onZoomed: (bool z) => setState(() => _zoomed = z),
+                  child: ListView.builder(
+                    controller: _scroll,
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.paddingOf(context).bottom,
+                    ),
+                    itemCount: widget.pages.length,
+                    itemExtentBuilder: (int i, _) => _tops[i + 1] - _tops[i],
+                    itemBuilder: (BuildContext context, int i) => Semantics(
+                      image: true,
+                      label: 'Page ${i + 1} of ${widget.pages.length}',
+                      child: ColoredBox(
+                        color: const Color(0xFF151517),
+                        child: Image(
+                          image: widget.pages[i].image(px),
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        ),
                       ),
                     ),
                   ),
