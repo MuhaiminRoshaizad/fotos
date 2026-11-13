@@ -1,4 +1,3 @@
-import 'motion_name.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -6,7 +5,9 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../format/formatters.dart';
 import '../theme/app_tokens.dart';
+import '../widgets/select_check.dart';
 import 'media_flight.dart';
+import 'motion_name.dart';
 
 /// Thumbnail sizes are bucketed so the same decode serves every grid level.
 int thumbnailPixels(double logicalWidth, double devicePixelRatio) {
@@ -154,7 +155,7 @@ class MediaTile extends StatelessWidget {
                   Positioned(
                     left: 6,
                     top: 6,
-                    child: _Check(selected: selected),
+                    child: SelectCheck(selected: selected),
                   ),
               ],
             ),
@@ -180,30 +181,4 @@ class _Badge extends StatelessWidget {
       child: child,
     ),
   );
-}
-
-class _Check extends StatelessWidget {
-  const _Check({required this.selected});
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    return AnimatedContainer(
-      duration: AppMotion.short,
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: selected ? cs.primary : Colors.black.withValues(alpha: 0.18),
-        border: Border.all(
-          color: selected ? cs.surface : Colors.white,
-          width: 2,
-        ),
-      ),
-      child: selected
-          ? Icon(CupertinoIcons.checkmark, size: 14, color: cs.onPrimary)
-          : null,
-    );
-  }
 }
