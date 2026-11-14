@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
@@ -14,9 +13,9 @@ import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/zoom_view.dart';
-import '../../albums/presentation/albums_providers.dart'
-    show nativeChannelProvider;
 import '../data/viewer_settings.dart';
+import '../../../core/video/strip_tiles.dart';
+import '../../../core/video/video_frames.dart';
 import '../../../core/video/video_session.dart';
 import 'viewer_glass.dart';
 import 'viewer_metrics.dart';
@@ -327,7 +326,6 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                     opacity: widget.chrome ? 1 : 0,
                     duration: AppMotion.short,
                     child: _Controls(
-                      asset: widget.asset,
                       path: _file!.path,
                       controller: c,
                       position: _session.position,
@@ -443,7 +441,6 @@ class _Pill extends StatelessWidget {
 /// Play/pause, time, loop and mute, and the filmstrip scrubber.
 class _Controls extends ConsumerWidget {
   const _Controls({
-    required this.asset,
     required this.path,
     required this.controller,
     required this.position,
@@ -454,7 +451,6 @@ class _Controls extends ConsumerWidget {
     required this.onScrubEnd,
   });
 
-  final AssetEntity asset;
   final String path;
   final VideoPlayerController controller;
 
@@ -553,7 +549,6 @@ class _Controls extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           _Filmstrip(
-            asset: asset,
             path: path,
             controller: controller,
             position: position,
@@ -568,18 +563,12 @@ class _Controls extends ConsumerWidget {
   }
 }
 
-/// The filmstrip's frames for a video file, kept for the session so a
-/// video opened again shows its strip at once.
-final _filmstripFramesProvider =
-    FutureProvider.family<List<Uint8List?>, (String, int)>(
-      (Ref ref, (String, int) key) =>
-          ref.watch(nativeChannelProvider).videoFrames(key.$1, key.$2, 192),
-    );
-
 /// Eight frames across the video; drag anywhere on it to move the playhead.
+/// Each slot shows a picture from its own eighth, from its start where it
+/// can, so the first slot is the opening frame; each fades in as soon as it
+/// is read, those nearest the playhead first.
 class _Filmstrip extends ConsumerWidget {
   const _Filmstrip({
-    required this.asset,
     required this.path,
     required this.controller,
     required this.position,
@@ -589,9 +578,8 @@ class _Filmstrip extends ConsumerWidget {
     required this.onEnd,
   });
 
-  static const int _frames = 8;
+  static const int _slots = 8;
 
-  final AssetEntity asset;
   final String path;
   final VideoPlayerController controller;
   final Duration position;
@@ -602,21 +590,16 @@ class _Filmstrip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final List<Uint8List?>? frames = ref
-        .watch(_filmstripFramesProvider((path, _frames)))
-        .value;
-    final Widget cover = Image(
-      key: const ValueKey<String>('cover'),
-      image: AssetEntityImageProvider(
-        asset,
-        isOriginal: false,
-        thumbnailSize: const ThumbnailSize.square(128),
-      ),
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-    );
+    final VideoFrames frames = ref.watch(videoFramesProvider(path));
     final Duration total = controller.value.duration;
+    final int length = total.inMilliseconds;
+    final List<Stretch> slots = <Stretch>[
+      for (int i = 0; i < _slots; i++)
+        (from: length * i ~/ _slots, until: length * (i + 1) ~/ _slots),
+    ];
+    if (length > 0) {
+      frames.want(slots, focus: position.inMilliseconds);
+    }
     final double f = total.inMilliseconds == 0
         ? 0
         : (position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
@@ -648,29 +631,31 @@ class _Filmstrip extends ConsumerWidget {
                 children: <Widget>[
                   ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadii.sm),
-                    child: Row(
-                      children: <Widget>[
-                        for (int i = 0; i < _frames; i++)
-                          Expanded(
-                            child: SizedBox.expand(
-                              // The cover holds each slot until the frames
-                              // arrive, then the frame fades in over it.
-                              child: AnimatedSwitcher(
-                                duration: AppMotion.short,
-                                child: frames?.elementAtOrNull(i) == null
-                                    ? cover
-                                    : Image.memory(
-                                        frames![i]!,
-                                        key: ValueKey<int>(i),
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                        gaplessPlayback: true,
-                                      ),
-                              ),
-                            ),
+                    child: ListenableBuilder(
+                      listenable: frames,
+                      builder: (BuildContext context, _) => Stack(
+                        fit: StackFit.expand,
+                        children: <Widget>[
+                          StripLoading(
+                            loading:
+                                length <= 0 ||
+                                slots.any(
+                                  (Stretch s) =>
+                                      frames.loading(s.from, s.until),
+                                ),
                           ),
-                      ],
+                          Row(
+                            children: <Widget>[
+                              for (final Stretch s in slots)
+                                Expanded(
+                                  child: FrameTile(
+                                    frame: frames.frameIn(s.from, s.until),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   AnimatedPositioned(

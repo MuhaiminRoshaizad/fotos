@@ -198,13 +198,6 @@ class NativeChannel(
                 frameReaders.remove(call.argument<Int>("id")!!)?.close()
                 result.success(null)
             }
-            "videoFrames" -> background(result) {
-                FilesNative.videoFrames(
-                    call.argument<String>("path")!!,
-                    call.argument<Int>("count")!!,
-                    call.argument<Int>("px")!!,
-                )
-            }
             "videoFramesAt" -> background(result, thumbs) {
                 FilesNative.videoFramesAt(
                     call.argument<String>("path")!!,

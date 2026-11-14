@@ -328,48 +328,6 @@ object FilesNative {
     }
 
     /**
-     * [count] frames spread evenly through the video at [path], each a JPEG
-     * about [px] across, or null where one can't be read. Each is the
-     * keyframe nearest its slot. Four readers share the slots, as Glide's
-     * four decode threads did: reading them one after another took over
-     * three seconds on a 500 MB 1080p file.
-     */
-    fun videoFrames(path: String, count: Int, px: Int): List<ByteArray?> {
-        val frames = arrayOfNulls<ByteArray>(count)
-        val readers = minOf(4, count)
-        val pool = Executors.newFixedThreadPool(readers)
-        try {
-            (0 until readers).map { r ->
-                pool.submit {
-                    val retriever = MediaMetadataRetriever()
-                    try {
-                        retriever.setDataSource(path)
-                        val ms = retriever.extractMetadata(
-                            MediaMetadataRetriever.METADATA_KEY_DURATION,
-                        )?.toLongOrNull() ?: 0L
-                        for (i in r until count step readers) {
-                            val us = (ms * 1000.0 * (i + 0.5) / count).toLong()
-                            frames[i] = try {
-                                frameAt(retriever, us, px)
-                            } catch (_: Exception) {
-                                null
-                            }
-                        }
-                    } catch (_: Exception) {
-                        // This reader's slots stay empty; the strip shows the
-                        // cover there.
-                    } finally {
-                        retriever.release()
-                    }
-                }
-            }.forEach { it.get() }
-        } finally {
-            pool.shutdown()
-        }
-        return frames.toList()
-    }
-
-    /**
      * Frames of the video at [path] at each of [times] (ms), as JPEGs about
      * [px] across, null where one can't be read: the editor's timeline asks
      * for the stretch on screen at its current zoom. The nearest keyframe
