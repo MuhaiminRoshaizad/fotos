@@ -13,5 +13,8 @@ void main() {
     expect(parseClock('1::2'), isNull);
     expect(parseClock('abc'), isNull);
     expect(parseClock(''), isNull);
+    // Too long to be a time, and too long for int.parse: refused, not thrown.
+    expect(parseClock('99999999999999999999999'), isNull);
+    expect(parseClock('1:30.12345'), isNull);
   });
 }

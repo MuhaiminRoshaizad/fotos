@@ -24,7 +24,11 @@ String clock(int ms) {
 /// up to 59.
 int? parseClock(String text) {
   final String t = text.trim();
-  if (!RegExp(r'^\d+(:\d{1,2}){0,2}(\.\d+)?$').hasMatch(t)) return null;
+  // At most six digits up front and three after the point: enough for any
+  // video, and short of what int.parse can't read.
+  if (!RegExp(r'^\d{1,6}(:\d{1,2}){0,2}(\.\d{1,3})?$').hasMatch(t)) {
+    return null;
+  }
   final List<String> dot = t.split('.');
   final List<int> parts = dot.first.split(':').map(int.parse).toList();
   for (int i = 1; i < parts.length; i++) {
