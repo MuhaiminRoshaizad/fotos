@@ -66,7 +66,13 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
     }
     final VideoPlayerController? c = _session.controller;
     if (!mounted || c == null) return;
-    setState(() => _plan = CutPlan.whole(c.value.duration.inMilliseconds));
+    final int length = c.value.duration.inMilliseconds;
+    // A file that reports no length has nothing to place a cut on.
+    if (length <= 0) {
+      setState(() => _failed = true);
+      return;
+    }
+    setState(() => _plan = CutPlan.whole(length));
   }
 
   Future<VideoPlayerController> _newController() async {
@@ -134,7 +140,9 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
 
   void _dragEnd() {
     _dragging = false;
-    if (!_wasPlaying) {
+    final bool resume = _wasPlaying;
+    _wasPlaying = false;
+    if (!resume) {
       setState(() {});
       return;
     }

@@ -226,9 +226,16 @@ class CutTimelineState extends State<CutTimeline>
     return best;
   }
 
+  // True between a drag's start and its end. Flutter's drag recognizer
+  // also reports a cancel on every plain tap and on a pinch, with no start
+  // before it; those are not drags, and must not end one.
+  bool _dragActive = false;
+
   void _dragStart(DragStartDetails d) {
     final double x = d.localPosition.dx;
     final Handle? h = _handleAt(x);
+    _dragActive = true;
+    _fingerX = x;
     _settleSeek();
     widget.onDragStart();
     if (h == null) {
@@ -245,7 +252,10 @@ class CutTimelineState extends State<CutTimeline>
   }
 
   void _dragUpdate(DragUpdateDetails d) {
-    final double x = d.localPosition.dx;
+    // Where the finger is, by adding up its movement: a second finger
+    // landing mid-drag becomes the one tracked, and its own place would
+    // make the handle or strip jump to it.
+    final double x = _fingerX += d.delta.dx;
     final Handle? h = _handle;
     if (h == null) {
       // The strip moves with the finger: drag right to go back in time.
@@ -254,7 +264,6 @@ class CutTimelineState extends State<CutTimeline>
       widget.onScrub(view.centre.round());
       return;
     }
-    _fingerX = x;
     _moveHandle(h, view.msAt(x + _grab, _width));
     _scrollAtEdge();
   }
@@ -269,6 +278,8 @@ class CutTimelineState extends State<CutTimeline>
   }
 
   void _dragEnd() {
+    if (!_dragActive) return;
+    _dragActive = false;
     _edgeScroll?.cancel();
     _edgeScroll = null;
     final bool wasHandle = _handle != null;

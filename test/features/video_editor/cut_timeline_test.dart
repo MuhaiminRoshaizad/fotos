@@ -21,6 +21,7 @@ class _HarnessState extends State<_Harness> {
   late CutPlan plan = widget.start;
   int position = 0;
   Handle? selected;
+  int dragEnds = 0;
   final TimelineFrames frames = TimelineFrames(
     (List<int> times) async => <Uint8List?>[for (final int _ in times) null],
   );
@@ -48,7 +49,7 @@ class _HarnessState extends State<_Harness> {
           }),
           onScrub: (int ms) => setState(() => position = ms),
           onDragStart: () {},
-          onDragEnd: () {},
+          onDragEnd: () => dragEnds++,
           onSelect: (Handle? h) => setState(() => selected = h),
           onSelectCut: (_) {},
         ),
@@ -235,6 +236,43 @@ void main() {
     await g.up();
     await tester.pumpAndSettle();
     expect(haptics, <Object?>['HapticFeedbackType.selectionClick']);
+  });
+
+  testWidgets('a plain tap is not the end of a drag', (
+    WidgetTester tester,
+  ) async {
+    // The editor resumes playback when a drag ends; a tap must not.
+    final _HarnessState s = await open(tester, CutPlan.whole(100000));
+    await tester.tapAt(at(tester, 300));
+    await tester.pumpAndSettle();
+    expect(s.dragEnds, 0);
+    await tester.dragFrom(at(tester, 300), const Offset(-60, 0));
+    await tester.pumpAndSettle();
+    expect(s.dragEnds, 1);
+  });
+
+  testWidgets('a second finger landing mid-drag does not throw the handle', (
+    WidgetTester tester,
+  ) async {
+    final _HarnessState s = await open(tester, CutPlan.whole(100000));
+    final TestGesture g = await tester.startGesture(at(tester, middle));
+    for (int i = 0; i < 3; i++) {
+      await g.moveBy(const Offset(10, 0));
+      await tester.pump();
+    }
+    final int before = s.plan.start;
+    // A thumb lands far off to the right and moves a little.
+    final TestGesture stray = await tester.startGesture(
+      at(tester, 380),
+      pointer: 91,
+    );
+    await stray.moveBy(const Offset(4, 0));
+    await tester.pump();
+    // 4 points' worth, not a jump of 150 points to the thumb.
+    expect(s.plan.start, closeTo(before + 4 * outMs, 2 * outMs));
+    await stray.up();
+    await g.up();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('a handle dragged past its neighbour stops beside it', (
