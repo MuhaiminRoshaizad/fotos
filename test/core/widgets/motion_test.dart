@@ -33,6 +33,33 @@ void main() {
     expect(find.bySemanticsLabel('Loop off'), findsOneWidget);
   });
 
+  testWidgets('a Pressable switched off fades to dim rather than jumping', (
+    WidgetTester tester,
+  ) async {
+    Widget button({required bool on}) => _host(
+      Pressable(
+        label: 'Save',
+        onTap: on ? () {} : null,
+        child: const Text('Save'),
+      ),
+    );
+    double opacity() => tester
+        .widget<Opacity>(
+          find.descendant(
+            of: find.byType(Pressable),
+            matching: find.byType(Opacity),
+          ),
+        )
+        .opacity;
+    await tester.pumpWidget(button(on: true));
+    expect(opacity(), 1);
+    await tester.pumpWidget(button(on: false));
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(opacity(), allOf(lessThan(1), greaterThan(0.35)));
+    await tester.pumpAndSettle();
+    expect(opacity(), closeTo(0.35, 0.001));
+  });
+
   testWidgets('a disabled Pressable does nothing', (WidgetTester tester) async {
     await tester.pumpWidget(
       _host(

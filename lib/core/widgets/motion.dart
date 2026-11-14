@@ -91,15 +91,33 @@ class _PressableState extends State<Pressable>
               child: Center(
                 widthFactor: 1,
                 heightFactor: 1,
-                child: AnimatedBuilder(
-                  animation: _press,
-                  builder: (BuildContext context, Widget? child) {
-                    final double v = _press.value;
-                    return Opacity(
-                      opacity: enabled ? (1 - 0.3 * v).clamp(0.0, 1.0) : 0.35,
-                      child: Transform.scale(scale: 1 - 0.14 * v, child: child),
-                    );
-                  },
+                // Turning on or off fades between bright and dim rather
+                // than jumping.
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: enabled ? 1 : 0.35),
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : AppMotion.short,
+                  curve: Curves.easeOut,
+                  builder:
+                      (BuildContext context, double bright, Widget? child) =>
+                          AnimatedBuilder(
+                            animation: _press,
+                            builder: (BuildContext context, Widget? child) {
+                              final double v = _press.value;
+                              return Opacity(
+                                opacity: (bright * (1 - 0.3 * v)).clamp(
+                                  0.0,
+                                  1.0,
+                                ),
+                                child: Transform.scale(
+                                  scale: 1 - 0.14 * v,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: child,
+                          ),
                   child: widget.child,
                 ),
               ),
