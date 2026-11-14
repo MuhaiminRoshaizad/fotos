@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 
 import '../../../core/platform/native_channel.dart';
@@ -40,9 +43,13 @@ class VideoCutter {
 
   final NativeChannel _native;
 
-  /// Percent done while a save runs.
-  Stream<int> get progress =>
-      _native.events('cutProgress').map((Object? p) => p! as int);
+  /// Percent done while [plan] saves, by time to encode.
+  Stream<int> progressOf(CutPlan plan) {
+    final List<int> lengths = <int>[for (final Span s in plan.kept) s.length];
+    return _native
+        .events('cutProgress')
+        .map((Object? p) => byLength(p! as int, lengths));
+  }
 
   /// Encodes the parts of video [id] that [plan] keeps and saves them
   /// beside the original, as a copy or, with [replace], in its place.
@@ -80,4 +87,28 @@ class VideoCutter {
 
   /// Stops a save that is still encoding. Once saving has begun it finishes.
   Future<void> cancel() => _native.invoke<void>('cutCancel');
+}
+
+/// Media3's [progress] for a save of parts [lengths] long, as a share of
+/// the whole time to encode.
+///
+/// Media3 gives every part an equal share of the progress however long it
+/// is (SequenceAssetLoader.getProgress in 1.9.2: the parts finished, times
+/// 100 over their count, plus the current part's percent over the count).
+/// A cut that leaves half a second before it made a save jump to 50% at
+/// once and then crawl through the remaining 54 minutes.
+@visibleForTesting
+int byLength(int progress, List<int> lengths) {
+  final int n = lengths.length;
+  if (n <= 1 || progress >= 100) return progress;
+  final int total = lengths.fold(0, (int sum, int l) => sum + l);
+  if (total <= 0) return progress;
+  final int index = math.min(n - 1, progress * n ~/ 100);
+  final int within = ((progress - index * 100 ~/ n) * n).clamp(0, 100);
+  int done = 0;
+  for (int i = 0; i < index; i++) {
+    done += lengths[i];
+  }
+  final double share = (done + lengths[index] * within / 100) / total;
+  return (share * 100).floor().clamp(0, 99);
 }

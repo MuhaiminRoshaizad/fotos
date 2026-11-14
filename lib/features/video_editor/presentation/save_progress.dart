@@ -22,9 +22,9 @@ Future<SavedEdit?> saveWithProgress(
   required bool replace,
 }) async {
   final ValueNotifier<int> percent = ValueNotifier<int>(0);
-  final StreamSubscription<int> sub = cutter.progress.listen(
-    (int p) => percent.value = p,
-  );
+  final StreamSubscription<int> sub = cutter
+      .progressOf(plan)
+      .listen((int p) => percent.value = p);
   final NavigatorState navigator = Navigator.of(context, rootNavigator: true);
   unawaited(
     showCupertinoDialog<void>(

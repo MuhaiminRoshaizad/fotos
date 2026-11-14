@@ -73,4 +73,37 @@ void main() {
       );
     }
   });
+
+  group('progress by length', () {
+    // Half a second kept before a cut, then 54 minutes.
+    const List<int> parts = <int>[500, 3240000];
+
+    test('a tiny first part no longer counts as half the save', () {
+      // Media3 reports 50% once the half second is done.
+      expect(byLength(50, parts), 0);
+      // and 75% half way through the long part.
+      expect(byLength(75, parts), 50);
+      expect(byLength(99, parts), 98);
+    });
+
+    test('parts of equal length read as Media3 reports them', () {
+      expect(byLength(25, <int>[1000, 1000]), 25);
+      expect(byLength(60, <int>[1000, 1000]), 60);
+    });
+
+    test('one part, and the finish, pass straight through', () {
+      expect(byLength(37, <int>[5000]), 37);
+      expect(byLength(100, parts), 100);
+    });
+
+    test('never runs backwards as Media3 counts up', () {
+      const List<int> three = <int>[60000, 2000, 900000];
+      int last = 0;
+      for (int p = 0; p < 100; p++) {
+        final int now = byLength(p, three);
+        expect(now, greaterThanOrEqualTo(last), reason: 'at $p%');
+        last = now;
+      }
+    });
+  });
 }
