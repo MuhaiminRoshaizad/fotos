@@ -240,10 +240,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
     // A third of what the strip shows, so both of its edges are in view
     // at any zoom: seconds on a zoomed-in hour, not six minutes.
     final int? span = _timeline.currentState?.visibleSpan;
-    final (CutPlan, int)? added = plan.addCut(
-      _position,
-      width: span == null ? null : span ~/ 3,
-    );
+    final (CutPlan, int)? added = plan.addCut(_position, visible: span);
     if (added == null) {
       return;
     }

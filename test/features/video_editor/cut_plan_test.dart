@@ -73,9 +73,18 @@ void main() {
     expect(p.cuts.single.start, 20000 + min);
   });
 
-  test('a cut can be made as wide as the strip shows, around the playhead', () {
-    final (CutPlan p, _) = CutPlan.whole(3600000).addCut(30000, width: 3000)!;
-    expect(p.cuts.single, const Span(28500, 31500));
+  test('a new cut fits the stretch in view: a third of it, at most a tenth '
+      'of the video', () {
+    // Zoomed in on an hour, 9 s in view: 3 s, around the playhead.
+    final (CutPlan zoomedIn, _) = CutPlan.whole(
+      3600000,
+    ).addCut(30000, visible: 9000)!;
+    expect(zoomedIn.cuts.single, const Span(28500, 31500));
+    // Zoomed out on a minute, more than the minute in view: 6 s.
+    final (CutPlan short, _) = CutPlan.whole(
+      60000,
+    ).addCut(30000, visible: 137000)!;
+    expect(short.cuts.single, const Span(27000, 33000));
   });
 
   test('a removed cut is kept again', () {

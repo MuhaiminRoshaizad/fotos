@@ -135,17 +135,23 @@ class CutPlan {
     List<Span>.unmodifiable(<Span>[...cuts]..[i] = s),
   );
 
-  /// A new cut around [ms], [width] wide (a tenth of the video unless
-  /// given) or as wide as fits, in the kept part [ms] falls in. Null when
-  /// that part is too short to leave something kept either side.
-  (CutPlan, int)? addCut(int ms, {int? width}) {
+  /// A new cut around [ms] in the kept part [ms] falls in: a tenth of the
+  /// video, or a third of the [visible] stretch of the timeline if that is
+  /// less, so both its edges are in view at any zoom; narrower if the part
+  /// is. Null when the part is too short to leave something kept either
+  /// side.
+  (CutPlan, int)? addCut(int ms, {int? visible}) {
     final List<Span> parts = kept;
     final int p = parts.indexWhere((Span s) => s.contains(ms));
     if (p < 0) return null;
     final Span part = parts[p];
     final int room = part.length - 2 * minPart;
     if (room < minPart) return null;
-    final int w = (width ?? duration ~/ 10).clamp(minPart, room);
+    final int tenth = duration ~/ 10;
+    final int wanted = visible == null || visible ~/ 3 > tenth
+        ? tenth
+        : visible ~/ 3;
+    final int w = wanted.clamp(minPart, room);
     final int lo = part.start + minPart;
     final int hi = part.end - minPart - w;
     final int from = (ms - w ~/ 2).clamp(lo, hi);
