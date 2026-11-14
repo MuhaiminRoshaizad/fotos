@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/core/media/add_to_album.dart';
 import 'package:fotos/core/media/media_providers.dart';
 import 'package:fotos/core/media/media_repository.dart';
+import 'package:fotos/core/widgets/inset_group.dart';
 import 'package:fotos/features/albums/data/album_prefs.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -28,12 +31,62 @@ class _Library extends FakeMediaRepository {
   ];
 }
 
+/// A library of [count] albums that arrive only when [loaded] completes.
+class _Slow extends FakeMediaRepository {
+  _Slow(this.count);
+  final int count;
+  final Completer<void> loaded = Completer<void>();
+
+  @override
+  Future<List<Album>> albums() async {
+    await loaded.future;
+    return <Album>[for (int i = 0; i < count; i++) _album('$i', 'Album $i')];
+  }
+}
+
 void main() {
+  testWidgets('the sheet opens before the albums load, and with 120 albums '
+      'builds only the rows in view', (WidgetTester tester) async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    final _Slow library = _Slow(120);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [mediaRepositoryProvider.overrideWithValue(library)],
+        child: MaterialApp(
+          home: Consumer(
+            builder: (BuildContext context, WidgetRef ref, _) => TextButton(
+              onPressed: () => addToAlbum(context, ref, <AssetEntity>[]),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    // Open at once, with placeholder rows while the albums load.
+    expect(find.text('Add to album'), findsOneWidget);
+    expect(find.text('Album name'), findsWidgets);
+
+    library.loaded.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Album 0'), findsOneWidget);
+    expect(find.text('Album name'), findsNothing);
+    // A screenful, not all 120 with their thumbnails.
+    expect(find.byType(GroupRow).evaluate().length, lessThan(30));
+  });
+
   testWidgets('the sheet lists pinned albums first, then the tab\'s order', (
     WidgetTester tester,
   ) async {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
+    // Tall enough for every row: the sheet builds only the rows in view.
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final ProviderContainer container = ProviderContainer(
       overrides: [mediaRepositoryProvider.overrideWithValue(_Library())],
     );

@@ -106,11 +106,15 @@ class InsetGroupItem extends StatelessWidget {
     required this.first,
     required this.last,
     required this.child,
+    this.dividerIndent = 52,
   });
 
   final bool first;
   final bool last;
   final Widget child;
+
+  /// Where the hairline above the row starts, as [InsetGroup.dividerIndent].
+  final double dividerIndent;
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +131,10 @@ class InsetGroupItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[if (!first) const _RowDivider(), child],
+            children: <Widget>[
+              if (!first) _RowDivider(indent: dividerIndent),
+              child,
+            ],
           ),
         ),
       ),

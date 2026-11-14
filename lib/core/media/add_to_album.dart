@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../format/formatters.dart';
 import '../theme/app_tokens.dart';
@@ -27,31 +28,13 @@ Future<void> addToAlbum(
   VoidCallback? onDone,
   void Function(String albumName)? onView,
 }) async {
-  final List<Album> albums = await ref.read(albumsProvider.future);
-  final List<String> empty = pendingEmptyAlbums(
-    await ref.read(emptyAlbumsProvider.future),
-    albums,
-  );
-  final AlbumPrefs prefs = await ref.read(albumPrefsProvider.future);
-  // As on the Albums tab: pins in their own order, then the tab's order.
-  // Android hands albums over in no order at all.
-  final List<Album> pinned = <Album>[
-    for (final String id in prefs.pinned)
-      ...albums.where((Album a) => a.id == id),
-  ];
-  final List<Album> rest = prefs.order.apply(
-    albums.where((Album a) => !prefs.pinned.contains(a.id)).toList(),
-  );
-  if (!context.mounted) return;
+  // The sheet opens at once and loads the albums itself, with placeholder
+  // rows meanwhile: with 120 albums, loading first kept the tap waiting
+  // over a second for anything to happen.
   final _Choice? choice = await showAppSheet<_Choice>(
     context,
     scrollControlled: true,
-    builder: (BuildContext ctx) => _AddToAlbumSheet(
-      count: items.length,
-      pinned: pinned,
-      albums: rest,
-      empty: empty,
-    ),
+    builder: (BuildContext ctx) => _AddToAlbumSheet(count: items.length),
   );
   if (choice == null || !context.mounted) return;
 
@@ -61,6 +44,12 @@ Future<void> addToAlbum(
   if (!context.mounted) return;
   String name = choice.album?.name ?? choice.emptyName ?? '';
   if (choice.album == null && choice.emptyName == null) {
+    final List<Album> albums = await ref.read(albumsProvider.future);
+    final List<String> empty = pendingEmptyAlbums(
+      await ref.read(emptyAlbumsProvider.future),
+      albums,
+    );
+    if (!context.mounted) return;
     final String? n = await promptName(
       context,
       title: 'New album',
@@ -153,24 +142,94 @@ List<String> pendingEmptyAlbums(List<String> empty, List<Album> albums) {
   return empty.where((String n) => !real.contains(n.toLowerCase())).toList();
 }
 
-class _AddToAlbumSheet extends StatefulWidget {
-  const _AddToAlbumSheet({
-    required this.count,
-    required this.pinned,
-    required this.albums,
-    required this.empty,
-  });
+class _AddToAlbumSheet extends ConsumerStatefulWidget {
+  const _AddToAlbumSheet({required this.count});
   final int count;
-  final List<Album> pinned;
-  final List<Album> albums;
-  final List<String> empty;
 
   @override
-  State<_AddToAlbumSheet> createState() => _AddToAlbumSheetState();
+  ConsumerState<_AddToAlbumSheet> createState() => _AddToAlbumSheetState();
 }
 
-class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
+/// One line of the sheet's album list, built only when scrolled to.
+sealed class _Line {
+  const _Line();
+}
+
+class _Heading extends _Line {
+  const _Heading(this.text);
+  final String text;
+}
+
+class _Gap extends _Line {
+  const _Gap();
+}
+
+class _Row extends _Line {
+  const _Row({
+    required this.first,
+    required this.last,
+    this.album,
+    this.emptyName,
+  });
+  final bool first;
+  final bool last;
+  final Album? album;
+  final String? emptyName;
+}
+
+class _Placeholder extends _Line {
+  const _Placeholder({required this.first, required this.last});
+  final bool first;
+  final bool last;
+}
+
+class _AddToAlbumSheetState extends ConsumerState<_AddToAlbumSheet> {
   bool _move = true;
+
+  static const double _indent = 14 + AlbumThumb.size + AppSpacing.md;
+
+  /// The album list as lines: pinned albums under their heading in pin
+  /// order, then empty albums and the rest in the Albums tab's order.
+  List<_Line> _lines(List<Album> albums, List<String> empty, AlbumPrefs prefs) {
+    final List<Album> pinned = <Album>[
+      for (final String id in prefs.pinned)
+        ...albums.where((Album a) => a.id == id),
+    ];
+    // Android hands albums over in no order at all.
+    final List<Album> rest = prefs.order.apply(
+      albums.where((Album a) => !prefs.pinned.contains(a.id)).toList(),
+    );
+    final bool headed = pinned.isNotEmpty;
+    final int others = empty.length + rest.length;
+    return <_Line>[
+      if (headed) ...<_Line>[
+        const _Heading('Pinned'),
+        for (int i = 0; i < pinned.length; i++)
+          _Row(first: i == 0, last: i == pinned.length - 1, album: pinned[i]),
+      ],
+      if (others > 0) ...<_Line>[
+        if (headed) const _Heading('Albums') else const _Gap(),
+        for (int i = 0; i < empty.length; i++)
+          _Row(first: i == 0, last: i == others - 1, emptyName: empty[i]),
+        for (int i = 0; i < rest.length; i++)
+          _Row(
+            first: empty.isEmpty && i == 0,
+            last: empty.length + i == others - 1,
+            album: rest[i],
+          ),
+      ],
+    ];
+  }
+
+  /// Rows the size of real ones, while the albums load.
+  static const List<_Line> _loading = <_Line>[
+    _Gap(),
+    _Placeholder(first: true, last: false),
+    _Placeholder(first: false, last: false),
+    _Placeholder(first: false, last: false),
+    _Placeholder(first: false, last: false),
+    _Placeholder(first: false, last: true),
+  ];
 
   Widget _albumRow(Album a) => GroupRow(
     leading: AlbumThumb(
@@ -183,6 +242,7 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
                 thumbnailSize: const ThumbnailSize.square(160),
               ),
               fit: BoxFit.cover,
+              gaplessPlayback: true,
             ),
     ),
     leadingWidth: AlbumThumb.size,
@@ -192,98 +252,119 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
     onTap: () => Navigator.of(context).pop(_Choice(a, _move)),
   );
 
+  Widget _line(_Line line) => switch (line) {
+    _Heading(:final String text) => GroupHeading(text),
+    _Gap() => const SizedBox(height: AppSpacing.lg),
+    _Placeholder(:final bool first, :final bool last) => Skeletonizer(
+      child: InsetGroupItem(
+        first: first,
+        last: last,
+        dividerIndent: _indent,
+        child: const GroupRow(
+          leading: AlbumThumb(child: SizedBox.expand()),
+          leadingWidth: AlbumThumb.size,
+          title: 'Album name',
+          subtitle: '12 items',
+          chevron: false,
+        ),
+      ),
+    ),
+    _Row(:final bool first, :final bool last, :final Album? album) =>
+      InsetGroupItem(
+        first: first,
+        last: last,
+        dividerIndent: _indent,
+        child: album != null
+            ? _albumRow(album)
+            : GroupRow(
+                leading: const AlbumThumb(
+                  child: Icon(CupertinoIcons.rectangle_stack),
+                ),
+                leadingWidth: AlbumThumb.size,
+                title: line.emptyName!,
+                subtitle: 'Empty',
+                chevron: false,
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(_Choice(null, _move, emptyName: line.emptyName)),
+              ),
+      ),
+  };
+
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    const double indent = 14 + AlbumThumb.size + AppSpacing.md;
-    final bool headed = widget.pinned.isNotEmpty;
+    final List<Album>? albums = ref.watch(albumsProvider).value;
+    final List<String>? empty = ref.watch(emptyAlbumsProvider).value;
+    final AlbumPrefs? prefs = ref.watch(albumPrefsProvider).value;
+    final List<_Line> lines = albums == null || empty == null || prefs == null
+        ? _loading
+        : _lines(albums, pendingEmptyAlbums(empty, albums), prefs);
+    final List<Widget> top = <Widget>[
+      SheetTitle('Add to album', subtitle: Fmt.count(widget.count, 'item')),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        child: CupertinoSlidingSegmentedControl<bool>(
+          groupValue: _move,
+          children: const <bool, Widget>{
+            true: Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('Move'),
+            ),
+            false: Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('Copy'),
+            ),
+          },
+          onValueChanged: (bool? v) {
+            if (v != null) setState(() => _move = v);
+          },
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xxl,
+          AppSpacing.sm,
+          AppSpacing.xxl,
+          AppSpacing.lg,
+        ),
+        child: Text(
+          _move
+              ? 'Moves the files into the album\'s folder. Uses no extra space.'
+              : 'Makes a second copy in the album. Uses extra space.',
+          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+        ),
+      ),
+      InsetGroup(
+        children: <Widget>[
+          GroupRow(
+            leading: const Icon(CupertinoIcons.plus),
+            leadingWidth: AlbumThumb.size,
+            title: 'New album',
+            chevron: false,
+            onTap: () => Navigator.of(context).pop(_Choice(null, _move)),
+          ),
+        ],
+      ),
+    ];
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.6,
       maxChildSize: 0.9,
-      builder: (BuildContext context, ScrollController scroll) => ListView(
-        controller: scroll,
-        children: <Widget>[
-          SheetTitle('Add to album', subtitle: Fmt.count(widget.count, 'item')),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: CupertinoSlidingSegmentedControl<bool>(
-              groupValue: _move,
-              children: const <bool, Widget>{
-                true: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 6),
-                  child: Text('Move'),
-                ),
-                false: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 6),
-                  child: Text('Copy'),
-                ),
-              },
-              onValueChanged: (bool? v) {
-                if (v != null) setState(() => _move = v);
-              },
-            ),
+      // Only the rows on screen are built, thumbnails included: a phone
+      // with a hundred albums opens the sheet as fast as one with three.
+      builder: (BuildContext context, ScrollController scroll) =>
+          ListView.builder(
+            controller: scroll,
+            itemCount: top.length + lines.length + 1,
+            itemBuilder: (BuildContext context, int i) {
+              if (i < top.length) return top[i];
+              if (i == top.length + lines.length) {
+                return const SizedBox(height: AppSpacing.lg);
+              }
+              return _line(lines[i - top.length]);
+            },
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xxl,
-              AppSpacing.sm,
-              AppSpacing.xxl,
-              AppSpacing.lg,
-            ),
-            child: Text(
-              _move
-                  ? 'Moves the files into the album\'s folder. Uses no extra space.'
-                  : 'Makes a second copy in the album. Uses extra space.',
-              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
-            ),
-          ),
-          InsetGroup(
-            children: <Widget>[
-              GroupRow(
-                leading: const Icon(CupertinoIcons.plus),
-                leadingWidth: AlbumThumb.size,
-                title: 'New album',
-                chevron: false,
-                onTap: () => Navigator.of(context).pop(_Choice(null, _move)),
-              ),
-            ],
-          ),
-          if (headed)
-            InsetGroup(
-              header: 'Pinned',
-              dividerIndent: indent,
-              children: <Widget>[
-                for (final Album a in widget.pinned) _albumRow(a),
-              ],
-            ),
-          if (widget.empty.isNotEmpty || widget.albums.isNotEmpty) ...<Widget>[
-            // A heading brings its own space above it.
-            if (!headed) const SizedBox(height: AppSpacing.lg),
-            InsetGroup(
-              header: headed ? 'Albums' : null,
-              dividerIndent: indent,
-              children: <Widget>[
-                for (final String n in widget.empty)
-                  GroupRow(
-                    leading: const AlbumThumb(
-                      child: Icon(CupertinoIcons.rectangle_stack),
-                    ),
-                    leadingWidth: AlbumThumb.size,
-                    title: n,
-                    subtitle: 'Empty',
-                    chevron: false,
-                    onTap: () => Navigator.of(
-                      context,
-                    ).pop(_Choice(null, _move, emptyName: n)),
-                  ),
-                for (final Album a in widget.albums) _albumRow(a),
-              ],
-            ),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-        ],
-      ),
     );
   }
 }
