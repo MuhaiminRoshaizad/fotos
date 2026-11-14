@@ -95,6 +95,123 @@ void main() {
     expect(transform(tester).getMaxScaleOnAxis(), closeTo(1, 0.01));
   });
 
+  /// A pinch as a hand makes it: the second finger lands a moment after the
+  /// first, which has drifted a little, and then [still] stays put while
+  /// the other finger moves by [step] ten times.
+  Future<void> pinch(
+    WidgetTester tester, {
+    required Offset still,
+    required Offset moving,
+    required Offset step,
+  }) async {
+    final TestGesture a = await tester.startGesture(still, pointer: 31);
+    await a.moveBy(step / 2);
+    await tester.pump(const Duration(milliseconds: 40));
+    final TestGesture b = await tester.startGesture(moving, pointer: 32);
+    for (int i = 0; i < 10; i++) {
+      await b.moveBy(step);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await a.up();
+    await b.up();
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('a pinch with one finger held still zooms instead of turning '
+      'the page', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final PageController c = PageController();
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PageView(
+          controller: c,
+          children: <Widget>[
+            for (int i = 0; i < 2; i++)
+              ZoomView(child: SizedBox.expand(child: Text('page $i'))),
+          ],
+        ),
+      ),
+    );
+    await pinch(
+      tester,
+      still: const Offset(150, 400),
+      moving: const Offset(200, 400),
+      step: const Offset(12, 0),
+    );
+    expect(c.page, 0);
+    expect(transform(tester).getMaxScaleOnAxis(), greaterThan(1.5));
+  });
+
+  testWidgets('a pinch along a scrolling list zooms instead of scrolling', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final ScrollController s = ScrollController();
+    addTearDown(s.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ZoomView(
+          child: ListView.builder(
+            controller: s,
+            itemCount: 50,
+            itemExtent: 300,
+            itemBuilder: (_, int i) => Text('panel $i'),
+          ),
+        ),
+      ),
+    );
+    await pinch(
+      tester,
+      still: const Offset(200, 500),
+      moving: const Offset(200, 400),
+      step: const Offset(0, -12),
+    );
+    expect(s.offset, 0);
+    expect(transform(tester).getMaxScaleOnAxis(), greaterThan(1.5));
+  });
+
+  testWidgets('a scroll already going keeps going when a second finger '
+      'lands', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final ScrollController s = ScrollController();
+    addTearDown(s.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ZoomView(
+          child: ListView.builder(
+            controller: s,
+            itemCount: 50,
+            itemExtent: 300,
+            itemBuilder: (_, int i) => Text('panel $i'),
+          ),
+        ),
+      ),
+    );
+    final TestGesture a = await tester.startGesture(const Offset(200, 600));
+    for (int i = 0; i < 5; i++) {
+      await a.moveBy(const Offset(0, -20));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final TestGesture b = await tester.startGesture(
+      const Offset(300, 600),
+      pointer: 41,
+    );
+    await b.moveBy(const Offset(0, -30));
+    await tester.pump();
+    await a.up();
+    await b.up();
+    await tester.pumpAndSettle();
+    expect(s.offset, greaterThan(50));
+    expect(transform(tester).getMaxScaleOnAxis(), 1);
+  });
+
   testWidgets('at normal size a swipe turns the page of a page view', (
     WidgetTester tester,
   ) async {

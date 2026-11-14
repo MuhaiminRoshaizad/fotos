@@ -175,10 +175,25 @@ class ZoomViewState extends State<ZoomView>
 /// A scale gesture that won't take a single finger at normal size, so a
 /// swipe goes to whatever is around it; two fingers, or any once zoomed in,
 /// it takes as usual.
+///
+/// A second finger is a pinch the moment it lands. Waiting for the pinch to
+/// show itself lost it to the scroll or page around: a drag counts both
+/// fingers' travel and wins at 18 px, while a pinch with one finger held
+/// still only spreads half as fast as the other finger moves.
 class _PinchFirst extends ScaleGestureRecognizer {
   _PinchFirst({required this.zoomed});
 
   final bool Function() zoomed;
+
+  @override
+  void handleEvent(PointerEvent event) {
+    super.handleEvent(event);
+    // Only while both fingers are still undecided: one that already
+    // started a scroll keeps scrolling, and this one has let it go.
+    if (event is PointerDownEvent && pointerCount >= 2) {
+      resolve(GestureDisposition.accepted);
+    }
+  }
 
   @override
   void resolve(GestureDisposition disposition) {
