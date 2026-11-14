@@ -19,6 +19,27 @@ String clock(int ms) {
   return h > 0 ? '$h:${m.toString().padLeft(2, '0')}:$t' : '$m:$t';
 }
 
+/// A time typed as "30", "1:30", "1:02:30" or with tenths, "0:30.5", in
+/// ms; null when it isn't one. Seconds and minutes after the first part go
+/// up to 59.
+int? parseClock(String text) {
+  final String t = text.trim();
+  if (!RegExp(r'^\d+(:\d{1,2}){0,2}(\.\d+)?$').hasMatch(t)) return null;
+  final List<String> dot = t.split('.');
+  final List<int> parts = dot.first.split(':').map(int.parse).toList();
+  for (int i = 1; i < parts.length; i++) {
+    if (parts[i] > 59) return null;
+  }
+  int seconds = 0;
+  for (final int p in parts) {
+    seconds = seconds * 60 + p;
+  }
+  final int fraction = dot.length < 2
+      ? 0
+      : (double.parse('0.${dot[1]}') * 1000).round();
+  return seconds * 1000 + fraction;
+}
+
 class EditorTopBar extends StatelessWidget {
   const EditorTopBar({
     super.key,
@@ -134,6 +155,7 @@ class EditorTools extends StatelessWidget {
     required this.selectedCut,
     required this.canAddCut,
     required this.onAddCut,
+    required this.onTypeTime,
     required this.onKeepCut,
     required this.onNudge,
   });
@@ -143,8 +165,12 @@ class EditorTools extends StatelessWidget {
   final int? selectedCut;
   final bool canAddCut;
   final VoidCallback onAddCut;
+
   final VoidCallback onKeepCut;
   final ValueChanged<int> onNudge;
+
+  /// Opens a box to type the selected handle's time.
+  final VoidCallback onTypeTime;
 
   static const TextStyle _label = TextStyle(color: Colors.white, fontSize: 15);
 
@@ -187,14 +213,29 @@ class EditorTools extends StatelessWidget {
                         label: 'Back a tenth of a second',
                         onStep: () => onNudge(-100),
                       ),
-                      SizedBox(
-                        width: 150,
-                        child: Text(
-                          '${_name(h)} ${clock(plan.at(h))}',
-                          textAlign: TextAlign.center,
-                          style: _label.copyWith(
-                            fontFeatures: const <FontFeature>[
-                              FontFeature.tabularFigures(),
+                      // Tap to type the time instead.
+                      Pressable(
+                        label: 'Type a time for ${_name(h)}',
+                        onTap: onTypeTime,
+                        child: SizedBox(
+                          width: 170,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              Text(
+                                '${_name(h)} ${clock(plan.at(h))}',
+                                style: _label.copyWith(
+                                  fontFeatures: const <FontFeature>[
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              const Icon(
+                                CupertinoIcons.pencil,
+                                size: 16,
+                                color: Colors.white70,
+                              ),
                             ],
                           ),
                         ),
@@ -237,6 +278,7 @@ class _Nudge extends StatefulWidget {
 
   final IconData icon;
   final String label;
+
   final VoidCallback onStep;
 
   @override

@@ -184,6 +184,40 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
     _move(h, plan.at(h) + ms);
   }
 
+  /// Asks for the selected handle's time typed out, for a moment already
+  /// known, such as an ad from 12:40 to 14:05.
+  Future<void> _typeTime() async {
+    final Handle? h = _selected;
+    final CutPlan? plan = _plan;
+    if (h == null || plan == null) return;
+    _session.pause();
+    final String? typed = await promptName(
+      context,
+      title: 'Set the time',
+      label: 'Time',
+      hint: 'e.g. 0:30 or 1:02:30.5',
+      confirmLabel: 'Set',
+      initial: clock(plan.at(h)),
+      keyboardType: TextInputType.datetime,
+      subject: 'time',
+      inputFormatters: <TextInputFormatter>[
+        FilteringTextInputFormatter.allow(RegExp('[0-9:.]')),
+      ],
+      validate: (String v) {
+        final int? ms = parseClock(v);
+        if (ms == null) return 'Type a time like 0:30 or 1:02:30';
+        if (ms > plan.duration) {
+          return 'The video is only ${clock(plan.duration)} long';
+        }
+        return null;
+      },
+    );
+    final int? ms = typed == null ? null : parseClock(typed);
+    if (ms == null || !mounted) return;
+    // Stops at its neighbours, as a drag does; the label shows where.
+    _move(h, ms);
+  }
+
   void _addCut() {
     final CutPlan? plan = _plan;
     if (plan == null) return;
@@ -348,6 +382,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
                     onAddCut: _addCut,
                     onKeepCut: _keepCut,
                     onNudge: _nudge,
+                    onTypeTime: _typeTime,
                   ),
                 ],
               ],
