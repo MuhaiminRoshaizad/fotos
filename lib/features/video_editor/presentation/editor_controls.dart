@@ -21,7 +21,8 @@ String clock(int ms) {
 }
 
 class EditorTopBar extends StatelessWidget {
-  const EditorTopBar({super.key, 
+  const EditorTopBar({
+    super.key,
     required this.canSave,
     required this.onCancel,
     required this.onSave,
@@ -127,7 +128,8 @@ class EditorReadout extends StatelessWidget {
 /// Under the timeline: fine adjustment for a selected handle, and the cut
 /// buttons.
 class EditorTools extends StatelessWidget {
-  const EditorTools({super.key, 
+  const EditorTools({
+    super.key,
     required this.plan,
     required this.selected,
     required this.selectedCut,
