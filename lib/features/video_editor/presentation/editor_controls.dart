@@ -211,7 +211,7 @@ class EditorTools extends StatelessWidget {
                       _Nudge(
                         icon: CupertinoIcons.chevron_left,
                         label: 'Back a tenth of a second',
-                        onStep: () => onNudge(-100),
+                        onStep: (int size) => onNudge(-size),
                       ),
                       // Tap to type the time instead.
                       Pressable(
@@ -243,7 +243,7 @@ class EditorTools extends StatelessWidget {
                       _Nudge(
                         icon: CupertinoIcons.chevron_right,
                         label: 'On a tenth of a second',
-                        onStep: () => onNudge(100),
+                        onStep: (int size) => onNudge(size),
                       ),
                     ],
                   ),
@@ -272,14 +272,16 @@ class EditorTools extends StatelessWidget {
   }
 }
 
-/// A step button that repeats while held.
+/// A step button that repeats while held: a tenth of a second a step at
+/// first, then a whole second once held for about a second.
 class _Nudge extends StatefulWidget {
   const _Nudge({required this.icon, required this.label, required this.onStep});
 
   final IconData icon;
   final String label;
 
-  final VoidCallback onStep;
+  /// Called with the step's size in ms.
+  final ValueChanged<int> onStep;
 
   @override
   State<_Nudge> createState() => _NudgeState();
@@ -306,13 +308,14 @@ class _NudgeState extends State<_Nudge> {
       label: widget.label,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onStep,
+        onTap: () => widget.onStep(100),
         onLongPressStart: (_) {
-          widget.onStep();
-          _repeat = Timer.periodic(
-            const Duration(milliseconds: 90),
-            (_) => widget.onStep(),
-          );
+          widget.onStep(100);
+          int steps = 0;
+          _repeat = Timer.periodic(const Duration(milliseconds: 90), (_) {
+            steps++;
+            widget.onStep(steps < 11 ? 100 : 1000);
+          });
         },
         onLongPressEnd: (_) => _stop(),
         onLongPressCancel: _stop,
