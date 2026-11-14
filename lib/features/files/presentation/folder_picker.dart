@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,6 +86,19 @@ class _FolderPickerState extends ConsumerState<_FolderPicker> {
     final List<FileEntry> folders = (list.value ?? const <FileEntry>[])
         .where((FileEntry e) => e.isFolder && !widget.exclude.contains(e.path))
         .toList();
+    // The Files tab's pinned folders, as shortcuts from wherever the picker
+    // is. One being moved, or inside one being moved, can't take itself.
+    final List<String> pins = <String>[
+      for (final String path
+          in ref.watch(filesTabPinsProvider).value ?? const <String>[])
+        if (!p.equals(path, _dir) &&
+            Directory(path).existsSync() &&
+            !widget.exclude.any(
+              (String ex) => p.equals(ex, path) || p.isWithin(ex, path),
+            ))
+          path,
+    ];
+    final int lead = pins.isEmpty ? 0 : 1;
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.75,
@@ -134,7 +149,7 @@ class _FolderPickerState extends ConsumerState<_FolderPicker> {
           Expanded(
             child: list.isLoading && !list.hasValue
                 ? const SizedBox.shrink()
-                : folders.isEmpty
+                : folders.isEmpty && pins.isEmpty
                 ? Center(
                     child: Text(
                       'No folders here',
@@ -147,17 +162,41 @@ class _FolderPickerState extends ConsumerState<_FolderPicker> {
                 : ListView.builder(
                     controller: scroll,
                     padding: EdgeInsets.zero,
-                    itemCount: folders.length,
-                    itemBuilder: (BuildContext context, int i) =>
-                        InsetGroupItem(
-                          first: i == 0,
-                          last: i == folders.length - 1,
-                          child: GroupRow(
-                            leading: const Icon(CupertinoIcons.folder_fill),
-                            title: folders[i].name,
-                            onTap: () => setState(() => _dir = folders[i].path),
-                          ),
+                    itemCount: lead + folders.length,
+                    itemBuilder: (BuildContext context, int i) {
+                      if (i < lead) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            InsetGroup(
+                              header: 'Pinned',
+                              children: <Widget>[
+                                for (final String path in pins)
+                                  GroupRow(
+                                    leading: const Icon(
+                                      CupertinoIcons.folder_fill,
+                                    ),
+                                    title: p.basename(path),
+                                    onTap: () => setState(() => _dir = path),
+                                  ),
+                              ],
+                            ),
+                            if (folders.isNotEmpty)
+                              const GroupHeading('Folders'),
+                          ],
+                        );
+                      }
+                      final FileEntry f = folders[i - lead];
+                      return InsetGroupItem(
+                        first: i == lead,
+                        last: i == lead + folders.length - 1,
+                        child: GroupRow(
+                          leading: const Icon(CupertinoIcons.folder_fill),
+                          title: f.name,
+                          onTap: () => setState(() => _dir = f.path),
                         ),
+                      );
+                    },
                   ),
           ),
           Padding(
