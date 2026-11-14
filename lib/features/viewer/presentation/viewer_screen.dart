@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
+import 'package:flutter/cupertino.dart'
+    show CupertinoButton, CupertinoIcons, CupertinoPageRoute;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart' show VelocityTracker;
@@ -14,10 +15,13 @@ import '../../../core/media/add_to_album.dart';
 import '../../../core/media/animated.dart';
 import '../../../core/media/media_actions.dart';
 import '../../../core/media/media_flight.dart';
+import '../../../core/media/media_providers.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/app_sheet.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../core/media/read_mode.dart';
+import '../../video_editor/presentation/video_editor_screen.dart';
 import 'details_sheet.dart';
 import 'video_page.dart';
 import 'motion_photo.dart';
@@ -121,6 +125,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
   /// A video pinched in: the pages hold still so a finger pans it.
   bool _videoZoomed = false;
+
+  /// While the editor is open its own player plays, and this one waits.
+  bool _editing = false;
 
   ReadMode get _mode =>
       readModeFor(ref.watch(readModesProvider).value, widget.args.folder);
@@ -246,6 +253,52 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       _items.removeAt(_index);
       if (_index >= _items.length) _index = _items.length - 1;
     });
+  }
+
+  /// Opens the video editor; a saved edit takes the original's place in the
+  /// viewer when it replaced it, or comes next to it as a copy.
+  Future<void> _edit() async {
+    final AssetEntity e = _current;
+    setState(() => _editing = true);
+    final EditOutcome? out = await Navigator.of(context).push<EditOutcome>(
+      CupertinoPageRoute<EditOutcome>(
+        fullscreenDialog: true,
+        builder: (_) => VideoEditorScreen(asset: e),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _editing = false);
+    if (out == null) return;
+    ref
+      ..invalidate(libraryProvider)
+      ..invalidate(albumsProvider)
+      ..invalidate(favouritesProvider);
+    final AssetEntity? saved = await AssetEntity.fromId(out.saved.id);
+    if (!mounted || saved == null) return;
+    final int at = _items.indexWhere((AssetEntity x) => x.id == e.id);
+    if (at < 0) return;
+    setState(() {
+      if (out.saved.replaced) {
+        _items[at] = saved;
+      } else {
+        _items.insert(at + 1, saved);
+      }
+    });
+    if (out.saved.replaced) {
+      showToast(context, 'Replaced with the edited video');
+    } else {
+      showToast(
+        context,
+        out.askedToReplace
+            ? 'Original kept. Saved as ${out.saved.name}'
+            : 'Saved as ${out.saved.name}',
+        actionLabel: 'View',
+        onAction: () {
+          final int i = _items.indexWhere((AssetEntity x) => x.id == saved.id);
+          if (i >= 0 && mounted) _showAt(i);
+        },
+      );
+    }
   }
 
   void _details() {
@@ -436,7 +489,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                         child: VideoPage(
                           key: ValueKey<String>(item.id),
                           asset: item,
-                          active: i == _index,
+                          active: i == _index && !_editing,
                           chrome: _chrome,
                           onTap: () => _setChrome(!_chrome),
                           onZoomed: (bool z) =>
@@ -507,6 +560,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                           _thumbStrip(),
                           _Actions(
                             favourite: e.isFavorite,
+                            onEdit: e.type == AssetType.video ? _edit : null,
                             onShare: () => ref.read(mediaActionsProvider).share(
                               context,
                               <AssetEntity>[e],
@@ -691,6 +745,7 @@ class _TopBar extends StatelessWidget {
 class _Actions extends StatelessWidget {
   const _Actions({
     required this.favourite,
+    required this.onEdit,
     required this.onShare,
     required this.onAddToAlbum,
     required this.onFavourite,
@@ -699,6 +754,9 @@ class _Actions extends StatelessWidget {
   });
 
   final bool favourite;
+
+  /// Null for a photo: only videos have the editor.
+  final VoidCallback? onEdit;
   final VoidCallback onShare;
   final VoidCallback onAddToAlbum;
   final VoidCallback onFavourite;
@@ -707,9 +765,11 @@ class _Actions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Six buttons for a video: a little narrower, still a full touch target.
+    final double width = onEdit == null ? 56 : 48;
     Widget action(IconData icon, String label, VoidCallback onTap) => Pressable(
       label: label,
-      minSize: const Size(56, ViewerMetrics.actionButtonHeight),
+      minSize: Size(width, ViewerMetrics.actionButtonHeight),
       onTap: onTap,
       child: Icon(icon, color: Colors.white),
     );
@@ -734,10 +794,12 @@ class _Actions extends StatelessWidget {
                 'Add to album',
                 onAddToAlbum,
               ),
+              if (onEdit != null)
+                action(CupertinoIcons.scissors, 'Edit', onEdit!),
               // The heart fills in place and swells once as it does.
               Pressable(
                 label: favourite ? 'Remove from Favourites' : 'Favourite',
-                minSize: const Size(56, ViewerMetrics.actionButtonHeight),
+                minSize: Size(width, ViewerMetrics.actionButtonHeight),
                 onTap: onFavourite,
                 child: Pop(
                   on: favourite,
