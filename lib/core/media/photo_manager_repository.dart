@@ -107,25 +107,34 @@ class PhotoManagerRepository implements MediaRepository {
       type: RequestType.common,
       filterOption: _filter(_typeWhere(MediaKind.all)),
     );
-    final List<Album> out = <Album>[];
-    for (final AssetPathEntity p in paths) {
-      final int count = await p.assetCountAsync;
-      if (count == 0) continue;
-      final List<AssetEntity> first = await p.getAssetListRange(
-        start: 0,
-        end: 1,
-      );
-      out.add(
-        Album(
+    // Each album costs two trips to Android, its count and its cover. One
+    // after another, 120 albums took over three seconds on the emulator
+    // before the Albums tab or the Add to album sheet could show; a few at
+    // once keeps Android busy without flooding it, in the same order.
+    final List<Album?> out = List<Album?>.filled(paths.length, null);
+    int next = 0;
+    Future<void> worker() async {
+      while (next < paths.length) {
+        final int i = next++;
+        final AssetPathEntity p = paths[i];
+        final int count = await p.assetCountAsync;
+        if (count == 0) continue;
+        final List<AssetEntity> first = await p.getAssetListRange(
+          start: 0,
+          end: 1,
+        );
+        out[i] = Album(
           id: p.id,
           name: p.name,
           count: count,
           path: p,
           cover: first.isEmpty ? null : first.first,
-        ),
-      );
+        );
+      }
     }
-    return out;
+
+    await Future.wait(<Future<void>>[for (int w = 0; w < 8; w++) worker()]);
+    return <Album>[for (final Album? a in out) ?a];
   }
 
   @override
