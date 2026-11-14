@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart' show VelocityTracker;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -412,6 +413,13 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                   itemCount: _items.length,
                   // A pinched-in video pans instead of turning the page.
                   canScrollPage: (_) => !_videoZoomed,
+                  // Two fingers are a pinch, never a page turn. Left to
+                  // itself the page view only stands aside when the fingers
+                  // move apart on its axis, so a pinch with one finger
+                  // held still turned the page.
+                  shouldAccpetHorizontalOrVerticalDrag:
+                      (Map<int, VelocityTracker> fingers) =>
+                          fingers.length == 1,
                   onPageChanged: (int i) {
                     _videoZoomed = false;
                     if (_scrubbing) return;

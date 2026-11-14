@@ -90,6 +90,31 @@ void main() {
     await finish(tester);
   });
 
+  testWidgets('a pinch with one finger held still never turns the page', (
+    WidgetTester tester,
+  ) async {
+    await open(tester, ReadMode.photos);
+    final TestGesture held = await tester.startGesture(
+      const Offset(150, 400),
+      pointer: 51,
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+    final TestGesture moving = await tester.startGesture(
+      const Offset(220, 400),
+      pointer: 52,
+    );
+    for (int i = 0; i < 10; i++) {
+      await moving.moveBy(const Offset(12, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+      // Checked while the fingers are down: let go, a short drag snaps back.
+      expect(page(tester), 1);
+    }
+    await held.up();
+    await moving.up();
+    await settle(tester);
+    await finish(tester);
+  });
+
   testWidgets('read as photos, a tap at the edge only shows or hides the '
       'controls', (WidgetTester tester) async {
     await open(tester, ReadMode.photos);
