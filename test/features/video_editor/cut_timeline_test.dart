@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/features/video_editor/domain/cut_plan.dart';
 import 'package:fotos/features/video_editor/domain/timeline_view.dart';
@@ -40,6 +39,7 @@ class _HarnessState extends State<_Harness> {
           plan: plan,
           frames: frames,
           position: position,
+          playing: false,
           selected: selected,
           selectedCut: null,
           onMove: (Handle h, int ms) => setState(() {
@@ -185,6 +185,56 @@ void main() {
     await g.up();
     await tester.pumpAndSettle();
     expect(s.plan.start, closeTo(target, 25));
+  });
+
+  testWidgets('a tap on the strip glides the playhead there, not a jump', (
+    WidgetTester tester,
+  ) async {
+    final _HarnessState s = await open(tester, CutPlan.whole(100000));
+    await tester.tapAt(at(tester, 300));
+    // The glide starts on the frame after the tap.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(s.position, closeTo(100 * outMs, outMs));
+    // On its way, not there yet.
+    expect(
+      timeline(tester).view.centre,
+      allOf(greaterThan(0), lessThan(s.position)),
+    );
+    await tester.pumpAndSettle();
+    expect(timeline(tester).view.centre, s.position);
+  });
+
+  testWidgets('a handle reaching its neighbour ticks once as it stops', (
+    WidgetTester tester,
+  ) async {
+    final List<Object?> haptics = <Object?>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (
+          MethodCall call,
+        ) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            haptics.add(call.arguments);
+          }
+          return null;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    CutPlan plan = CutPlan.whole(100000);
+    (plan, _) = plan.addCut(50000)!; // 45 s to 55 s
+    await open(tester, plan);
+    final TestGesture g = await tester.startGesture(
+      at(tester, middle + 45000 / outMs),
+    );
+    for (int i = 0; i < 10; i++) {
+      await g.moveBy(const Offset(5, 0));
+      await tester.pump();
+    }
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(haptics, <Object?>['HapticFeedbackType.selectionClick']);
   });
 
   testWidgets('a handle dragged past its neighbour stops beside it', (

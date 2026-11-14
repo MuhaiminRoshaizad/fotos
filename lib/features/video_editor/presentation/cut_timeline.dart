@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../../../core/haptics/app_haptics.dart';
 import '../../../core/platform/gesture_exclusion.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/pinch_first.dart';
@@ -26,6 +27,7 @@ class CutTimeline extends StatefulWidget {
     required this.plan,
     required this.frames,
     required this.position,
+    required this.playing,
     required this.selected,
     required this.selectedCut,
     required this.onMove,
@@ -41,6 +43,10 @@ class CutTimeline extends StatefulWidget {
 
   /// The playhead, in ms of the original video.
   final int position;
+
+  /// While playing the strip follows the playhead exactly; a jump made
+  /// otherwise (a tap, a typed time, Start here) glides there instead.
+  final bool playing;
   final Handle? selected;
   final int? selectedCut;
   final void Function(Handle handle, int ms) onMove;
@@ -64,7 +70,8 @@ class CutTimeline extends StatefulWidget {
   State<CutTimeline> createState() => CutTimelineState();
 }
 
-class CutTimelineState extends State<CutTimeline> {
+class CutTimelineState extends State<CutTimeline>
+    with TickerProviderStateMixin {
   final GlobalKey _box = GlobalKey();
   double _width = 1;
   TimelineView? _view;
@@ -86,21 +93,99 @@ class CutTimelineState extends State<CutTimeline> {
   // A pinch: the zoom it began at.
   double _pinchFrom = 1;
 
+  // Where a finger is in charge, things follow it exactly; otherwise a
+  // change glides. A scroll in progress:
+  bool _scrolling = false;
+
+  // A change to the plan made by a button, gliding from how it looked.
+  late final AnimationController _settle = AnimationController(
+    vsync: this,
+    duration: AppMotion.short,
+  )..addListener(_redraw);
+  PlanShape? _shapeFrom;
+
+  // A change of selection, cross-fading.
+  late final AnimationController _selecting = AnimationController(
+    vsync: this,
+    duration: AppMotion.short,
+    value: 1,
+  )..addListener(_redraw);
+  Handle? _previous;
+  int? _previousCut;
+
+  // A jump of the playhead, gliding the strip there.
+  late final AnimationController _seek =
+      AnimationController(
+        vsync: this,
+        duration: AppMotion.short,
+      )..addListener(() {
+        final double t = Curves.easeOut.transform(_seek.value);
+        setState(() => _view = view.at(_seekFrom + (_seekTo - _seekFrom) * t));
+      });
+  double _seekFrom = 0;
+  double _seekTo = 0;
+
+  // Whether a dragged handle, or a pinch, is held at a limit: the tick is
+  // felt once on reaching it, not on every move past it.
+  bool _atStop = false;
+  bool _zoomStop = false;
+
+  void _redraw() => setState(() {});
+
+  /// The plan as drawn for [target]: [target] itself, or on its way there.
+  PlanShape _shapeFor(CutPlan target) {
+    final PlanShape to = PlanShape.of(target);
+    final PlanShape? from = _shapeFrom;
+    if (from == null || !_settle.isAnimating) return to;
+    return PlanShape.lerp(from, to, Curves.easeOut.transform(_settle.value));
+  }
+
+  /// Stops a glide of the strip where it was going.
+  void _settleSeek() {
+    if (!_seek.isAnimating) return;
+    _seek.stop();
+    _view = view.at(_seekTo);
+  }
+
   @override
   void didUpdateWidget(CutTimeline oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // The strip follows the playhead (playback, a seek), except while a
-    // handle is held: the strip stays still under the finger then, though
-    // the picture shows the frame at the handle.
+    final bool still = MediaQuery.disableAnimationsOf(context);
+    // A plan changed by a button (Start here, a step, a typed time, a new
+    // or kept cut) glides there; a handle under a finger follows it.
+    if (widget.plan != oldWidget.plan && _handle == null && !still) {
+      _shapeFrom = _shapeFor(oldWidget.plan);
+      _settle.forward(from: 0);
+    }
+    if (widget.selected != oldWidget.selected ||
+        widget.selectedCut != oldWidget.selectedCut) {
+      _previous = oldWidget.selected;
+      _previousCut = oldWidget.selectedCut;
+      still ? _selecting.value = 1 : _selecting.forward(from: 0);
+    }
+    // The strip follows the playhead, except while a handle is held: it
+    // stays still under the finger then, though the picture shows the
+    // frame at the handle. Playback and a scroll move it exactly; any
+    // other jump glides.
     if (_handle == null &&
         _view != null &&
         widget.position != oldWidget.position) {
-      _view = _view!.at(widget.position);
+      if (_scrolling || widget.playing || still) {
+        _seek.stop();
+        _view = _view!.at(widget.position);
+      } else {
+        _seekFrom = view.centre;
+        _seekTo = widget.position.toDouble();
+        _seek.forward(from: 0);
+      }
     }
   }
 
   @override
   void dispose() {
+    _settle.dispose();
+    _selecting.dispose();
+    _seek.dispose();
     _edgeScroll?.cancel();
     GestureExclusion.set(this, null, 1);
     super.dispose();
@@ -141,12 +226,15 @@ class CutTimelineState extends State<CutTimeline> {
   void _dragStart(DragStartDetails d) {
     final double x = d.localPosition.dx;
     final Handle? h = _handleAt(x);
+    _settleSeek();
     widget.onDragStart();
     if (h == null) {
+      _scrolling = true;
       _scrollFrom = x;
       _scrollCentre = view.centre;
       return;
     }
+    _atStop = false;
     _handle = h;
     _grab = view.xOf(widget.plan.at(h), _width) - x;
     _fingerX = x;
@@ -164,8 +252,17 @@ class CutTimelineState extends State<CutTimeline> {
       return;
     }
     _fingerX = x;
-    widget.onMove(h, view.msAt(x + _grab, _width));
+    _moveHandle(h, view.msAt(x + _grab, _width));
     _scrollAtEdge();
+  }
+
+  /// Moves [h] toward [ms]; a tick is felt as it reaches a neighbour or an
+  /// end of the video and stops there.
+  void _moveHandle(Handle h, int ms) {
+    final bool stopped = widget.plan.move(h, ms).at(h) != ms;
+    if (stopped && !_atStop) AppHaptics.tick();
+    _atStop = stopped;
+    widget.onMove(h, ms);
   }
 
   void _dragEnd() {
@@ -173,6 +270,7 @@ class CutTimelineState extends State<CutTimeline> {
     _edgeScroll = null;
     final bool wasHandle = _handle != null;
     _handle = null;
+    _scrolling = false;
     // Back to the frame under the playhead, which hasn't moved.
     if (wasHandle) widget.onScrub(view.centre.round());
     widget.onDragEnd();
@@ -205,15 +303,25 @@ class CutTimelineState extends State<CutTimeline> {
       // Up to 12 points a frame at the very edge.
       final double points = g / CutTimeline.edge * 12;
       setState(() => _view = view.at(view.centre + points * view.msPerPoint));
-      widget.onMove(h, view.msAt(_fingerX + _grab, _width));
+      _moveHandle(h, view.msAt(_fingerX + _grab, _width));
     });
   }
 
-  void _pinchStart(ScaleStartDetails d) => _pinchFrom = view.msPerPoint;
+  void _pinchStart(ScaleStartDetails d) {
+    _settleSeek();
+    _pinchFrom = view.msPerPoint;
+    _zoomStop = false;
+  }
 
   void _pinchUpdate(ScaleUpdateDetails d) {
     if (d.pointerCount < 2 || d.scale <= 0) return;
-    setState(() => _view = view.zoomed(_pinchFrom / d.scale, _width));
+    final double wanted = _pinchFrom / d.scale;
+    final TimelineView next = view.zoomed(wanted, _width);
+    // A tick on reaching all the way in or out, as the grid's zoom steps.
+    final bool stopped = next.msPerPoint != wanted;
+    if (stopped && !_zoomStop) AppHaptics.tick();
+    _zoomStop = stopped;
+    setState(() => _view = next);
   }
 
   void _tap(TapUpDetails d) {
@@ -299,10 +407,13 @@ class CutTimelineState extends State<CutTimeline> {
                     Positioned.fill(
                       child: CustomPaint(
                         painter: EditPainter(
-                          plan: widget.plan,
+                          plan: _shapeFor(widget.plan),
                           view: view,
                           selected: widget.selected,
                           selectedCut: widget.selectedCut,
+                          previous: _previous,
+                          previousCut: _previousCut,
+                          selecting: _selecting.value,
                           top: AppSpacing.md,
                           height: CutTimeline.stripHeight,
                         ),

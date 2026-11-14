@@ -379,6 +379,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
                     plan: plan,
                     frames: _frames!,
                     position: _position,
+                    playing: c.value.isPlaying,
                     selected: _selected,
                     selectedCut: _selectedCut,
                     onMove: _move,
