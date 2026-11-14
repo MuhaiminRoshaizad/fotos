@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/motion.dart';
 import '../domain/cut_plan.dart';
-import 'cut_timeline.dart';
 import 'cut_timeline_painter.dart' show editYellow;
 
 /// A time with tenths, for placing a cut: "1:23.4".
@@ -104,9 +103,9 @@ class EditorReadout extends StatelessWidget {
     );
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        CutTimeline.inset,
+        AppSpacing.xl,
         AppSpacing.md,
-        CutTimeline.inset,
+        AppSpacing.xl,
         0,
       ),
       child: Row(
@@ -174,8 +173,8 @@ class EditorTools extends StatelessWidget {
             child: h == null
                 ? const Center(
                     child: Text(
-                      'Drag the yellow ends to trim. Cut a section to take out '
-                      'a part in between.',
+                      'Drag the yellow ends to trim. Pinch the timeline to '
+                      'zoom in on a long video.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white60, fontSize: 13),
                     ),

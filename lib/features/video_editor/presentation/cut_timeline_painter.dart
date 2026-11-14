@@ -1,74 +1,131 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_tokens.dart';
 import '../domain/cut_plan.dart';
+import '../domain/timeline_view.dart';
+import 'timeline_frames.dart';
 
 // The editor is always dark, as the viewer is. iOS's own system yellow and
 // red, the colours its trim and destructive controls use.
 const Color editYellow = Color(0xFFFFD60A);
 const Color editRed = Color(0xFFFF3B30);
 
-/// The video's frames along the timeline; a still-loading strip is plain.
-class TimelineFrames extends StatelessWidget {
-  const TimelineFrames({super.key, required this.frames});
+/// The video's frames along the strip for the stretch in [view]: one tile
+/// per round step of time, each showing the frame from its middle, or the
+/// nearest frame read so far while its own loads.
+class FrameTiles extends StatelessWidget {
+  const FrameTiles({
+    super.key,
+    required this.view,
+    required this.frames,
+    required this.width,
+    required this.height,
+  });
 
-  final List<Uint8List?>? frames;
+  final TimelineView view;
+  final TimelineFrames frames;
+  final double width;
+  final double height;
+
+  /// The narrowest a tile gets; frames are portrait-ish thumbnails.
+  static const double minTile = 40;
+
+  /// The middle of each tile on screen, in ms: the frames [view] needs.
+  static List<int> needed(TimelineView view, double width) {
+    final int step = view.tileStep(minTile);
+    final int first = (view.msAt(0, width) / step).floor().clamp(0, 1 << 30);
+    final int last = (view.msAt(width, width) / step).ceil();
+    return <int>[
+      for (int i = first; i <= last; i++)
+        if (i * step < view.duration) _middle(i, step, view.duration),
+    ];
+  }
+
+  static int _middle(int i, int step, int duration) {
+    final int end = (i + 1) * step < duration ? (i + 1) * step : duration;
+    return (i * step + end) ~/ 2;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final List<Uint8List?> all = frames ?? const <Uint8List?>[];
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadii.sm),
-      child: ColoredBox(
-        color: const Color(0xFF2C2C2E),
-        child: Row(
-          children: <Widget>[
-            for (final Uint8List? f in all.isEmpty ? <Uint8List?>[null] : all)
-              Expanded(
-                child: f == null
-                    ? const SizedBox.expand()
-                    : Image.memory(
-                        f,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        gaplessPlayback: true,
-                      ),
-              ),
-          ],
-        ),
+    final int step = view.tileStep(minTile);
+    final int first = (view.msAt(0, width) / step).floor().clamp(0, 1 << 30);
+    final int last = (view.msAt(width, width) / step).ceil();
+    final double left = view.xOf(0, width);
+    final double right = view.xOf(view.duration, width);
+    return ClipRect(
+      child: Stack(
+        children: <Widget>[
+          // The video's own extent, dark until its frames arrive.
+          Positioned(
+            left: left,
+            width: right - left,
+            top: 0,
+            bottom: 0,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+              child: const ColoredBox(color: Color(0xFF2C2C2E)),
+            ),
+          ),
+          for (int i = first; i <= last; i++)
+            if (i * step < view.duration)
+              _tile(i, step, view.xOf(i * step, width)),
+        ],
       ),
+    );
+  }
+
+  Widget _tile(int i, int step, double x) {
+    final int end = (i + 1) * step < view.duration
+        ? (i + 1) * step
+        : view.duration;
+    final double w = view.xOf(end, width) - x;
+    final Widget image = switch (frames.frameNear(
+      _middle(i, step, view.duration),
+    )) {
+      null => const SizedBox.expand(),
+      final f => Image.memory(
+        f,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        gaplessPlayback: true,
+      ),
+    };
+    return Positioned(
+      left: x,
+      width: w,
+      top: 0,
+      height: height,
+      child: ClipRect(child: image),
     );
   }
 }
 
 /// Everything drawn over the frames: what is left out, the yellow frame
-/// and grips round what is kept, the cut handles and the playhead.
+/// and grips round what is kept, the cut handles, and the playhead fixed in
+/// the middle.
 class EditPainter extends CustomPainter {
   EditPainter({
     required this.plan,
-    required this.position,
+    required this.view,
     required this.selected,
     required this.selectedCut,
-    required this.inset,
     required this.top,
     required this.height,
   });
 
   final CutPlan plan;
-  final int position;
+  final TimelineView view;
   final Handle? selected;
   final int? selectedCut;
-  final double inset;
   final double top;
   final double height;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double w = size.width - 2 * inset;
-    double x(int ms) => inset + ms / plan.duration * w;
+    final double w = size.width;
+    double x(int ms) => view.xOf(ms, w);
     final double bottom = top + height;
     Rect band(int from, int to) => Rect.fromLTRB(x(from), top, x(to), bottom);
 
@@ -98,16 +155,14 @@ class EditPainter extends CustomPainter {
     _endHandle(canvas, l - 12, l, selected == const Handle.start());
     _endHandle(canvas, r, r + 12, selected == const Handle.end());
 
-    // The playhead, over everything.
-    final double p = x(position.clamp(0, plan.duration));
+    // The playhead, fixed in the middle, over everything.
+    final double p = w / 2;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTRB(p - 1.5, top - 6, p + 1.5, bottom + 6),
         const Radius.circular(1.5),
       ),
-      Paint()
-        ..color = Colors.white
-        ..maskFilter = null,
+      Paint()..color = Colors.white,
     );
   }
 
@@ -150,7 +205,7 @@ class EditPainter extends CustomPainter {
   @override
   bool shouldRepaint(EditPainter old) =>
       old.plan != plan ||
-      old.position != position ||
+      old.view != view ||
       old.selected != selected ||
       old.selectedCut != selectedCut;
 }

@@ -15,18 +15,12 @@ import '../../albums/presentation/albums_providers.dart'
 import '../data/video_cutter.dart';
 import '../domain/cut_plan.dart';
 import 'cut_timeline.dart';
+import 'timeline_frames.dart';
 import 'editor_controls.dart';
 import 'save_progress.dart';
 
 /// What the editor saved, and whether replacing the original was asked for.
 typedef EditOutcome = ({SavedEdit saved, bool askedToReplace});
-
-/// Frames for the editor's timeline, kept while the editor is open.
-final _timelineFramesProvider = FutureProvider.autoDispose
-    .family<List<Uint8List?>, String>(
-      (Ref ref, String path) =>
-          ref.watch(nativeChannelProvider).videoFrames(path, 10, 160),
-    );
 
 /// Cuts parts out of a video: the ends with the yellow handles, anything
 /// in between with Cut a section. Preview plays the result, skipping what
@@ -45,6 +39,9 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
   late final VideoSession _session = VideoSession(_newController)
     ..addListener(_tick);
   File? _file;
+
+  /// The timeline's frames, read for whatever stretch it shows.
+  TimelineFrames? _frames;
   bool _failed = false;
   CutPlan? _plan;
   Handle? _selected;
@@ -73,6 +70,10 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
   Future<VideoPlayerController> _newController() async {
     final File? f = _file ??= await widget.asset.file;
     if (f == null) throw const FileSystemException('The video has no file');
+    _frames ??= TimelineFrames(
+      (List<int> times) =>
+          ref.read(nativeChannelProvider).videoFramesAt(f.path, times, 120),
+    );
     final VideoPlayerController c = VideoPlayerController.file(f);
     try {
       await c.initialize();
@@ -267,6 +268,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
   void dispose() {
     _session.removeListener(_tick);
     _session.dispose();
+    _frames?.dispose();
     super.dispose();
   }
 
@@ -327,9 +329,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
                   EditorReadout(plan: plan, position: _position),
                   CutTimeline(
                     plan: plan,
-                    frames: _file == null
-                        ? null
-                        : ref.watch(_timelineFramesProvider(_file!.path)).value,
+                    frames: _frames!,
                     position: _position,
                     selected: _selected,
                     selectedCut: _selectedCut,
