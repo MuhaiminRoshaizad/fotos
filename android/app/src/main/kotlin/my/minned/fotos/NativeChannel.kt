@@ -27,6 +27,9 @@ class NativeChannel(
 
     @Volatile private var takeout: TakeoutImporter? = null
 
+    // The cut under way, if any; one at a time.
+    private var cutter: VideoCutter? = null
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "exif" -> background(result) { exif(call.argument<String>("path")!!) }
@@ -212,6 +215,35 @@ class NativeChannel(
                 if (item != null && keepTakeout) TakeoutImporter.publishStaged(activity, item)
                 TakeoutImporter.dropReview(activity, id)
                 null
+            }
+            "cutVideo" -> {
+                if (cutter != null) {
+                    result.error("busy", "A video is already being saved", null)
+                    return
+                }
+                val keep = call.argument<List<List<Number>>>("keep")!!.map { it[0].toLong() to it[1].toLong() }
+                val c = VideoCutter(activity, io) { percent ->
+                    channel.invokeMethod("cutProgress", percent)
+                }
+                cutter = c
+                c.start(
+                    call.argument<String>("id")!!.toLong(),
+                    keep,
+                    call.argument<Boolean>("replace")!!,
+                ) { outcome ->
+                    cutter = null
+                    outcome.fold(
+                        { result.success(it) },
+                        { e ->
+                            val code = (e as? VideoCutter.CutException)?.code ?: "failed"
+                            result.error(code, e.message, null)
+                        },
+                    )
+                }
+            }
+            "cutCancel" -> {
+                cutter?.cancel()
+                result.success(null)
             }
             "keepScreenOn" -> {
                 val on = call.argument<Boolean>("on")!!

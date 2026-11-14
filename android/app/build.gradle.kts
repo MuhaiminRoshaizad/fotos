@@ -68,4 +68,7 @@ flutter {
 dependencies {
     // FileProvider for "Open with"; the same version the plugins already resolve.
     implementation("androidx.core:core:1.16.0")
+    // Cuts videos for the editor. The same Media3 release video_player
+    // already ships for playback, so the shared parts are not duplicated.
+    implementation("androidx.media3:media3-transformer:1.9.2")
 }
