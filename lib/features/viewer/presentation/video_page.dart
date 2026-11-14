@@ -327,6 +327,7 @@ class _VideoPageState extends ConsumerState<VideoPage> {
                     duration: AppMotion.short,
                     child: _Controls(
                       path: _file!.path,
+                      modified: widget.asset.modifiedDateSecond ?? 0,
                       controller: c,
                       position: _session.position,
                       gliding: c.value.isPlaying && _session.target == null,
@@ -442,6 +443,7 @@ class _Pill extends StatelessWidget {
 class _Controls extends ConsumerWidget {
   const _Controls({
     required this.path,
+    required this.modified,
     required this.controller,
     required this.position,
     required this.gliding,
@@ -452,6 +454,7 @@ class _Controls extends ConsumerWidget {
   });
 
   final String path;
+  final int modified;
   final VideoPlayerController controller;
 
   /// The position to show: the seek target while one is under way.
@@ -550,6 +553,7 @@ class _Controls extends ConsumerWidget {
           const SizedBox(height: AppSpacing.sm),
           _Filmstrip(
             path: path,
+            modified: modified,
             controller: controller,
             position: position,
             gliding: gliding,
@@ -570,6 +574,7 @@ class _Controls extends ConsumerWidget {
 class _Filmstrip extends ConsumerWidget {
   const _Filmstrip({
     required this.path,
+    required this.modified,
     required this.controller,
     required this.position,
     required this.gliding,
@@ -581,6 +586,9 @@ class _Filmstrip extends ConsumerWidget {
   static const int _slots = 8;
 
   final String path;
+
+  /// When the file last changed, in seconds: a new version gets new frames.
+  final int modified;
   final VideoPlayerController controller;
   final Duration position;
   final bool gliding;
@@ -590,7 +598,9 @@ class _Filmstrip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final VideoFrames frames = ref.watch(videoFramesProvider(path));
+    final VideoFrames frames = ref.watch(
+      videoFramesProvider((path: path, modified: modified)),
+    );
     final Duration total = controller.value.duration;
     final int length = total.inMilliseconds;
     final List<Stretch> slots = <Stretch>[

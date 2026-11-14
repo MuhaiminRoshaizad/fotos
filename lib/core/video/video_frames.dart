@@ -171,23 +171,28 @@ class NativeFrameSource implements FrameSource {
   }
 }
 
-/// The frames of the video file at a path, shared by its viewer page and
-/// its editor. Kept two minutes after both close, so going back to a video
-/// shows its strip at once.
-final videoFramesProvider = Provider.autoDispose.family<VideoFrames, String>((
-  Ref ref,
-  String path,
-) {
-  final VideoFrames frames = VideoFrames(
-    NativeFrameSource(ref.watch(nativeChannelProvider), path, 192),
-  );
-  final link = ref.keepAlive();
-  Timer? expiry;
-  ref.onCancel(() => expiry = Timer(const Duration(minutes: 2), link.close));
-  ref.onResume(() => expiry?.cancel());
-  ref.onDispose(() {
-    expiry?.cancel();
-    frames.dispose();
-  });
-  return frames;
-});
+/// The frames of a video file, shared by its viewer page and its editor,
+/// keyed by its path and when it last changed: a video saved over another
+/// with Replace takes the same path, and must not show the old pictures.
+/// Kept two minutes after both close, so going back to a video shows its
+/// strip at once.
+final videoFramesProvider = Provider.autoDispose
+    .family<VideoFrames, ({String path, int modified})>((
+      Ref ref,
+      ({String path, int modified}) file,
+    ) {
+      final VideoFrames frames = VideoFrames(
+        NativeFrameSource(ref.watch(nativeChannelProvider), file.path, 192),
+      );
+      final link = ref.keepAlive();
+      Timer? expiry;
+      ref.onCancel(
+        () => expiry = Timer(const Duration(minutes: 2), link.close),
+      );
+      ref.onResume(() => expiry?.cancel());
+      ref.onDispose(() {
+        expiry?.cancel();
+        frames.dispose();
+      });
+      return frames;
+    });

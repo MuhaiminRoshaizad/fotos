@@ -80,7 +80,10 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
     final File? f = _file ??= await widget.asset.file;
     if (f == null) throw const FileSystemException('The video has no file');
     _frames ??= ref.listenManual(
-      videoFramesProvider(f.path),
+      videoFramesProvider((
+        path: f.path,
+        modified: widget.asset.modifiedDateSecond ?? 0,
+      )),
       (VideoFrames? _, VideoFrames _) {},
     );
     final VideoPlayerController c = VideoPlayerController.file(f);

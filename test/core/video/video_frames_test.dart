@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/core/platform/native_channel.dart';
 import 'package:fotos/core/video/video_frames.dart';
@@ -204,5 +205,26 @@ void main() {
       'videoFrameIn',
       'videoFramesClose',
     ]);
+  });
+
+  test('a video saved over another at the same path gets its own frames', () {
+    final ProviderContainer c = ProviderContainer();
+    addTearDown(c.dispose);
+    const ({String path, int modified}) before = (
+      path: '/v.mp4',
+      modified: 100,
+    );
+    const ({String path, int modified}) after = (path: '/v.mp4', modified: 200);
+    c.listen(videoFramesProvider(before), (_, _) {});
+    c.listen(videoFramesProvider(after), (_, _) {});
+
+    expect(
+      c.read(videoFramesProvider(after)),
+      isNot(same(c.read(videoFramesProvider(before)))),
+    );
+    expect(
+      c.read(videoFramesProvider(before)),
+      same(c.read(videoFramesProvider(before))),
+    );
   });
 }
