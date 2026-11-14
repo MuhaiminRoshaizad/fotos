@@ -218,6 +218,20 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
     _move(h, ms);
   }
 
+  /// The edit starts at the playhead: everything before it goes, as when
+  /// an intro has just finished playing.
+  void _startHere() {
+    final CutPlan? plan = _plan;
+    if (plan == null) return;
+    _session.pause();
+    // Stops short of a cut after it, as a drag does.
+    setState(() {
+      _plan = plan.move(const Handle.start(), _position);
+      _selected = const Handle.start();
+      _selectedCut = null;
+    });
+  }
+
   void _addCut() {
     final CutPlan? plan = _plan;
     if (plan == null) return;
@@ -380,6 +394,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
                     selectedCut: _selectedCut,
                     canAddCut: plan.addCut(_position) != null,
                     onAddCut: _addCut,
+                    onStartHere: _position > plan.start ? _startHere : null,
                     onKeepCut: _keepCut,
                     onNudge: _nudge,
                     onTypeTime: _typeTime,

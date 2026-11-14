@@ -155,6 +155,7 @@ class EditorTools extends StatelessWidget {
     required this.selectedCut,
     required this.canAddCut,
     required this.onAddCut,
+    required this.onStartHere,
     required this.onTypeTime,
     required this.onKeepCut,
     required this.onNudge,
@@ -166,6 +167,8 @@ class EditorTools extends StatelessWidget {
   final bool canAddCut;
   final VoidCallback onAddCut;
 
+  /// Starts the edit at the playhead: play through an intro, then tap.
+  final VoidCallback? onStartHere;
   final VoidCallback onKeepCut;
   final ValueChanged<int> onNudge;
 
@@ -252,18 +255,25 @@ class EditorTools extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               _ToolButton(
-                icon: CupertinoIcons.scissors,
-                label: 'Cut a section',
-                onTap: canAddCut ? onAddCut : null,
+                icon: CupertinoIcons.arrow_right_to_line,
+                label: 'Start here',
+                onTap: onStartHere,
               ),
-              if (selectedCut != null) ...<Widget>[
-                const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.md),
+              // A selected cut can only be kept; with none, a new one can
+              // be made. One slot keeps the row on one line.
+              if (selectedCut != null)
                 _ToolButton(
                   icon: CupertinoIcons.arrow_uturn_left,
                   label: 'Keep this part',
                   onTap: onKeepCut,
+                )
+              else
+                _ToolButton(
+                  icon: CupertinoIcons.scissors,
+                  label: 'Cut a section',
+                  onTap: canAddCut ? onAddCut : null,
                 ),
-              ],
             ],
           ),
         ],
