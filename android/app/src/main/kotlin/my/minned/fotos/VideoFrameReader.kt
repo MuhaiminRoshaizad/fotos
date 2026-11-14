@@ -6,6 +6,7 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 
 /**
  * Frames of one video for the viewer's strip and the editor's timeline,
@@ -77,6 +78,8 @@ class VideoFrameReader(private val path: String, private val px: Int) {
 
     /** The first keyframe at or after [ms], in ms, or null if unknown. */
     private fun keyframeFrom(ms: Long): Long? = synchronized(keys) {
+        // Not opened after close, or nothing would release it.
+        if (closed) return null
         if (!indexTried) {
             indexTried = true
             index = openIndex()
@@ -110,7 +113,12 @@ class VideoFrameReader(private val path: String, private val px: Int) {
         idle.poll()?.let { return it }
         // Opened outside the lock, so the readers open side by side.
         val mayOpen = synchronized(this) { (made < READERS).also { if (it) made++ } }
-        if (!mayOpen) return idle.take()
+        // Wait for a reader to come back, unless they are closed meanwhile:
+        // a closed reader is released, never returned.
+        while (!mayOpen) {
+            if (closed) return null
+            idle.poll(200, TimeUnit.MILLISECONDS)?.let { return it }
+        }
         return try {
             MediaMetadataRetriever().apply { setDataSource(path) }
         } catch (_: Exception) {
