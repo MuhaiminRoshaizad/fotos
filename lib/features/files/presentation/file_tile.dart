@@ -191,8 +191,15 @@ class _Pages extends ConsumerWidget {
     final int? pages = ref
         .watch(zipPagesProvider((entry.path, entry.size)))
         .value;
-    if (pages == null) return const SizedBox.shrink();
-    return CornerBadge(icon: CupertinoIcons.book_fill, text: '$pages');
+    // Fades in once counted, as a cover fades in over its placeholder.
+    return AnimatedSwitcher(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : AppMotion.short,
+      child: pages == null
+          ? const SizedBox.shrink()
+          : CornerBadge(icon: CupertinoIcons.book_fill, text: '$pages'),
+    );
   }
 }
 

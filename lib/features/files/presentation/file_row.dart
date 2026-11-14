@@ -96,28 +96,41 @@ class FileRow extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 16, color: cs.onSurface),
                     ),
-                    Text.rich(
-                      TextSpan(
-                        children: <InlineSpan>[
-                          if (pinned) ...<InlineSpan>[
-                            WidgetSpan(
-                              alignment: PlaceholderAlignment.middle,
-                              child: Icon(
-                                CupertinoIcons.pin_fill,
-                                size: 12,
-                                color: cs.onSurfaceVariant,
+                    // A comic's page count arrives after the row is
+                    // drawn; the line cross-fades to take it in.
+                    AnimatedSwitcher(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : AppMotion.short,
+                      layoutBuilder: (Widget? current, List<Widget> previous) =>
+                          Stack(
+                            alignment: Alignment.centerLeft,
+                            children: <Widget>[...previous, ?current],
+                          ),
+                      child: Text.rich(
+                        key: ValueKey<String>(meta),
+                        TextSpan(
+                          children: <InlineSpan>[
+                            if (pinned) ...<InlineSpan>[
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: Icon(
+                                  CupertinoIcons.pin_fill,
+                                  size: 12,
+                                  color: cs.onSurfaceVariant,
+                                ),
                               ),
-                            ),
-                            const TextSpan(text: ' Pinned · '),
+                              const TextSpan(text: ' Pinned · '),
+                            ],
+                            TextSpan(text: meta),
                           ],
-                          TextSpan(text: meta),
-                        ],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],
