@@ -24,6 +24,12 @@ class TimelineFrames extends ChangeNotifier {
   /// At most this many frames per trip to Android.
   static const int batch = 8;
 
+  /// At most this many frames kept; past it, those farthest from the
+  /// stretch last shown go first. Scrolling a zoomed-in hour asks for
+  /// thousands.
+  static const int keep = 400;
+  int _near = 0;
+
   /// The frame for [ms], or the nearest one read so far.
   Uint8List? frameNear(int ms) {
     final Uint8List? exact = _frames[ms];
@@ -39,6 +45,7 @@ class TimelineFrames extends ChangeNotifier {
 
   /// The moments on screen now; replaces what was asked for before.
   void want(List<int> times) {
+    if (times.isNotEmpty) _near = times[times.length ~/ 2];
     _wanted = <int>[
       for (final int t in times)
         if (!_frames.containsKey(t) && !_failed.contains(t)) t,
@@ -62,6 +69,7 @@ class TimelineFrames extends ChangeNotifier {
           _frames[next[i]] = f;
         }
       }
+      _trim();
       notifyListeners();
     } on Object {
       _failed.addAll(next);
@@ -69,6 +77,16 @@ class TimelineFrames extends ChangeNotifier {
       _reading = false;
     }
     _pump();
+  }
+
+  void _trim() {
+    while (_frames.length > keep) {
+      final int first = _frames.firstKey()!;
+      final int last = _frames.lastKey()!;
+      _frames.remove(
+        (_near - first).abs() > (last - _near).abs() ? first : last,
+      );
+    }
   }
 
   @override
