@@ -64,6 +64,9 @@ Future<SavedEdit?> saveWithProgress(
           'fotos needs All files access to save beside the original. The '
               'original video is unchanged.',
         CutFailure.busy => 'Another video is still saving.',
+        CutFailure.afterTrash =>
+          'The original went to Recently deleted, but the edit couldn\'t '
+              'be finished. Restore the original from Recently deleted.',
         _ =>
           'Something went wrong while saving. The original video is '
               'unchanged.',

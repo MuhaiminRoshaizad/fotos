@@ -232,16 +232,21 @@ class NativeChannel(
                     return
                 }
                 val keep = call.argument<List<List<Number>>>("keep")!!.map { it[0].toLong() to it[1].toLong() }
+                val id = call.argument<String>("id")!!.toLong()
+                val replace = call.argument<Boolean>("replace")!!
                 val c = VideoCutter(activity, io) { percent ->
                     channel.invokeMethod("cutProgress", percent)
                 }
+                // Only once the arguments are read: a bad call must not
+                // leave every later save refused as busy.
                 cutter = c
-                c.start(
-                    call.argument<String>("id")!!.toLong(),
-                    keep,
-                    call.argument<Boolean>("replace")!!,
-                ) { outcome ->
+                // An encode can take minutes; the phone mustn't sleep and
+                // pause it partway.
+                val awake = android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                activity.window.addFlags(awake)
+                c.start(id, keep, replace) { outcome ->
                     cutter = null
+                    activity.window.clearFlags(awake)
                     outcome.fold(
                         { result.success(it) },
                         { e ->

@@ -273,8 +273,16 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       ..invalidate(libraryProvider)
       ..invalidate(albumsProvider)
       ..invalidate(favouritesProvider);
-    final AssetEntity? saved = await AssetEntity.fromId(out.saved.id);
-    if (!mounted || saved == null) return;
+    // Android can be slow to list a new file; the save stands, and the
+    // library shows it once listed.
+    final AssetEntity? saved = out.saved.id.isEmpty
+        ? null
+        : await AssetEntity.fromId(out.saved.id);
+    if (!mounted) return;
+    if (saved == null) {
+      showToast(context, 'Saved as ${out.saved.name}');
+      return;
+    }
     final int at = _items.indexWhere((AssetEntity x) => x.id == e.id);
     if (at < 0) return;
     setState(() {

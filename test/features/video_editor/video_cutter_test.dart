@@ -56,6 +56,7 @@ void main() {
       ('no_space', CutFailure.noSpace),
       ('cancelled', CutFailure.cancelled),
       ('busy', CutFailure.busy),
+      ('after_trash', CutFailure.afterTrash),
       ('failed', CutFailure.failed),
       ('anything else', CutFailure.failed),
     ]) {

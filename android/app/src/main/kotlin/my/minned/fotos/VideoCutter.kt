@@ -73,6 +73,10 @@ class VideoCutter(
     // Set once the encode is checked and saving begins: from there a
     // cancel could strand the original in the trash with no edit to show.
     private var committing = false
+
+    // Set once the original is in the trash: from then on the new file is
+    // the only copy outside the trash, and is never deleted, whatever fails.
+    private var trashed = false
     private var reply: ((Result<Map<String, Any?>>) -> Unit)? = null
 
     /**
@@ -101,6 +105,7 @@ class VideoCutter(
                 if (dir.usableSpace < src.file.length() * 2 + 64L * 1024 * 1024) {
                     throw CutException("no_space", "Not enough free space")
                 }
+                clearStale(dir)
                 val out = File(dir, ".${src.file.nameWithoutExtension}.fotos-${System.currentTimeMillis()}.mp4")
                 temp = out
                 main.post { encode(src, keep, out, expected, replace) }
@@ -280,6 +285,7 @@ class VideoCutter(
         }
         try {
             MediaRequests.trash(activity, listOf(src.id.toString()), listOf(true), true) { ok ->
+                trashed = ok
                 io.execute {
                     // A declined trash keeps the original, and the edit
                     // becomes a copy beside it.
@@ -298,12 +304,22 @@ class VideoCutter(
             // moved it to the trash yet; a copy's name is better than
             // failing with the original already gone.
             val wanted = File(out.parentFile, name)
-            val target = if (wanted.exists()) File(out.parentFile, copyName(src.file)) else wanted
+            var target = if (wanted.exists()) File(out.parentFile, copyName(src.file)) else wanted
             if (!out.renameTo(target)) {
-                throw CutException("failed", "Could not name the new video ${target.name}")
+                // One more try under a copy's name before giving up.
+                target = File(out.parentFile, copyName(src.file))
+                if (!out.renameTo(target)) {
+                    throw CutException("failed", "Could not name the new video ${target.name}")
+                }
             }
             temp = null
-            val uri = scan(target) ?: throw CutException("failed", "Android did not list the new video")
+            // The file is in place under its name, so the save stands even
+            // if the media scan is slow to list it; the library catches up.
+            val uri = scan(target)
+            if (uri == null) {
+                succeed(mapOf("id" to "", "name" to target.name, "replaced" to replaced))
+                return
+            }
             if (src.favourite) {
                 // A favourite stays one; best effort.
                 try {
@@ -343,13 +359,33 @@ class VideoCutter(
             transformer = null
             val t = temp
             temp = null
+            if (trashed) {
+                // The original is in the trash: keep the edit, hidden or
+                // not, and say so, rather than claim nothing changed.
+                reply?.invoke(Result.failure(CutException("after_trash", e.message ?: "Saving failed")))
+                return@post
+            }
             if (t != null) io.execute { t.delete() }
             reply?.invoke(Result.failure(e))
         }
     }
 
+    /**
+     * Removes temp files a save left in [dir] more than a day ago, as one
+     * cut short by the app being closed. A recent one may belong to a save
+     * still finishing, so it stays.
+     */
+    private fun clearStale(dir: File) {
+        val dayAgo = System.currentTimeMillis() - 24L * 60 * 60 * 1000
+        dir.listFiles { f -> f.isFile && staleTemp.matches(f.name) && f.lastModified() < dayAgo }
+            ?.forEach { it.delete() }
+    }
+
     companion object {
         private val editedSuffix = Regex(""" \(edited(?: \d+)?\)$""")
+
+        /** The hidden file a save encodes into: ".Trip.fotos-1794628184720.mp4". */
+        private val staleTemp = Regex("""^\..*\.fotos-\d+\.mp4$""")
 
         /**
          * "Trip.mp4" -> "Trip (edited).mp4", then "Trip (edited 2).mp4" and

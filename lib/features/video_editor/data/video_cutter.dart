@@ -20,8 +20,9 @@ class SavedEdit {
   final bool replaced;
 }
 
-/// Why a save did not happen. The original is untouched in every case.
-enum CutFailure { noAccess, noSpace, cancelled, busy, failed }
+/// Why a save did not finish. The original is untouched in every case but
+/// [afterTrash]: there it is in Recently deleted, and the edit is kept.
+enum CutFailure { noAccess, noSpace, cancelled, busy, failed, afterTrash }
 
 class CutException implements Exception {
   const CutException(this.reason, this.detail);
@@ -71,6 +72,7 @@ class VideoCutter {
         'no_space' => CutFailure.noSpace,
         'cancelled' => CutFailure.cancelled,
         'busy' => CutFailure.busy,
+        'after_trash' => CutFailure.afterTrash,
         _ => CutFailure.failed,
       }, e.message);
     }
