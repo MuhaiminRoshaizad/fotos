@@ -20,7 +20,7 @@ import 'file_thumb.dart';
 /// While the folder is selecting, [selected] is non-null: the row shows a
 /// tick, a tap toggles it, and a drag that starts on the tick sweeps the
 /// rows it passes over.
-class FileRow extends StatelessWidget {
+class FileRow extends ConsumerWidget {
   const FileRow({
     super.key,
     required this.entry,
@@ -49,13 +49,21 @@ class FileRow extends StatelessWidget {
   final ValueChanged<Offset>? onSweepUpdate;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ColorScheme cs = Theme.of(context).colorScheme;
     final bool selecting = selected != null;
     final bool on = selected ?? false;
+    // A comic says how long it is before how big.
+    final int? pages = entry.kind == FileKind.zip
+        ? ref.watch(zipPagesProvider((entry.path, entry.size))).value
+        : null;
     final String meta = entry.isFolder
         ? Fmt.date(entry.modified)
-        : '${Fmt.size(entry.size)} · ${Fmt.date(entry.modified)}';
+        : <String>[
+            if (pages != null) Fmt.count(pages, 'page'),
+            Fmt.size(entry.size),
+            Fmt.date(entry.modified),
+          ].join(' · ');
     final Widget row = Material(
       color: on
           ? Color.alphaBlend(cs.primary.withValues(alpha: 0.12), cs.groupedRow)

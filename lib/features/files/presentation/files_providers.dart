@@ -57,6 +57,13 @@ final zipCoverProvider = FutureProvider.family<Uint8List?, (String, int)>(
       ref.watch(nativeChannelProvider).zipCover(zip.$1, 400),
 );
 
+/// A comic's page count for its tile, or null for a ZIP that isn't one.
+/// Keyed by size too, so a rewritten archive is counted again.
+final zipPagesProvider = FutureProvider.family<int?, (String, int)>(
+  (Ref ref, (String, int) zip) =>
+      ref.watch(nativeChannelProvider).zipPageCount(zip.$1),
+);
+
 /// The files inside a ZIP, for its contents screen. Invalidated after a
 /// delete so the grid reads the rewritten archive.
 final zipEntriesProvider = FutureProvider.autoDispose

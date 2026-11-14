@@ -305,6 +305,13 @@ class NativeChannel {
         'px': px,
       });
 
+  /// How many pages the ZIP at [path] holds when it reads as a comic (all
+  /// pictures but a few extras), or null when it doesn't.
+  Future<int?> zipPageCount(String path) => _channel.invokeMethod<int>(
+    'zipPageCount',
+    <String, Object>{'path': path},
+  );
+
   /// The files inside the ZIP at [path], in the order the archive lists them.
   Future<List<ZipEntry>> zipEntries(String path) async {
     final List<Object?> list = (await _channel.invokeMethod<List<Object?>>(

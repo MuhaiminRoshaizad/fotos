@@ -126,6 +126,9 @@ class NativeChannel(
             "zipCover" -> background(result) {
                 FilesNative.zipCover(call.argument<String>("path")!!, call.argument<Int>("px")!!)
             }
+            "zipPageCount" -> background(result, thumbs) {
+                FilesNative.zipPageCount(call.argument<String>("path")!!)
+            }
             "zipEntries" -> background(result) {
                 FilesNative.zipEntries(call.argument<String>("path")!!)
             }

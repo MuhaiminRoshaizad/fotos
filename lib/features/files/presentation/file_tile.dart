@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/corner_badge.dart';
 import '../../../core/widgets/inset_group.dart';
 import '../../../core/widgets/motion.dart';
 import '../domain/file_entry.dart';
@@ -82,6 +83,12 @@ class FileTile extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  if (entry.kind == FileKind.zip)
+                    Positioned(
+                      right: 4,
+                      bottom: 4,
+                      child: _Pages(entry: entry),
+                    ),
                   if (pinned && !selecting)
                     const Positioned(
                       left: 6,
@@ -171,6 +178,21 @@ class FileTile extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// A comic's page count in the corner; nothing for a ZIP that isn't one.
+class _Pages extends ConsumerWidget {
+  const _Pages({required this.entry});
+  final FileEntry entry;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int? pages = ref
+        .watch(zipPagesProvider((entry.path, entry.size)))
+        .value;
+    if (pages == null) return const SizedBox.shrink();
+    return CornerBadge(icon: CupertinoIcons.book_fill, text: '$pages');
   }
 }
 

@@ -5,6 +5,7 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../format/formatters.dart';
 import '../theme/app_tokens.dart';
+import '../widgets/corner_badge.dart';
 import '../widgets/select_check.dart';
 import 'media_flight.dart';
 import 'motion_name.dart';
@@ -100,28 +101,9 @@ class MediaTile extends StatelessWidget {
                   Positioned(
                     right: 4,
                     bottom: 4,
-                    child: _Badge(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          const Icon(
-                            CupertinoIcons.play_fill,
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                          Text(
-                            Fmt.duration(asset.videoDuration),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              fontFeatures: <FontFeature>[
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: CornerBadge(
+                      icon: CupertinoIcons.play_fill,
+                      text: Fmt.duration(asset.videoDuration),
                     ),
                   ),
                 if (!video && !selecting && looksLikeMotionPhoto(asset.title))
@@ -164,21 +146,4 @@ class MediaTile extends StatelessWidget {
       },
     );
   }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: 0.6),
-      borderRadius: BorderRadius.circular(AppRadii.sm),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(2, 1, 6, 1),
-      child: child,
-    ),
-  );
 }

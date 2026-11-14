@@ -106,13 +106,7 @@ object FilesNative {
      */
     fun zipCover(path: String, px: Int): ByteArray? = try {
         ZipFile(path).use { zip ->
-            val images = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "avif")
-            val entry = zip.entries().asSequence()
-                .filter { !it.isDirectory && it.name.substringAfterLast('.', "").lowercase() in images }
-                // Skips macOS resource forks and anything too large to be a page.
-                .filter { !it.name.startsWith("__MACOSX/") && it.size in 1..40_000_000 }
-                .minByOrNull { it.name.lowercase() }
-                ?: return@use null
+            val entry = pages(zip).minByOrNull { it.name.lowercase() } ?: return@use null
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, bounds) }
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@use null
@@ -123,6 +117,37 @@ object FilesNative {
             val bitmap = zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, options) }
                 ?: return@use null
             ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 80, it) }.toByteArray()
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    private val pictureTypes = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "avif")
+
+    /**
+     * The pictures in [zip] that count as pages: skips macOS resource forks
+     * and anything too large to be a page.
+     */
+    private fun pages(zip: ZipFile): Sequence<ZipEntry> = zip.entries().asSequence().filter {
+        !it.isDirectory &&
+            !it.name.startsWith("__MACOSX/") &&
+            it.name.substringAfterLast('.', "").lowercase() in pictureTypes &&
+            it.size in 1..40_000_000
+    }
+
+    /**
+     * How many pages the ZIP at [path] holds when it reads as a comic, or
+     * null when it doesn't: a comic is pictures but for a few extras such as
+     * ComicInfo.xml, while a Takeout or backup ZIP is full of other files.
+     * Reads only the archive's index.
+     */
+    fun zipPageCount(path: String): Int? = try {
+        ZipFile(path).use { zip ->
+            val pictures = pages(zip).count()
+            val others = zip.entries().asSequence().count {
+                !it.isDirectory && !it.name.startsWith("__MACOSX/")
+            } - pictures
+            pictures.takeIf { it > 0 && others <= maxOf(3, it / 10) }
         }
     } catch (_: Exception) {
         null
@@ -168,7 +193,6 @@ object FilesNative {
      * Skips macOS resource forks, as [zipCover] does.
      */
     fun zipEntries(path: String): List<Map<String, Any>> {
-        val images = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "avif")
         ZipFile(path).use { zip ->
             return zip.entries().asSequence()
                 .filter { !it.isDirectory && !it.name.startsWith("__MACOSX/") }
@@ -176,7 +200,7 @@ object FilesNative {
                     mapOf(
                         "name" to e.name,
                         "size" to maxOf(e.size, 0L),
-                        "isImage" to (e.name.substringAfterLast('.', "").lowercase() in images),
+                        "isImage" to (e.name.substringAfterLast('.', "").lowercase() in pictureTypes),
                     )
                 }
                 .toList()
