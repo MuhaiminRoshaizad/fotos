@@ -8,6 +8,7 @@ import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../data/video_cutter.dart';
 import '../domain/cut_plan.dart';
+import '../domain/save_estimate.dart';
 
 /// Saves [plan] behind a dialog that shows how far the encode has got and
 /// can be cancelled until saving begins. Returns the saved video, or null
@@ -83,57 +84,88 @@ Future<SavedEdit?> saveWithProgress(
   return null;
 }
 
-class _SavingDialog extends StatelessWidget {
+class _SavingDialog extends StatefulWidget {
   const _SavingDialog({required this.percent, required this.onCancel});
 
   final ValueListenable<int> percent;
   final VoidCallback onCancel;
 
   @override
+  State<_SavingDialog> createState() => _SavingDialogState();
+}
+
+class _SavingDialogState extends State<_SavingDialog> {
+  final Stopwatch _clock = Stopwatch()..start();
+  late final SaveEstimate _estimate = SaveEstimate(() => _clock.elapsed);
+
+  late final Timer _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.percent.addListener(_report);
+    // The time left counts down between progress reports.
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  }
+
+  void _report() {
+    _estimate.report(widget.percent.value);
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _tick.cancel();
+    widget.percent.removeListener(_report);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: percent,
-      builder: (BuildContext context, int p, _) {
-        // At 100 the encode is done and the file is being checked and
-        // named: too late to stop safely.
-        final bool finishing = p >= 100;
-        return CupertinoAlertDialog(
-          title: Text(finishing ? 'Finishing' : 'Saving video'),
-          content: Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.md),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.pill),
-                  child: LinearProgressIndicator(
-                    value: finishing ? null : p / 100,
-                    minHeight: 6,
-                    color: Theme.of(context).colorScheme.primary,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  finishing ? 'Checking the new video' : '$p%',
-                  style: const TextStyle(
-                    fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
+    final int p = widget.percent.value;
+    // At 100 the encode is done and the file is being checked and named:
+    // too late to stop safely.
+    final bool finishing = p >= 100;
+    const TextStyle figures = TextStyle(
+      fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
+    );
+    return CupertinoAlertDialog(
+      title: Text(finishing ? 'Finishing' : 'Saving video'),
+      content: Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadii.pill),
+              child: LinearProgressIndicator(
+                value: finishing ? null : p / 100,
+                minHeight: 6,
+                color: Theme.of(context).colorScheme.primary,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
+              ),
             ),
-          ),
-          actions: <Widget>[
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: finishing ? null : onCancel,
-              child: const Text('Cancel'),
+            const SizedBox(height: AppSpacing.sm),
+            Text(finishing ? 'Checking the new video' : '$p%', style: figures),
+            // Always one line here, so the dialog doesn't change size.
+            Text(
+              finishing ? ' ' : timeLeft(_estimate.left),
+              style: figures.copyWith(
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
             ),
           ],
-        );
-      },
+        ),
+      ),
+      actions: <Widget>[
+        CupertinoDialogAction(
+          isDestructiveAction: true,
+          onPressed: finishing ? null : widget.onCancel,
+          child: const Text('Cancel'),
+        ),
+      ],
     );
   }
 }
