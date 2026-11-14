@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_tokens.dart';
@@ -58,9 +58,16 @@ class EditorTopBar extends StatelessWidget {
       height: 52,
       child: Row(
         children: <Widget>[
-          CupertinoButton(
-            onPressed: onCancel,
-            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+          Pressable(
+            label: 'Cancel',
+            onTap: onCancel,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white, fontSize: 17),
+              ),
+            ),
           ),
           const Expanded(
             child: Text(
@@ -73,13 +80,19 @@ class EditorTopBar extends StatelessWidget {
               ),
             ),
           ),
-          CupertinoButton(
-            onPressed: canSave ? onSave : null,
-            child: Text(
-              'Save',
-              style: TextStyle(
-                color: canSave ? editYellow : Colors.white38,
-                fontWeight: FontWeight.w600,
+          // Dim until there is something to save, then fades bright.
+          Pressable(
+            label: 'Save',
+            onTap: canSave ? onSave : null,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Text(
+                'Save',
+                style: TextStyle(
+                  color: editYellow,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -199,57 +212,62 @@ class EditorTools extends StatelessWidget {
         children: <Widget>[
           SizedBox(
             height: 48,
-            child: h == null
-                ? const Center(
-                    child: Text(
-                      'Drag the yellow ends to trim. Pinch the timeline to '
-                      'zoom in on a long video.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white60, fontSize: 13),
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      _Nudge(
-                        icon: CupertinoIcons.chevron_left,
-                        label: 'Back a tenth of a second',
-                        onStep: (int size) => onNudge(-size),
+            child: AnimatedSwitcher(
+              duration: _motion(context),
+              child: h == null
+                  ? const Center(
+                      key: ValueKey<String>('hint'),
+                      child: Text(
+                        'Drag the yellow ends to trim. Pinch the timeline to '
+                        'zoom in on a long video.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white60, fontSize: 13),
                       ),
-                      // Tap to type the time instead.
-                      Pressable(
-                        label: 'Type a time for ${_name(h)}',
-                        onTap: onTypeTime,
-                        child: SizedBox(
-                          width: 170,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: <Widget>[
-                              Text(
-                                '${_name(h)} ${clock(plan.at(h))}',
-                                style: _label.copyWith(
-                                  fontFeatures: const <FontFeature>[
-                                    FontFeature.tabularFigures(),
-                                  ],
+                    )
+                  : Row(
+                      key: const ValueKey<String>('handle'),
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        _Nudge(
+                          icon: CupertinoIcons.chevron_left,
+                          label: 'Back a tenth of a second',
+                          onStep: (int size) => onNudge(-size),
+                        ),
+                        // Tap to type the time instead.
+                        Pressable(
+                          label: 'Type a time for ${_name(h)}',
+                          onTap: onTypeTime,
+                          child: SizedBox(
+                            width: 170,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: <Widget>[
+                                Text(
+                                  '${_name(h)} ${clock(plan.at(h))}',
+                                  style: _label.copyWith(
+                                    fontFeatures: const <FontFeature>[
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: AppSpacing.xs),
-                              const Icon(
-                                CupertinoIcons.pencil,
-                                size: 16,
-                                color: Colors.white70,
-                              ),
-                            ],
+                                const SizedBox(width: AppSpacing.xs),
+                                const Icon(
+                                  CupertinoIcons.pencil,
+                                  size: 16,
+                                  color: Colors.white70,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      _Nudge(
-                        icon: CupertinoIcons.chevron_right,
-                        label: 'On a tenth of a second',
-                        onStep: (int size) => onNudge(size),
-                      ),
-                    ],
-                  ),
+                        _Nudge(
+                          icon: CupertinoIcons.chevron_right,
+                          label: 'On a tenth of a second',
+                          onStep: (int size) => onNudge(size),
+                        ),
+                      ],
+                    ),
+            ),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -261,19 +279,32 @@ class EditorTools extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.md),
               // A selected cut can only be kept; with none, a new one can
-              // be made. One slot keeps the row on one line.
-              if (selectedCut != null)
-                _ToolButton(
-                  icon: CupertinoIcons.arrow_uturn_left,
-                  label: 'Keep this part',
-                  onTap: onKeepCut,
-                )
-              else
-                _ToolButton(
-                  icon: CupertinoIcons.scissors,
-                  label: 'Cut a section',
-                  onTap: canAddCut ? onAddCut : null,
-                ),
+              // be made. One slot keeps the row on one line, and the two
+              // trade places with a quick fade.
+              AnimatedSwitcher(
+                duration: _motion(context),
+                transitionBuilder: (Widget child, Animation<double> a) =>
+                    FadeTransition(
+                      opacity: a,
+                      child: ScaleTransition(
+                        scale: Tween<double>(begin: 0.92, end: 1).animate(a),
+                        child: child,
+                      ),
+                    ),
+                child: selectedCut != null
+                    ? _ToolButton(
+                        key: const ValueKey<String>('keep'),
+                        icon: CupertinoIcons.arrow_uturn_left,
+                        label: 'Keep this part',
+                        onTap: onKeepCut,
+                      )
+                    : _ToolButton(
+                        key: const ValueKey<String>('cut'),
+                        icon: CupertinoIcons.scissors,
+                        label: 'Cut a section',
+                        onTap: canAddCut ? onAddCut : null,
+                      ),
+              ),
             ],
           ),
         ],
@@ -281,6 +312,10 @@ class EditorTools extends StatelessWidget {
     );
   }
 }
+
+/// A short fade for the editor's controls; none with "Remove animations".
+Duration _motion(BuildContext context) =>
+    MediaQuery.disableAnimationsOf(context) ? Duration.zero : AppMotion.short;
 
 /// A step button that repeats while held: a tenth of a second a step at
 /// first, then a whole second once held for about a second.
@@ -313,34 +348,37 @@ class _NudgeState extends State<_Nudge> {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: widget.label,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+    // Pressable gives the tap and the press-in sink; holding is caught
+    // around it, so a held button sinks too.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPressStart: (_) {
+        widget.onStep(100);
+        int steps = 0;
+        _repeat = Timer.periodic(const Duration(milliseconds: 90), (_) {
+          steps++;
+          widget.onStep(steps < 11 ? 100 : 1000);
+        });
+      },
+      onLongPressEnd: (_) => _stop(),
+      onLongPressCancel: _stop,
+      child: Pressable(
+        label: widget.label,
+        minSize: const Size(48, 48),
         onTap: () => widget.onStep(100),
-        onLongPressStart: (_) {
-          widget.onStep(100);
-          int steps = 0;
-          _repeat = Timer.periodic(const Duration(milliseconds: 90), (_) {
-            steps++;
-            widget.onStep(steps < 11 ? 100 : 1000);
-          });
-        },
-        onLongPressEnd: (_) => _stop(),
-        onLongPressCancel: _stop,
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Icon(widget.icon, color: Colors.white),
-        ),
+        child: Icon(widget.icon, color: Colors.white),
       ),
     );
   }
 }
 
 class _ToolButton extends StatelessWidget {
-  const _ToolButton({required this.icon, required this.label, this.onTap});
+  const _ToolButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -348,7 +386,8 @@ class _ToolButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = onTap == null ? Colors.white38 : Colors.white;
+    // Pressable dims it, with a fade, while it can't be used.
+    const Color color = Colors.white;
     return Pressable(
       label: label,
       onTap: onTap,
@@ -366,7 +405,7 @@ class _ToolButton extends StatelessWidget {
           children: <Widget>[
             Icon(icon, size: 20, color: color),
             const SizedBox(width: AppSpacing.sm),
-            Text(label, style: TextStyle(color: color, fontSize: 15)),
+            Text(label, style: const TextStyle(color: color, fontSize: 15)),
           ],
         ),
       ),

@@ -368,7 +368,34 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
                                 aspectRatio: c.value.aspectRatio,
                                 child: VideoPlayer(c),
                               ),
-                              if (!c.value.isPlaying) const EditorPlayBadge(),
+                              // As in the viewer: the badge pops in when
+                              // playback stops and shrinks away as it starts.
+                              AnimatedSwitcher(
+                                duration:
+                                    MediaQuery.disableAnimationsOf(context)
+                                    ? Duration.zero
+                                    : const Duration(milliseconds: 220),
+                                reverseDuration: const Duration(
+                                  milliseconds: 140,
+                                ),
+                                switchInCurve: Curves.easeOutBack,
+                                switchOutCurve: Curves.easeIn,
+                                transitionBuilder:
+                                    (Widget child, Animation<double> a) =>
+                                        FadeTransition(
+                                          opacity: a,
+                                          child: ScaleTransition(
+                                            scale: Tween<double>(
+                                              begin: 0.7,
+                                              end: 1,
+                                            ).animate(a),
+                                            child: child,
+                                          ),
+                                        ),
+                                child: c.value.isPlaying
+                                    ? const SizedBox.shrink()
+                                    : const EditorPlayBadge(),
+                              ),
                             ],
                           ),
                         ),
