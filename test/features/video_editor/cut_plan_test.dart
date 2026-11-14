@@ -73,6 +73,11 @@ void main() {
     expect(p.cuts.single.start, 20000 + min);
   });
 
+  test('a cut can be made as wide as the strip shows, around the playhead', () {
+    final (CutPlan p, _) = CutPlan.whole(3600000).addCut(30000, width: 3000)!;
+    expect(p.cuts.single, const Span(28500, 31500));
+  });
+
   test('a removed cut is kept again', () {
     CutPlan p = CutPlan.whole(100000);
     (p, _) = p.addCut(50000)!;

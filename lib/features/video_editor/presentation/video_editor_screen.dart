@@ -40,6 +40,8 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
     ..addListener(_tick);
   File? _file;
 
+  final GlobalKey<CutTimelineState> _timeline = GlobalKey<CutTimelineState>();
+
   /// The timeline's frames, read for whatever stretch it shows.
   TimelineFrames? _frames;
   bool _failed = false;
@@ -235,7 +237,13 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
   void _addCut() {
     final CutPlan? plan = _plan;
     if (plan == null) return;
-    final (CutPlan, int)? added = plan.addCut(_position);
+    // A third of what the strip shows, so both of its edges are in view
+    // at any zoom: seconds on a zoomed-in hour, not six minutes.
+    final int? span = _timeline.currentState?.visibleSpan;
+    final (CutPlan, int)? added = plan.addCut(
+      _position,
+      width: span == null ? null : span ~/ 3,
+    );
     if (added == null) {
       return;
     }
@@ -403,6 +411,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
                 if (plan != null && c != null) ...<Widget>[
                   EditorReadout(plan: plan, position: _position),
                   CutTimeline(
+                    key: _timeline,
                     plan: plan,
                     frames: _frames!,
                     position: _position,

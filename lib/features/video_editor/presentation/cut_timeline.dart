@@ -79,6 +79,9 @@ class CutTimelineState extends State<CutTimeline>
   /// The view now: what the strip shows.
   TimelineView get view => _view!;
 
+  /// How much of the video the strip shows now, in ms.
+  int get visibleSpan => (view.msPerPoint * _width).round();
+
   // A handle being dragged, where on it the finger took hold, and the
   // finger's last place, for scrolling along at an edge.
   Handle? _handle;
