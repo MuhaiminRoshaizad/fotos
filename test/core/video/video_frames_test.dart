@@ -146,6 +146,39 @@ void main() {
   );
 
   test(
+    'a full store still keeps the pictures of the tiles on screen',
+    () async {
+      final _Source source = _Source();
+      final VideoFrames frames = VideoFrames(source);
+      addTearDown(frames.dispose);
+      Future<void> answerAll() async {
+        for (int i = 0; i < source.reads.length; i++) {
+          if (!source.reads[i].done.isCompleted) source.answer(i);
+        }
+        await pumpEventQueue();
+      }
+
+      // A zoomed-in scroll through the first 400 seconds fills the store.
+      for (int at = 0; at < 400; at += 10) {
+        frames.want(_tiles(at * 1000, 1000, 10), focus: (at + 5) * 1000);
+        for (int k = 0; k < 4; k++) {
+          await answerAll();
+        }
+      }
+      // Zoomed out to 17-minute tiles with the playhead near the start: the
+      // far tiles' pictures are the farthest from it, and still on screen.
+      final List<Stretch> wide = _tiles(0, 1024000, 4);
+      for (int k = 0; k < 5; k++) {
+        frames.want(wide, focus: 180000);
+        await answerAll();
+      }
+
+      expect(frames.frameIn(3072000, 4096000), isNotNull);
+      expect(frames.loading(3072000, 4096000), isFalse);
+    },
+  );
+
+  test(
     'lets go of the file once idle, and opens it again when asked',
     () async {
       final _Source source = _Source();

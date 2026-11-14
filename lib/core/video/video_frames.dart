@@ -52,6 +52,7 @@ class VideoFrames extends ChangeNotifier {
   final Set<int> _failed = <int>{};
   final Set<int> _reading = <int>{};
   List<Stretch> _wanted = const <Stretch>[];
+  List<Stretch> _onScreen = const <Stretch>[];
   int _focus = 0;
   Timer? _idle;
   bool _disposed = false;
@@ -73,6 +74,7 @@ class VideoFrames extends ChangeNotifier {
   void want(List<Stretch> stretches, {required int focus}) {
     if (_disposed) return;
     _focus = focus;
+    _onScreen = List<Stretch>.of(stretches);
     _wanted = <Stretch>[
       for (final Stretch s in stretches)
         if (loading(s.from, s.until)) s,
@@ -129,13 +131,25 @@ class VideoFrames extends ChangeNotifier {
     _pump();
   }
 
+  /// Drops the pictures farthest from the playhead, but never one a tile
+  /// on screen is showing: dropped, it would be read again at once, and
+  /// dropped again, for as long as that tile stayed in view.
   void _trim() {
+    bool showing(int ms) =>
+        _onScreen.any((Stretch s) => ms >= s.from && ms < s.until);
     while (_frames.length > keep) {
-      final int first = _frames.firstKey()!;
-      final int last = _frames.lastKey()!;
-      _frames.remove(
-        (_focus - first).abs() > (last - _focus).abs() ? first : last,
-      );
+      int? drop;
+      int farthest = -1;
+      for (final int ms in _frames.keys) {
+        if (showing(ms)) continue;
+        final int gap = (ms - _focus).abs();
+        if (gap > farthest) {
+          farthest = gap;
+          drop = ms;
+        }
+      }
+      if (drop == null) return;
+      _frames.remove(drop);
     }
   }
 
