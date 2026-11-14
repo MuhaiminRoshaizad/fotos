@@ -1,7 +1,7 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_tokens.dart';
+import 'pinch_first.dart';
 
 /// Pinch to zoom [child], and with [doubleTap] a double-tap zooms in at the
 /// spot tapped, or back out. At normal size it never takes a single finger,
@@ -144,9 +144,9 @@ class ZoomViewState extends State<ZoomView>
           // reaches whatever turns the page.
           behavior: HitTestBehavior.opaque,
           gestures: <Type, GestureRecognizerFactory>{
-            _PinchFirst: GestureRecognizerFactoryWithHandlers<_PinchFirst>(
-              () => _PinchFirst(zoomed: () => _zoomed),
-              (_PinchFirst r) => r
+            PinchFirst: GestureRecognizerFactoryWithHandlers<PinchFirst>(
+              () => PinchFirst(oneFinger: () => _zoomed),
+              (PinchFirst r) => r
                 ..onStart = _onStart
                 ..onUpdate = _onUpdate
                 ..onEnd = _onEnd,
@@ -169,39 +169,5 @@ class ZoomViewState extends State<ZoomView>
       onDoubleTap: _toggle,
       child: view,
     );
-  }
-}
-
-/// A scale gesture that won't take a single finger at normal size, so a
-/// swipe goes to whatever is around it; two fingers, or any once zoomed in,
-/// it takes as usual.
-///
-/// A second finger is a pinch the moment it lands. Waiting for the pinch to
-/// show itself lost it to the scroll or page around: a drag counts both
-/// fingers' travel and wins at 18 px, while a pinch with one finger held
-/// still only spreads half as fast as the other finger moves.
-class _PinchFirst extends ScaleGestureRecognizer {
-  _PinchFirst({required this.zoomed});
-
-  final bool Function() zoomed;
-
-  @override
-  void handleEvent(PointerEvent event) {
-    super.handleEvent(event);
-    // Only while both fingers are still undecided: one that already
-    // started a scroll keeps scrolling, and this one has let it go.
-    if (event is PointerDownEvent && pointerCount >= 2) {
-      resolve(GestureDisposition.accepted);
-    }
-  }
-
-  @override
-  void resolve(GestureDisposition disposition) {
-    if (disposition == GestureDisposition.accepted &&
-        pointerCount < 2 &&
-        !zoomed()) {
-      return;
-    }
-    super.resolve(disposition);
   }
 }
