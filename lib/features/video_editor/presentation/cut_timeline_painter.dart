@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/video/strip_tiles.dart';
+import '../../../core/video/video_frames.dart';
 import '../domain/cut_plan.dart';
 import '../domain/timeline_view.dart';
-import 'timeline_frames.dart';
 
 // The editor is always dark, as the viewer is. iOS's own system yellow and
 // red, the colours its trim and destructive controls use.
@@ -11,8 +14,10 @@ const Color editYellow = Color(0xFFFFD60A);
 const Color editRed = Color(0xFFFF3B30);
 
 /// The video's frames along the strip for the stretch in [view]: one tile
-/// per round step of time, each showing the frame from its middle, or the
-/// nearest frame read so far while its own loads.
+/// per step of time, each showing a picture from inside its own stretch,
+/// from its start where it can, fading in once read over a shimmer. As the
+/// strip zooms in each tile splits in two, and its picture stays with the
+/// half it came from.
 class FrameTiles extends StatelessWidget {
   const FrameTiles({
     super.key,
@@ -23,41 +28,34 @@ class FrameTiles extends StatelessWidget {
   });
 
   final TimelineView view;
-  final TimelineFrames frames;
+  final VideoFrames frames;
   final double width;
   final double height;
 
   /// The narrowest a tile gets; frames are portrait-ish thumbnails.
   static const double minTile = 40;
 
-  /// The middle of each tile on screen, in ms: the frames [view] needs.
-  static List<int> needed(TimelineView view, double width) {
+  /// The tiles on screen, in ms: the stretches [view] needs pictures for.
+  static List<Stretch> needed(TimelineView view, double width) {
     final int step = view.tileStep(minTile);
     final int first = (view.msAt(0, width) / step).floor().clamp(0, 1 << 30);
     final int last = (view.msAt(width, width) / step).ceil();
-    return <int>[
+    return <Stretch>[
       for (int i = first; i <= last; i++)
-        if (i * step < view.duration) _middle(i, step, view.duration),
+        if (i * step < view.duration)
+          (from: i * step, until: math.min((i + 1) * step, view.duration)),
     ];
-  }
-
-  static int _middle(int i, int step, int duration) {
-    final int end = (i + 1) * step < duration ? (i + 1) * step : duration;
-    return (i * step + end) ~/ 2;
   }
 
   @override
   Widget build(BuildContext context) {
-    final int step = view.tileStep(minTile);
-    final int first = (view.msAt(0, width) / step).floor().clamp(0, 1 << 30);
-    final int last = (view.msAt(width, width) / step).ceil();
-    final bool still = MediaQuery.disableAnimationsOf(context);
+    final List<Stretch> tiles = needed(view, width);
     final double left = view.xOf(0, width);
     final double right = view.xOf(view.duration, width);
     return ClipRect(
       child: Stack(
         children: <Widget>[
-          // The video's own extent, dark until its frames arrive.
+          // The video's own extent, shimmering while pictures are to come.
           Positioned(
             left: left,
             width: right - left,
@@ -65,46 +63,31 @@ class FrameTiles extends StatelessWidget {
             bottom: 0,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppRadii.sm),
-              child: const ColoredBox(color: Color(0xFF2C2C2E)),
+              child: StripLoading(
+                loading: tiles.any(
+                  (Stretch s) => frames.loading(s.from, s.until),
+                ),
+              ),
             ),
           ),
-          for (int i = first; i <= last; i++)
-            if (i * step < view.duration)
-              _tile(i, step, view.xOf(i * step, width), still),
+          for (final Stretch s in tiles)
+            Positioned(
+              // Keyed by its moment, so a tile keeps its picture, and its
+              // fade, as the strip scrolls and zooms.
+              key: ValueKey<int>(s.from),
+              left: view.xOf(s.from, width),
+              width: view.xOf(s.until, width) - view.xOf(s.from, width),
+              top: 0,
+              height: height,
+              child: ClipRect(
+                child: FrameTile(
+                  frame: frames.frameIn(s.from, s.until),
+                  // The picture is from the tile's start: show its left.
+                  alignment: Alignment.centerLeft,
+                ),
+              ),
+            ),
         ],
-      ),
-    );
-  }
-
-  Widget _tile(int i, int step, double x, bool still) {
-    final int end = (i + 1) * step < view.duration
-        ? (i + 1) * step
-        : view.duration;
-    final double w = view.xOf(end, width) - x;
-    final Widget image = switch (frames.frameNear(
-      _middle(i, step, view.duration),
-    )) {
-      null => const SizedBox.expand(),
-      final f => Image.memory(
-        f,
-        key: ObjectKey(f),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        gaplessPlayback: true,
-      ),
-    };
-    return Positioned(
-      left: x,
-      width: w,
-      top: 0,
-      height: height,
-      // A frame fades in over the stand-in it replaces.
-      child: ClipRect(
-        child: AnimatedSwitcher(
-          duration: still ? Duration.zero : AppMotion.short,
-          child: image,
-        ),
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../core/video/video_frames.dart';
 import '../../../core/video/video_session.dart';
 import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/dialogs.dart';
@@ -15,7 +16,6 @@ import '../../albums/presentation/albums_providers.dart'
 import '../data/video_cutter.dart';
 import '../domain/cut_plan.dart';
 import 'cut_timeline.dart';
-import 'timeline_frames.dart';
 import 'editor_controls.dart';
 import 'save_progress.dart';
 
@@ -42,8 +42,9 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
 
   final GlobalKey<CutTimelineState> _timeline = GlobalKey<CutTimelineState>();
 
-  /// The timeline's frames, read for whatever stretch it shows.
-  TimelineFrames? _frames;
+  /// The timeline's frames, read for whatever stretch it shows; shared
+  /// with the viewer's strip for the same video, held while open.
+  ProviderSubscription<VideoFrames>? _frames;
   bool _failed = false;
   CutPlan? _plan;
   Handle? _selected;
@@ -78,9 +79,9 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
   Future<VideoPlayerController> _newController() async {
     final File? f = _file ??= await widget.asset.file;
     if (f == null) throw const FileSystemException('The video has no file');
-    _frames ??= TimelineFrames(
-      (List<int> times) =>
-          ref.read(nativeChannelProvider).videoFramesAt(f.path, times, 120),
+    _frames ??= ref.listenManual(
+      videoFramesProvider(f.path),
+      (VideoFrames? _, VideoFrames _) {},
     );
     final VideoPlayerController c = VideoPlayerController.file(f);
     try {
@@ -329,7 +330,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
   void dispose() {
     _session.removeListener(_tick);
     _session.dispose();
-    _frames?.dispose();
+    _frames?.close();
     super.dispose();
   }
 
@@ -418,7 +419,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
                   CutTimeline(
                     key: _timeline,
                     plan: plan,
-                    frames: _frames!,
+                    frames: _frames!.read(),
                     position: _position,
                     playing: c.value.isPlaying,
                     selected: _selected,

@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fotos/core/video/video_frames.dart';
 import 'package:fotos/features/video_editor/domain/cut_plan.dart';
 import 'package:fotos/features/video_editor/domain/timeline_view.dart';
 import 'package:fotos/features/video_editor/presentation/cut_timeline.dart';
-import 'package:fotos/features/video_editor/presentation/timeline_frames.dart';
+
+/// A video whose frames can't be read; the timeline works without them.
+class _NoFrames implements FrameSource {
+  @override
+  Future<VideoFrame?> frameIn(int from, int until) async => null;
+
+  @override
+  void close() {}
+}
 
 /// The timeline with a plan and a playhead it changes, as the editor holds
 /// them.
@@ -22,9 +31,7 @@ class _HarnessState extends State<_Harness> {
   int position = 0;
   Handle? selected;
   int dragEnds = 0;
-  final TimelineFrames frames = TimelineFrames(
-    (List<int> times) async => <Uint8List?>[for (final int _ in times) null],
-  );
+  final VideoFrames frames = VideoFrames(_NoFrames());
 
   @override
   void dispose() {

@@ -76,34 +76,18 @@ class TimelineView {
 
   bool zoomedIn(double width) => msPerPoint < coarsest(duration, width) * 0.999;
 
-  /// The spacing of the frames along the strip: the first round step that
-  /// gives each frame at least [tile] points.
+  /// The spacing of the frames along the strip: the first step that gives
+  /// each frame at least [tile] points. Steps double from a quarter second,
+  /// as map tiles do between zoom levels, so zooming in splits every tile
+  /// in two and each picture already showing keeps its place.
   int tileStep(double tile) {
     final double want = msPerPoint * tile;
-    for (final int s in _steps) {
-      if (s >= want) return s;
+    int step = 250;
+    while (step < want) {
+      step *= 2;
     }
-    final int hour = _steps.last;
-    return ((want / hour).ceil()) * hour;
+    return step;
   }
-
-  static const List<int> _steps = <int>[
-    250,
-    500,
-    1000,
-    2000,
-    5000,
-    10000,
-    15000,
-    30000,
-    60000,
-    120000,
-    300000,
-    600000,
-    900000,
-    1800000,
-    3600000,
-  ];
 
   @override
   bool operator ==(Object other) =>

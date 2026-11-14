@@ -7,11 +7,11 @@ import 'package:flutter/scheduler.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/platform/gesture_exclusion.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/video/video_frames.dart';
 import '../../../core/widgets/pinch_first.dart';
 import '../domain/cut_plan.dart';
 import '../domain/timeline_view.dart';
 import 'cut_timeline_painter.dart';
-import 'timeline_frames.dart';
 
 /// The video's frames under the edit, with the playhead fixed in the middle:
 /// the kept stretch framed in yellow, cut parts in red.
@@ -39,7 +39,7 @@ class CutTimeline extends StatefulWidget {
   });
 
   final CutPlan plan;
-  final TimelineFrames frames;
+  final VideoFrames frames;
 
   /// The playhead, in ms of the original video.
   final int position;
@@ -367,7 +367,10 @@ class CutTimelineState extends State<CutTimeline>
         final TimelineView v = _view = _view == null
             ? TimelineView.fit(widget.plan.duration, _width).at(widget.position)
             : _view!.zoomed(_view!.msPerPoint, _width);
-        widget.frames.want(FrameTiles.needed(v, _width));
+        widget.frames.want(
+          FrameTiles.needed(v, _width),
+          focus: widget.position,
+        );
         return Semantics(
           label: 'Timeline',
           child: RawGestureDetector(

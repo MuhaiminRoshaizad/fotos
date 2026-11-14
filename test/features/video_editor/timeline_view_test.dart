@@ -30,9 +30,26 @@ void main() {
     expect(v.at(90000).centre, 60000);
   });
 
-  test('frames sit a round step apart, at least a tile wide', () {
+  test('frames sit a step apart, at least a tile wide and under two', () {
     final TimelineView v = TimelineView.fit(3600000, width).zoomed(25, width);
     expect(v.tileStep(40), 1000);
-    expect(TimelineView.fit(3600000, width).tileStep(40), 900000);
+    for (double mpp = 25; mpp < 30000; mpp *= 1.3) {
+      final TimelineView z = TimelineView.fit(
+        3600000,
+        width,
+      ).zoomed(mpp, width);
+      expect(z.tileStep(40) / z.msPerPoint, inInclusiveRange(40, 80));
+    }
+  });
+
+  test('zooming in splits every tile in two, so no frame moves', () {
+    final TimelineView whole = TimelineView.fit(3600000, width);
+    int coarser = whole.tileStep(40);
+    for (double mpp = whole.msPerPoint; mpp > 25; mpp /= 1.1) {
+      final int step = whole.zoomed(mpp, width).tileStep(40);
+      // Every tile start at the coarser zoom is a tile start here too.
+      expect(coarser % step, 0);
+      coarser = step;
+    }
   });
 }
