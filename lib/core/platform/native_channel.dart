@@ -387,6 +387,22 @@ class NativeChannel {
     ];
   }
 
+  /// Frames of the video at [path] at each of [times] (ms); null where a
+  /// frame can't be read.
+  Future<List<Uint8List?>> videoFramesAt(
+    String path,
+    List<int> times,
+    int px,
+  ) async {
+    final List<Object?>? frames = await _channel.invokeListMethod<Object?>(
+      'videoFramesAt',
+      <String, Object>{'path': path, 'times': times, 'px': px},
+    );
+    return <Uint8List?>[
+      for (final Object? f in frames ?? const <Object?>[]) f as Uint8List?,
+    ];
+  }
+
   Future<int> pdfPageCount(String path) async => (await _channel
       .invokeMethod<int>('pdfPageCount', <String, Object>{'path': path}))!;
 

@@ -370,6 +370,45 @@ object FilesNative {
     }
 
     /**
+     * Frames of the video at [path] at each of [times] (ms), as JPEGs about
+     * [px] across, null where one can't be read: the editor's timeline asks
+     * for the stretch on screen at its current zoom. The nearest keyframe
+     * stands in for each moment, which is quick and close enough for a
+     * thumbnail.
+     */
+    fun videoFramesAt(path: String, times: List<Long>, px: Int): List<ByteArray?> {
+        val frames = arrayOfNulls<ByteArray>(times.size)
+        val readers = minOf(3, times.size)
+        if (readers == 0) return emptyList()
+        val pool = Executors.newFixedThreadPool(readers)
+        try {
+            (0 until readers).map { r ->
+                pool.submit {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(path)
+                        for (i in r until times.size step readers) {
+                            frames[i] = try {
+                                frameAt(retriever, times[i] * 1000, px)
+                            } catch (_: Exception) {
+                                null
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // This reader's frames stay empty; the timeline keeps
+                        // showing its nearest neighbours there.
+                    } finally {
+                        retriever.release()
+                    }
+                }
+            }.forEach { it.get() }
+        } finally {
+            pool.shutdown()
+        }
+        return frames.toList()
+    }
+
+    /**
      * A picture or video file's thumbnail as a JPEG about [px] across, or
      * null. Android keeps its own thumbnails for every file MediaStore
      * knows, as the Photos tab uses; decoding the original instead read

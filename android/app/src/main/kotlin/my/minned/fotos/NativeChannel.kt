@@ -181,6 +181,13 @@ class NativeChannel(
                     call.argument<Int>("px")!!,
                 )
             }
+            "videoFramesAt" -> background(result, thumbs) {
+                FilesNative.videoFramesAt(
+                    call.argument<String>("path")!!,
+                    call.argument<List<Number>>("times")!!.map { it.toLong() },
+                    call.argument<Int>("px")!!,
+                )
+            }
             "pdfPage" -> background(result) {
                 FilesNative.pdfPage(
                     call.argument<String>("path")!!,
