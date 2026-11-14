@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fotos/features/viewer/presentation/seek_queue.dart';
+import 'package:fotos/core/video/seek_queue.dart';
 
 void main() {
   test('seeks requested during a seek collapse into the newest one', () async {

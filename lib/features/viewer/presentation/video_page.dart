@@ -17,7 +17,7 @@ import '../../../core/widgets/zoom_view.dart';
 import '../../albums/presentation/albums_providers.dart'
     show nativeChannelProvider;
 import '../data/viewer_settings.dart';
-import 'video_session.dart';
+import '../../../core/video/video_session.dart';
 import 'viewer_glass.dart';
 import 'viewer_metrics.dart';
 
