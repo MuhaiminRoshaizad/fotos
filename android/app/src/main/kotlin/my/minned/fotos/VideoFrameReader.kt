@@ -19,52 +19,21 @@ import java.util.concurrent.LinkedBlockingQueue
  * keyframes are often ten seconds apart.
  *
  * Opening a file costs more than reading a frame, so up to [READERS]
- * readers stay open until [close], each used by one call at a time.
+ * frame readers stay open until [close], each used by one call at a time,
+ * and one shared index finds the keyframes.
  */
 class VideoFrameReader(private val path: String, private val px: Int) {
     companion object {
         const val READERS = 3
     }
 
-    private class Reader(path: String) {
-        val retriever = MediaMetadataRetriever().apply { setDataSource(path) }
-
-        // Finds keyframes; null when the file has no video track it knows.
-        val extractor: MediaExtractor? = MediaExtractor().let { x ->
-            try {
-                x.setDataSource(path)
-                val track = (0 until x.trackCount).firstOrNull {
-                    x.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
-                }
-                if (track == null) {
-                    x.release()
-                    null
-                } else {
-                    x.selectTrack(track)
-                    x
-                }
-            } catch (_: Exception) {
-                x.release()
-                null
-            }
-        }
-
-        /** The first keyframe at or after [ms], in ms, or null. */
-        fun keyframeFrom(ms: Long): Long? {
-            val x = extractor ?: return null
-            x.seekTo(ms * 1000, MediaExtractor.SEEK_TO_NEXT_SYNC)
-            return x.sampleTime.takeIf { it >= 0 }?.let { it / 1000 }
-        }
-
-        fun release() {
-            retriever.release()
-            extractor?.release()
-        }
-    }
-
-    private val idle = LinkedBlockingQueue<Reader>()
+    private val idle = LinkedBlockingQueue<MediaMetadataRetriever>()
     private var made = 0
     @Volatile private var closed = false
+
+    private val keys = Any()
+    private var index: MediaExtractor? = null
+    private var indexTried = false
 
     /**
      * The picture for the stretch [fromMs] to [untilMs], as the moment it
@@ -73,16 +42,17 @@ class VideoFrameReader(private val path: String, private val px: Int) {
      */
     fun frameIn(fromMs: Long, untilMs: Long): Pair<Long, ByteArray>? {
         if (closed) return null
+        // A reader first: the readers open while the first call reads the
+        // keyframe index.
         val reader = take() ?: return null
         try {
-            val key = reader.keyframeFrom(fromMs)
+            val key = keyframeFrom(fromMs)
             val (ms, option) = if (key != null && key < untilMs) {
                 key to MediaMetadataRetriever.OPTION_CLOSEST_SYNC
             } else {
                 fromMs to MediaMetadataRetriever.OPTION_CLOSEST
             }
-            val frame = reader.retriever.getScaledFrameAtTime(ms * 1000, option, px, px)
-                ?: return null
+            val frame = reader.getScaledFrameAtTime(ms * 1000, option, px, px) ?: return null
             val jpeg = ByteArrayOutputStream()
                 .also { frame.compress(Bitmap.CompressFormat.JPEG, 80, it) }
                 .toByteArray()
@@ -94,30 +64,68 @@ class VideoFrameReader(private val path: String, private val px: Int) {
     }
 
     /** Releases the readers; any still reading are released when done. */
-    @Synchronized
     fun close() {
-        closed = true
-        while (true) (idle.poll() ?: break).release()
+        synchronized(this) {
+            closed = true
+            while (true) (idle.poll() ?: break).release()
+        }
+        synchronized(keys) {
+            index?.release()
+            index = null
+        }
     }
 
-    private fun take(): Reader? {
+    /** The first keyframe at or after [ms], in ms, or null if unknown. */
+    private fun keyframeFrom(ms: Long): Long? = synchronized(keys) {
+        if (!indexTried) {
+            indexTried = true
+            index = openIndex()
+        }
+        val x = index ?: return null
+        x.seekTo(ms * 1000, MediaExtractor.SEEK_TO_NEXT_SYNC)
+        x.sampleTime.takeIf { it >= 0 }?.let { it / 1000 }
+    }
+
+    private fun openIndex(): MediaExtractor? {
+        val x = MediaExtractor()
+        return try {
+            x.setDataSource(path)
+            val track = (0 until x.trackCount).firstOrNull {
+                x.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
+            }
+            if (track == null) {
+                x.release()
+                null
+            } else {
+                x.selectTrack(track)
+                x
+            }
+        } catch (_: Exception) {
+            x.release()
+            null
+        }
+    }
+
+    private fun take(): MediaMetadataRetriever? {
         idle.poll()?.let { return it }
+        // Opened outside the lock, so the readers open side by side.
+        val mayOpen = synchronized(this) { (made < READERS).also { if (it) made++ } }
+        if (!mayOpen) return idle.take()
+        return try {
+            MediaMetadataRetriever().apply { setDataSource(path) }
+        } catch (_: Exception) {
+            synchronized(this) { made-- }
+            null
+        }
+    }
+
+    private fun give(reader: MediaMetadataRetriever) {
         synchronized(this) {
-            if (made < READERS) {
-                made++
-                return try {
-                    Reader(path)
-                } catch (_: Exception) {
-                    made--
-                    null
-                }
+            if (!closed) {
+                idle.put(reader)
+                return
             }
         }
-        return idle.take()
-    }
-
-    @Synchronized
-    private fun give(reader: Reader) {
-        if (closed) reader.release() else idle.put(reader)
+        reader.release()
     }
 }
