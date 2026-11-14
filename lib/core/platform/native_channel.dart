@@ -403,6 +403,38 @@ class NativeChannel {
     ];
   }
 
+  /// Opens readers for frames of the video at [path], each JPEG about [px]
+  /// across. Pass the id to [videoFrameIn]; close it with
+  /// [videoFramesClose].
+  Future<int> videoFramesOpen(String path, int px) async =>
+      (await _channel.invokeMethod<int>('videoFramesOpen', <String, Object>{
+        'path': path,
+        'px': px,
+      }))!;
+
+  /// A picture from inside [from] to [until] (ms) of the video opened as
+  /// [id]: a keyframe there if there is one, else the frame at [from].
+  /// Null if it can't be read.
+  Future<({int ms, Uint8List jpeg})?> videoFrameIn(
+    int id,
+    int from,
+    int until,
+  ) async {
+    final Map<String, Object?>? m = await _channel
+        .invokeMapMethod<String, Object?>('videoFrameIn', <String, Object>{
+          'id': id,
+          'from': from,
+          'until': until,
+        });
+    if (m == null) return null;
+    return (ms: (m['ms']! as num).toInt(), jpeg: m['jpeg']! as Uint8List);
+  }
+
+  Future<void> videoFramesClose(int id) => _channel.invokeMethod<void>(
+    'videoFramesClose',
+    <String, Object>{'id': id},
+  );
+
   Future<int> pdfPageCount(String path) async => (await _channel
       .invokeMethod<int>('pdfPageCount', <String, Object>{'path': path}))!;
 

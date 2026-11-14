@@ -25,6 +25,11 @@ class NativeChannel(
     // dozens at once; three at a time keeps the rest of the app responsive.
     private val thumbs = Executors.newFixedThreadPool(3)
 
+    // Frames for the video strips: one reader at a time per task.
+    private val frames = Executors.newFixedThreadPool(VideoFrameReader.READERS)
+    private val frameReaders = java.util.concurrent.ConcurrentHashMap<Int, VideoFrameReader>()
+    private val nextFrameReader = java.util.concurrent.atomic.AtomicInteger()
+
     @Volatile private var takeout: TakeoutImporter? = null
 
     // The cut under way, if any; one at a time.
@@ -173,6 +178,25 @@ class NativeChannel(
                     call.argument<String>("path")!!,
                     call.argument<Int>("px")!!,
                 )
+            }
+            "videoFramesOpen" -> {
+                val id = nextFrameReader.incrementAndGet()
+                frameReaders[id] = VideoFrameReader(
+                    call.argument<String>("path")!!,
+                    call.argument<Int>("px")!!,
+                )
+                result.success(id)
+            }
+            "videoFrameIn" -> background(result, frames) {
+                frameReaders[call.argument<Int>("id")!!]?.frameIn(
+                    call.argument<Number>("from")!!.toLong(),
+                    call.argument<Number>("until")!!.toLong(),
+                )?.let { (ms, jpeg) -> mapOf("ms" to ms, "jpeg" to jpeg) }
+            }
+            "videoFramesClose" -> {
+                // Idle readers go now; one mid-read goes as it finishes.
+                frameReaders.remove(call.argument<Int>("id")!!)?.close()
+                result.success(null)
             }
             "videoFrames" -> background(result) {
                 FilesNative.videoFrames(
