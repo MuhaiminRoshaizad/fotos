@@ -13,6 +13,7 @@ import '../widgets/batch_progress.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/inset_group.dart';
 import '../widgets/toast.dart';
+import '../../features/albums/data/album_prefs.dart';
 import 'empty_albums.dart';
 import 'media_providers.dart';
 import 'media_repository.dart';
@@ -31,12 +32,26 @@ Future<void> addToAlbum(
     await ref.read(emptyAlbumsProvider.future),
     albums,
   );
+  final AlbumPrefs prefs = await ref.read(albumPrefsProvider.future);
+  // As on the Albums tab: pins in their own order, then the tab's order.
+  // Android hands albums over in no order at all.
+  final List<Album> pinned = <Album>[
+    for (final String id in prefs.pinned)
+      ...albums.where((Album a) => a.id == id),
+  ];
+  final List<Album> rest = prefs.order.apply(
+    albums.where((Album a) => !prefs.pinned.contains(a.id)).toList(),
+  );
   if (!context.mounted) return;
   final _Choice? choice = await showAppSheet<_Choice>(
     context,
     scrollControlled: true,
-    builder: (BuildContext ctx) =>
-        _AddToAlbumSheet(count: items.length, albums: albums, empty: empty),
+    builder: (BuildContext ctx) => _AddToAlbumSheet(
+      count: items.length,
+      pinned: pinned,
+      albums: rest,
+      empty: empty,
+    ),
   );
   if (choice == null || !context.mounted) return;
 
@@ -141,10 +156,12 @@ List<String> pendingEmptyAlbums(List<String> empty, List<Album> albums) {
 class _AddToAlbumSheet extends StatefulWidget {
   const _AddToAlbumSheet({
     required this.count,
+    required this.pinned,
     required this.albums,
     required this.empty,
   });
   final int count;
+  final List<Album> pinned;
   final List<Album> albums;
   final List<String> empty;
 
@@ -155,9 +172,31 @@ class _AddToAlbumSheet extends StatefulWidget {
 class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
   bool _move = true;
 
+  Widget _albumRow(Album a) => GroupRow(
+    leading: AlbumThumb(
+      child: a.cover == null
+          ? const Icon(CupertinoIcons.rectangle_stack)
+          : Image(
+              image: AssetEntityImageProvider(
+                a.cover!,
+                isOriginal: false,
+                thumbnailSize: const ThumbnailSize.square(160),
+              ),
+              fit: BoxFit.cover,
+            ),
+    ),
+    leadingWidth: AlbumThumb.size,
+    title: a.name,
+    subtitle: Fmt.count(a.count, 'item'),
+    chevron: false,
+    onTap: () => Navigator.of(context).pop(_Choice(a, _move)),
+  );
+
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
+    const double indent = 14 + AlbumThumb.size + AppSpacing.md;
+    final bool headed = widget.pinned.isNotEmpty;
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.6,
@@ -210,10 +249,20 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
               ),
             ],
           ),
-          if (widget.empty.isNotEmpty || widget.albums.isNotEmpty) ...<Widget>[
-            const SizedBox(height: AppSpacing.lg),
+          if (headed)
             InsetGroup(
-              dividerIndent: 14 + AlbumThumb.size + AppSpacing.md,
+              header: 'Pinned',
+              dividerIndent: indent,
+              children: <Widget>[
+                for (final Album a in widget.pinned) _albumRow(a),
+              ],
+            ),
+          if (widget.empty.isNotEmpty || widget.albums.isNotEmpty) ...<Widget>[
+            // A heading brings its own space above it.
+            if (!headed) const SizedBox(height: AppSpacing.lg),
+            InsetGroup(
+              header: headed ? 'Albums' : null,
+              dividerIndent: indent,
               children: <Widget>[
                 for (final String n in widget.empty)
                   GroupRow(
@@ -228,26 +277,7 @@ class _AddToAlbumSheetState extends State<_AddToAlbumSheet> {
                       context,
                     ).pop(_Choice(null, _move, emptyName: n)),
                   ),
-                for (final Album a in widget.albums)
-                  GroupRow(
-                    leading: AlbumThumb(
-                      child: a.cover == null
-                          ? const Icon(CupertinoIcons.rectangle_stack)
-                          : Image(
-                              image: AssetEntityImageProvider(
-                                a.cover!,
-                                isOriginal: false,
-                                thumbnailSize: const ThumbnailSize.square(160),
-                              ),
-                              fit: BoxFit.cover,
-                            ),
-                    ),
-                    leadingWidth: AlbumThumb.size,
-                    title: a.name,
-                    subtitle: Fmt.count(a.count, 'item'),
-                    chevron: false,
-                    onTap: () => Navigator.of(context).pop(_Choice(a, _move)),
-                  ),
+                for (final Album a in widget.albums) _albumRow(a),
               ],
             ),
           ],
