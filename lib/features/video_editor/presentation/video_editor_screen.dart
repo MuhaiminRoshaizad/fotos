@@ -79,6 +79,8 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
   Future<VideoPlayerController> _newController() async {
     final File? f = _file ??= await widget.asset.file;
     if (f == null) throw const FileSystemException('The video has no file');
+    // Closed while the file was being found: ref can't be used any more.
+    if (!mounted) throw const FileSystemException('The editor was closed');
     _frames ??= ref.listenManual(
       videoFramesProvider((
         path: f.path,
