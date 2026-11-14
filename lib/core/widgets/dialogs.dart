@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInputFormatter;
 
 import '../haptics/app_haptics.dart';
 import '../theme/app_tokens.dart';
@@ -58,6 +59,9 @@ Future<String?> promptName(
   required String? Function(String value) validate,
   String initial = '',
   bool selectStem = false,
+  TextInputType keyboardType = TextInputType.text,
+  List<TextInputFormatter>? inputFormatters,
+  String subject = 'name',
 }) {
   return showAppSheet<String>(
     context,
@@ -70,6 +74,9 @@ Future<String?> promptName(
       validate: validate,
       initial: initial,
       selectStem: selectStem,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      subject: subject,
     ),
   );
 }
@@ -92,6 +99,9 @@ class _NameSheet extends StatefulWidget {
     required this.validate,
     required this.initial,
     required this.selectStem,
+    required this.keyboardType,
+    required this.inputFormatters,
+    required this.subject,
   });
 
   final String title;
@@ -101,6 +111,11 @@ class _NameSheet extends StatefulWidget {
   final String? Function(String value) validate;
   final String initial;
   final bool selectStem;
+  final TextInputType keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+
+  /// What is being typed, for the hint on moving the cursor.
+  final String subject;
 
   @override
   State<_NameSheet> createState() => _NameSheetState();
@@ -225,7 +240,8 @@ class _NameSheetState extends State<_NameSheet> {
                   // Wraps rather than scrolls sideways; Done still submits.
                   minLines: 1,
                   maxLines: 6,
-                  keyboardType: TextInputType.text,
+                  keyboardType: widget.keyboardType,
+                  inputFormatters: widget.inputFormatters,
                   textInputAction: TextInputAction.done,
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
@@ -259,8 +275,10 @@ class _NameSheetState extends State<_NameSheet> {
             child: Text(
               _error ??
                   (_ending.isEmpty
-                      ? 'Press and hold the name, then slide, to move the cursor.'
-                      : 'The $_ending ending is kept. Press and hold the name, '
+                      ? 'Press and hold the ${widget.subject}, then slide, to '
+                            'move the cursor.'
+                      : 'The $_ending ending is kept. Press and hold the '
+                            '${widget.subject}, '
                             'then slide, to move the cursor.'),
               style: TextStyle(
                 fontSize: 13,
