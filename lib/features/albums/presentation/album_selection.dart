@@ -9,6 +9,7 @@ import '../../../core/selection/selection.dart';
 import '../../../core/widgets/toast.dart';
 import '../data/album_prefs.dart';
 import '../data/galleries.dart';
+import 'album_sheets.dart';
 import 'album_tiles.dart';
 import 'gallery_sheets.dart';
 
@@ -103,6 +104,26 @@ List<SelectionAction> albumSelectionActions(WidgetRef ref) {
           );
         }
         done();
+      },
+    ),
+    SelectionAction(
+      icon: CupertinoIcons.trash,
+      label: 'Delete',
+      destructive: true,
+      run: (BuildContext context, Set<String> ids) async {
+        final List<Album> albums = albumsIn(ids);
+        if (albums.isEmpty) {
+          showToast(
+            context,
+            'Galleries are ungrouped from their menu. Pick albums.',
+            failed: true,
+          );
+          return;
+        }
+        final bool kept = albums.length < ids.length;
+        if (await deleteAlbums(context, ref, albums, galleriesKept: kept)) {
+          done();
+        }
       },
     ),
   ];

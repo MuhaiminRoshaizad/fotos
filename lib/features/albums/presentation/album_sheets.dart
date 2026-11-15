@@ -438,27 +438,42 @@ Future<void> showGalleryOrderSheet(
 
 /// Moves every item in [album] to Android's trash, which also removes the
 /// folder from Albums once it is empty.
-Future<bool> deleteAlbum(
+Future<bool> deleteAlbum(BuildContext context, WidgetRef ref, Album album) =>
+    deleteAlbums(context, ref, <Album>[album]);
+
+/// Moves every item in [albums] to Recently deleted in one request, after
+/// asking. [galleriesKept] says so when galleries were selected too, since
+/// those are left alone. Returns whether anything was deleted.
+Future<bool> deleteAlbums(
   BuildContext context,
   WidgetRef ref,
-  Album album,
-) async {
+  List<Album> albums, {
+  bool galleriesKept = false,
+}) async {
+  if (albums.isEmpty) return false;
+  final int count = albums.fold(0, (int n, Album a) => n + a.count);
+  final bool one = count == 1;
   final bool ok = await confirmAction(
     context,
-    title: 'Delete ${album.name}?',
+    title: albums.length == 1
+        ? 'Delete ${albums.single.name}?'
+        : 'Delete ${Fmt.count(albums.length, 'album')}?',
     message:
-        'Its ${Fmt.count(album.count, 'item')} move to Recently deleted. '
-        'You can restore them for 30 days.',
+        '${albums.length == 1 ? 'Its' : 'Their'} ${Fmt.count(count, 'item')} '
+        '${one ? 'moves' : 'move'} to Recently deleted. You can restore '
+        '${one ? 'it' : 'them'} for 30 days.'
+        '${galleriesKept ? ' Selected galleries are not deleted.' : ''}',
     confirmLabel: 'Delete',
   );
   if (!ok || !context.mounted) return false;
-  final List<AssetEntity> items = await ref
-      .read(mediaRepositoryProvider)
-      .albumItems(album);
+  final MediaRepository repo = ref.read(mediaRepositoryProvider);
+  final List<AssetEntity> all = <AssetEntity>[
+    for (final Album a in albums) ...await repo.albumItems(a),
+  ];
   if (!context.mounted) return false;
   final Set<String> gone = await ref
       .read(mediaActionsProvider)
-      .trash(context, items, confirm: false);
+      .trash(context, all, confirm: false);
   ref.invalidate(albumsProvider);
   return gone.isNotEmpty;
 }

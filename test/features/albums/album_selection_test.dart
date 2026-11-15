@@ -15,12 +15,29 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 
 import '../../support/fake_media_repository.dart';
 
+// Comic 1 holds one item, the rest three.
 Album _album(String id) => Album(
   id: id,
   name: 'Comic $id',
-  count: 3,
+  count: id == '1' ? 1 : 3,
   path: AssetPathEntity(id: id, name: 'Comic $id'),
 );
+
+/// Each album holds one item named after it, and trashed ids are kept.
+class _Library extends FakeMediaRepository {
+  final List<String> trashed = <String>[];
+
+  @override
+  Future<List<AssetEntity>> albumItems(Album album) async => <AssetEntity>[
+    AssetEntity(id: 'in ${album.id}', typeInt: 1, width: 1, height: 1),
+  ];
+
+  @override
+  Future<List<String>> moveToTrash(List<AssetEntity> items) async {
+    trashed.addAll(items.map((AssetEntity e) => e.id));
+    return super.moveToTrash(items);
+  }
+}
 
 class _NoEmpty extends EmptyAlbumsNotifier {
   @override
@@ -30,7 +47,10 @@ class _NoEmpty extends EmptyAlbumsNotifier {
 void main() {
   late ProviderContainer container;
 
-  Future<void> openAlbums(WidgetTester tester) async {
+  Future<void> openAlbums(
+    WidgetTester tester, {
+    FakeMediaRepository? repo,
+  }) async {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
     tester.view.physicalSize = const Size(400, 900);
@@ -40,7 +60,9 @@ void main() {
       ProviderScope(
         retry: (_, _) => null,
         overrides: [
-          mediaRepositoryProvider.overrideWithValue(FakeMediaRepository()),
+          mediaRepositoryProvider.overrideWithValue(
+            repo ?? FakeMediaRepository(),
+          ),
           albumsProvider.overrideWith(
             (Ref ref) async => <Album>[
               for (int i = 1; i <= 6; i++) _album('$i'),
@@ -178,6 +200,71 @@ void main() {
       '3',
       '5',
     ]);
+    await tester.pump(const Duration(seconds: 4));
+  });
+
+  testWidgets('selected albums are deleted together after asking', (
+    WidgetTester tester,
+  ) async {
+    final _Library repo = _Library();
+    await openAlbums(tester, repo: repo);
+    await tester.tap(find.text('Select'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Comic 1'));
+    await tester.pump();
+    await tester.tap(find.text('Comic 2'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Delete').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete 2 albums?'), findsOneWidget);
+    expect(
+      find.text(
+        'Their 4 items move to Recently deleted. You can restore them '
+        'for 30 days.',
+      ),
+      findsOneWidget,
+    );
+    expect(repo.trashed, isEmpty);
+
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    expect(repo.trashed, <String>['in 1', 'in 2']);
+    expect(container.read(selectionProvider).active, isFalse);
+    await tester.pump(const Duration(seconds: 4));
+  });
+
+  testWidgets('deleting says one item right and that galleries stay', (
+    WidgetTester tester,
+  ) async {
+    final _Library repo = _Library();
+    await openAlbums(tester, repo: repo);
+    await container.read(galleriesProvider.notifier).create('Read', <String>[
+      '5',
+      '6',
+    ]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Select'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Comic 1'));
+    await tester.pump();
+    await tester.tap(find.text('Read'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Delete').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete Comic 1?'), findsOneWidget);
+    expect(
+      find.text(
+        'Its 1 item moves to Recently deleted. You can restore it for 30 '
+        'days. Selected galleries are not deleted.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    expect(repo.trashed, <String>['in 1']);
+    expect(container.read(galleriesProvider).value!.single.name, 'Read');
     await tester.pump(const Duration(seconds: 4));
   });
 }
