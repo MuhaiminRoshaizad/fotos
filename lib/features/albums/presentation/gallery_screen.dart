@@ -10,6 +10,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
 import '../data/galleries.dart';
+import 'album_selection.dart';
 import 'album_tiles.dart';
 import 'gallery_sheets.dart';
 import '../../../core/widgets/bottom_bar_space.dart';
@@ -119,6 +120,8 @@ class GalleryScreen extends ConsumerWidget {
                           child: AlbumTile(
                             key: ValueKey<String>(a.id),
                             album: a,
+                            onSelect: () =>
+                                startAlbumSelection(ref, first: a.id),
                           ),
                         ),
                     ],

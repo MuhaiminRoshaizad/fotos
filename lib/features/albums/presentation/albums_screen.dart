@@ -231,10 +231,15 @@ class _AlbumsBodyState extends ConsumerState<_AlbumsBody> {
                   key: ValueKey<String>(g.id),
                   gallery: g,
                   albums: inside(g),
+                  onSelect: () => startAlbumSelection(ref, first: g.id),
                 ),
             for (final Album a in list)
               if (a.id == id && matches(a.name))
-                AlbumTile(key: ValueKey<String>(a.id), album: a),
+                AlbumTile(
+                  key: ValueKey<String>(a.id),
+                  album: a,
+                  onSelect: () => startAlbumSelection(ref, first: a.id),
+                ),
           ],
         ];
         final List<Gallery> restGalleries =
@@ -343,11 +348,16 @@ class _AlbumsBodyState extends ConsumerState<_AlbumsBody> {
                       key: ValueKey<String>(g.id),
                       gallery: g,
                       albums: inside(g),
+                      onSelect: () => startAlbumSelection(ref, first: g.id),
                     ),
                   for (final String n in pending)
                     EmptyAlbumTile(key: ValueKey<String>('empty:$n'), name: n),
                   for (final Album a in rest)
-                    AlbumTile(key: ValueKey<String>(a.id), album: a),
+                    AlbumTile(
+                      key: ValueKey<String>(a.id),
+                      album: a,
+                      onSelect: () => startAlbumSelection(ref, first: a.id),
+                    ),
                 ],
               ),
             if (q.isEmpty)
@@ -389,14 +399,14 @@ class _AlbumsBodyState extends ConsumerState<_AlbumsBody> {
             SliverToBoxAdapter(child: SizedBox(height: bottom)),
           ],
         );
-        return selecting
-            ? GestureDetector(
-                onLongPressStart: _sweepStart,
-                onLongPressMoveUpdate: _sweepMove,
-                onLongPressEnd: (_) => _anchor = null,
-                child: scroll,
-              )
-            : scroll;
+        // Always present, so starting to select doesn't rebuild every tile
+        // under a new parent.
+        return GestureDetector(
+          onLongPressStart: selecting ? _sweepStart : null,
+          onLongPressMoveUpdate: selecting ? _sweepMove : null,
+          onLongPressEnd: selecting ? (_) => _anchor = null : null,
+          child: scroll,
+        );
       },
     );
   }

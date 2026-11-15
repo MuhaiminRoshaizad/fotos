@@ -15,7 +15,6 @@ import '../../../core/widgets/lift_menu.dart';
 import '../../../core/widgets/select_check.dart';
 import '../data/album_prefs.dart';
 import '../data/galleries.dart';
-import 'album_selection.dart';
 import 'album_sheets.dart';
 import 'albums_providers.dart';
 import 'gallery_sheets.dart';
@@ -215,9 +214,13 @@ Rect _square(BuildContext context) {
 }
 
 class AlbumTile extends ConsumerWidget {
-  const AlbumTile({super.key, required this.album});
+  const AlbumTile({super.key, required this.album, required this.onSelect});
 
   final Album album;
+
+  /// Starts selecting with this album ticked. The page passes it, since the
+  /// selection bar outlives a tile that scrolls away or rebuilds.
+  final VoidCallback onSelect;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -261,7 +264,7 @@ class AlbumTile extends ConsumerWidget {
         ],
       );
       if (choice == null || !context.mounted) return;
-      if (choice == _select) return startAlbumSelection(ref, first: album.id);
+      if (choice == _select) return onSelect();
       await runAlbumOption(context, ref, album, choice as AlbumOption);
     }
 
@@ -377,12 +380,20 @@ class GalleryMosaic extends ConsumerWidget {
 }
 
 class GalleryTile extends ConsumerWidget {
-  const GalleryTile({super.key, required this.gallery, required this.albums});
+  const GalleryTile({
+    super.key,
+    required this.gallery,
+    required this.albums,
+    required this.onSelect,
+  });
 
   final Gallery gallery;
 
   /// Its albums that are on the phone, in the gallery's order.
   final List<Album> albums;
+
+  /// Starts selecting with this gallery ticked; see [AlbumTile.onSelect].
+  final VoidCallback onSelect;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -412,9 +423,7 @@ class GalleryTile extends ConsumerWidget {
         ],
       );
       if (choice == null || !context.mounted) return;
-      if (choice == _select) {
-        return startAlbumSelection(ref, first: gallery.id);
-      }
+      if (choice == _select) return onSelect();
       await runGalleryOption(context, ref, gallery, choice as GalleryOption);
     }
 

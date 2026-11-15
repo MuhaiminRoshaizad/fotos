@@ -127,4 +127,57 @@ void main() {
     expect(container.read(selectionProvider).active, isTrue);
     expect(selected(), <String>{'3'});
   });
+
+  Future<void> makeGallery(WidgetTester tester, String name) async {
+    await tester.tap(find.bySemanticsLabel('To gallery').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New gallery'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText).last, name);
+    await tester.tap(find.text('Make gallery'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('albums selected from a hold menu go into a gallery', (
+    WidgetTester tester,
+  ) async {
+    await openAlbums(tester);
+    await tester.longPress(find.text('Comic 3'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Select').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Comic 4'));
+    await tester.pumpAndSettle();
+
+    await makeGallery(tester, 'Read');
+
+    final List<Gallery> galleries = container.read(galleriesProvider).value!;
+    expect(galleries.single.albumIds, <String>['3', '4']);
+    expect(container.read(selectionProvider).active, isFalse);
+    await tester.pump(const Duration(seconds: 4));
+  });
+
+  testWidgets('the bar still works once the held tile is off screen', (
+    WidgetTester tester,
+  ) async {
+    await openAlbums(tester);
+    await tester.longPress(find.text('Comic 3'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Select').last);
+    await tester.pumpAndSettle();
+    // Searching hides the held tile, as scrolling past it would.
+    await tester.enterText(find.byType(EditableText).first, '5');
+    await tester.pumpAndSettle();
+    expect(find.text('Comic 3'), findsNothing);
+    await tester.tap(find.text('Comic 5'));
+    await tester.pumpAndSettle();
+
+    await makeGallery(tester, 'Read');
+
+    expect(container.read(galleriesProvider).value!.single.albumIds, <String>[
+      '3',
+      '5',
+    ]);
+    await tester.pump(const Duration(seconds: 4));
+  });
 }
