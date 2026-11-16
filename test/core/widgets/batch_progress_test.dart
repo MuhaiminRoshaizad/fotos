@@ -17,6 +17,7 @@ void main() {
     WidgetTester tester, {
     required List<String> items,
     required Future<void> Function(String) each,
+    Stream<(int, int)>? progress,
   }) async {
     late Future<int> result;
     await tester.pumpWidget(
@@ -32,6 +33,7 @@ void main() {
                 items: items,
                 nameOf: (String s) => s,
                 each: each,
+                progress: progress,
               ),
               child: const Text('go'),
             ),
@@ -96,5 +98,32 @@ void main() {
     expect(find.byIcon(CupertinoIcons.checkmark_circle_fill), findsNothing);
     await tester.pumpAndSettle(const Duration(seconds: 1));
     expect(await result, 1);
+  });
+
+  testWidgets('one long job counts the parts it reports, as extracting does', (
+    WidgetTester tester,
+  ) async {
+    final StreamController<(int, int)> parts = StreamController<(int, int)>();
+    final Completer<void> gate = Completer<void>();
+    final Future<int> result = await start(
+      tester,
+      items: <String>['comic.zip'],
+      each: (_) => gate.future,
+      progress: parts.stream,
+    );
+    parts.add((53, 1500));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Moving 1 items'), findsOneWidget);
+    expect(find.text('54 of 1500'), findsOneWidget);
+
+    gate.complete();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byIcon(CupertinoIcons.checkmark_circle_fill), findsOneWidget);
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+    expect(await result, 0);
+    unawaited(parts.close());
   });
 }

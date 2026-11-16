@@ -16,7 +16,6 @@ import '../../../core/media/media_providers.dart';
 import '../../../core/media/read_mode.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/platform/native_channel.dart';
-import '../../../core/theme/app_tokens.dart';
 import '../../../core/validation/validators.dart';
 import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/batch_progress.dart';
@@ -566,60 +565,36 @@ Future<void> _extract(
   final String target = p.join(parent, folder);
   if (!context.mounted) return;
   final NativeChannel native = ref.read(nativeChannelProvider);
-  final ValueNotifier<(int, int)> progress = ValueNotifier<(int, int)>((0, 0));
-  final StreamSubscription<(int, int)> sub = native.extractProgress.listen(
-    (v) => progress.value = v,
-  );
-  final Future<int> work = native.extract(zip.path, target);
-  unawaited(
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      useRootNavigator: true,
-      builder: (BuildContext ctx) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          title: Text('Extracting ${zip.name}'),
-          content: ValueListenableBuilder<(int, int)>(
-            valueListenable: progress,
-            builder: (_, (int, int) v, _) => Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                LinearProgressIndicator(value: v.$2 == 0 ? null : v.$1 / v.$2),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  v.$2 == 0 ? 'Checking space…' : '${v.$1} of ${v.$2} files',
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-  String message;
   int written = 0;
-  try {
-    written = await work;
-    message = 'Extracted ${Fmt.count(written, 'file')} into $folder';
-    AppHaptics.success();
-  } on NotEnoughSpaceException catch (e) {
-    message = 'Not enough space. Extracting needs ${Fmt.size(e.needed)} free.';
-    AppHaptics.error();
-  } on Exception {
-    message = 'Couldn\'t extract ${zip.name}. It may be damaged.';
-    AppHaptics.error();
-  } finally {
-    await sub.cancel();
-  }
-  if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-  progress.dispose();
+  Exception? error;
+  await runBatch<FileEntry>(
+    context,
+    verb: 'Extracting',
+    doneVerb: 'Extracted',
+    what: zip.name,
+    items: <FileEntry>[zip],
+    progress: native.extractProgress,
+    each: (FileEntry z) async {
+      try {
+        written = await native.extract(z.path, target);
+      } on Exception catch (e) {
+        error = e;
+        rethrow;
+      }
+    },
+  );
+  final String message = switch (error) {
+    null => 'Extracted ${Fmt.count(written, 'file')} into $folder',
+    NotEnoughSpaceException(:final int needed) =>
+      'Not enough space. Extracting needs ${Fmt.size(needed)} free.',
+    _ => 'Couldn\'t extract ${zip.name}. It may be damaged.',
+  };
   _refresh(ref);
   if (context.mounted) {
     showToast(
       context,
       message,
+      failed: error != null,
       actionLabel: written > 0 ? 'Open' : null,
       onAction: written > 0
           ? () => context.push(
