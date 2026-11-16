@@ -62,7 +62,19 @@ void main() {
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(const MaterialApp(home: _Viewer()));
+    await tester.pumpWidget(
+      MaterialApp(
+        // Android's touch slop, as a phone hands it to Flutter (8 dp);
+        // tests otherwise use Flutter's defaults, which hid the bug.
+        builder: (BuildContext context, Widget? child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            gestureSettings: const DeviceGestureSettings(touchSlop: 8),
+          ),
+          child: child!,
+        ),
+        home: const _Viewer(),
+      ),
+    );
     await tester.pumpAndSettle();
     // Zoom in, as a pinch would.
     await tester.tapAt(const Offset(200, 400));

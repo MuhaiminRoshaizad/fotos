@@ -184,7 +184,13 @@ class ZoomViewState extends State<ZoomView>
                 () => PinchFirst(
                   oneFinger: () => _zoomed && widget.scrollAxis == null,
                 ),
+                // The phone's own touch slop, as GestureDetector, lists and
+                // page views get it. A RawGestureDetector doesn't pass it
+                // on, so this one kept Flutter's default (a 36 px pan)
+                // while the video's swipe-down handler took a finger at
+                // Android's 16 dp first: zoomed in, a video panned no way.
                 (PinchFirst r) => r
+                  ..gestureSettings = MediaQuery.maybeGestureSettingsOf(context)
                   ..onStart = _onStart
                   ..onUpdate = _onUpdate
                   ..onEnd = _onEnd,
