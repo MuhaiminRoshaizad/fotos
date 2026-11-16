@@ -60,14 +60,10 @@ class _ViewIntentHandlerState extends ConsumerState<ViewIntentHandler> {
 
   Future<void> _open(String uri) async {
     final String? id = mediaStoreId(uri);
-    final BuildContext? ctx = rootNavigatorKey.currentContext;
     if (id == null) {
-      if (ctx != null && ctx.mounted) {
-        showToast(
-          ctx,
-          'fotos opens photos and videos from this phone\'s library only.',
-        );
-      }
+      _toastOnRoot(
+        'fotos opens photos and videos from this phone\'s library only.',
+      );
       return;
     }
     await openInViewer(ref, id);
@@ -85,13 +81,9 @@ Future<void> openInViewer(WidgetRef ref, String id) async {
   }
   final AssetEntity? asset = await AssetEntity.fromId(id);
   if (asset == null) {
-    final BuildContext? ctx = rootNavigatorKey.currentContext;
-    if (ctx != null && ctx.mounted) {
-      showToast(
-        ctx,
-        'That item isn\'t available. Allow photo access and try again.',
-      );
-    }
+    _toastOnRoot(
+      'That item isn\'t available. Allow photo access and try again.',
+    );
     return;
   }
   // Open on this one at once; the library (about half a second for a
@@ -108,4 +100,13 @@ Future<void> openInViewer(WidgetRef ref, String id) async {
           library: ref.read(libraryProvider(MediaKind.all).future),
         ),
       );
+}
+
+/// A toast over everything, from no screen in particular. The root
+/// navigator's own context sits above its overlay, so the overlay is
+/// handed over directly; looking it up from that context finds none.
+void _toastOnRoot(String message) {
+  final NavigatorState? root = rootNavigatorKey.currentState;
+  if (root == null || !root.mounted) return;
+  showToast(root.context, message, overlay: root.overlay);
 }
