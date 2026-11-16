@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/large_title_scaffold.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../../../core/widgets/bottom_bar_space.dart';
 
@@ -44,29 +45,32 @@ class _PdfScreenState extends ConsumerState<PdfScreen> {
   Widget build(BuildContext context) {
     final AsyncValue<int> count = ref.watch(_pageCountProvider(widget.path));
     final ColorScheme cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          p.basename(widget.path),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        actions: <Widget>[
-          IconButton(
-            tooltip: 'Share',
-            onPressed: () => SharePlus.instance.share(
-              ShareParams(files: <XFile>[XFile(widget.path)]),
-            ),
-            icon: const Icon(CupertinoIcons.square_arrow_up),
+    return LargeTitleScaffold(
+      title: p.basename(widget.path),
+      leading: BackBarButton(label: p.basename(p.dirname(widget.path))),
+      trailing: <Widget>[
+        BarButton.icon(
+          icon: CupertinoIcons.square_arrow_up,
+          tooltip: 'Share',
+          onPressed: () => SharePlus.instance.share(
+            ShareParams(files: <XFile>[XFile(widget.path)]),
           ),
-        ],
-      ),
-      body: count.when(
-        loading: () => const SizedBox.shrink(),
-        error: (_, _) => const EmptyState(
-          icon: CupertinoIcons.doc_richtext,
-          title: 'This PDF can\'t be opened',
-          message: 'It may be damaged or protected with a password.',
+        ),
+      ],
+      body: (BuildContext context, Widget header) => count.when(
+        loading: () => header,
+        error: (_, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            header,
+            const Expanded(
+              child: EmptyState(
+                icon: CupertinoIcons.doc_richtext,
+                title: 'This PDF can\'t be opened',
+                message: 'It may be damaged or protected with a password.',
+              ),
+            ),
+          ],
         ),
         data: (int pages) => LayoutBuilder(
           builder: (BuildContext context, BoxConstraints c) {
@@ -85,22 +89,25 @@ class _PdfScreenState extends ConsumerState<PdfScreen> {
                     return false;
                   },
                   child: ListView.builder(
-                    padding: EdgeInsets.fromLTRB(
-                      AppSpacing.lg,
-                      AppSpacing.sm,
-                      AppSpacing.lg,
-                      bottomClearance(context),
-                    ),
-                    itemCount: pages,
-                    itemBuilder: (BuildContext context, int i) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                      child: _Page(
-                        path: widget.path,
-                        index: i,
-                        px: px,
-                        width: pageWidth,
-                      ),
-                    ),
+                    padding: EdgeInsets.only(bottom: bottomClearance(context)),
+                    // The title first, then the pages.
+                    itemCount: pages + 1,
+                    itemBuilder: (BuildContext context, int i) => i == 0
+                        ? header
+                        : Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.lg,
+                              0,
+                              AppSpacing.lg,
+                              AppSpacing.md,
+                            ),
+                            child: _Page(
+                              path: widget.path,
+                              index: i - 1,
+                              px: px,
+                              width: pageWidth,
+                            ),
+                          ),
                   ),
                 ),
                 Positioned(
