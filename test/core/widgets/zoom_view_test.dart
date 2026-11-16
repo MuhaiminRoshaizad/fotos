@@ -235,4 +235,56 @@ void main() {
     await tester.pumpAndSettle();
     expect(c.page, 1);
   });
+
+  testWidgets('zoomed into a strip, a diagonal drag scrolls the strip and '
+      'pans across it at once', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final ScrollController s = ScrollController();
+    addTearDown(s.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ZoomView(
+          scrollAxis: Axis.vertical,
+          child: ListView.builder(
+            controller: s,
+            itemCount: 50,
+            itemExtent: 300,
+            itemBuilder: (_, int i) => Text('panel $i'),
+          ),
+        ),
+      ),
+    );
+    await doubleTap(tester, const Offset(200, 400));
+    expect(transform(tester).getMaxScaleOnAxis(), greaterThan(2));
+    final double x = transform(tester).getTranslation().x;
+
+    final TestGesture g = await tester.startGesture(const Offset(200, 500));
+    for (int i = 0; i < 10; i++) {
+      await g.moveBy(const Offset(12, -12));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(s.offset, greaterThan(20), reason: 'the strip scrolls');
+    expect(
+      transform(tester).getTranslation().x,
+      greaterThan(x + 60),
+      reason: 'and the zoom pans sideways',
+    );
+
+    // Straight sideways, nothing scrolls: the finger only pans.
+    final double offset = s.offset;
+    final double x2 = transform(tester).getTranslation().x;
+    final TestGesture h = await tester.startGesture(const Offset(200, 500));
+    for (int i = 0; i < 8; i++) {
+      await h.moveBy(const Offset(-15, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await h.up();
+    await tester.pumpAndSettle();
+    expect(s.offset, offset);
+    expect(transform(tester).getTranslation().x, lessThan(x2 - 60));
+  });
 }

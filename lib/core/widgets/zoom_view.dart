@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_tokens.dart';
@@ -19,9 +21,18 @@ class ZoomView extends StatefulWidget {
     this.doubleTap = true,
     this.maxScale = 5,
     this.onZoomed,
+    this.scrollAxis,
   });
 
   final Widget child;
+
+  /// The axis [child] scrolls along, if it is a scrolling list. Zoomed in,
+  /// one finger then leaves that axis to the list and pans only across it,
+  /// both at once: a diagonal drag scrolls the strip and moves sideways.
+  /// Taking the finger whole instead, the zoom lost every diagonal drag to
+  /// the list, which wins at 18 px along its axis while a pan needs 36 px
+  /// in all.
+  final Axis? scrollAxis;
 
   /// False where a double-tap already means something else, as on a video,
   /// where it skips or plays.
@@ -127,6 +138,23 @@ class ZoomViewState extends State<ZoomView>
     if (_scale < 1.01) _animateTo(Matrix4.identity());
   }
 
+  // Fingers down now, for panning across a scrolling list.
+  int _fingers = 0;
+
+  /// Zoomed into a list, one finger's travel across the list's axis pans;
+  /// its travel along the axis is the list's to scroll.
+  void _onMove(PointerMoveEvent e) {
+    final Axis? axis = widget.scrollAxis;
+    if (axis == null || !_zoomed || _fingers != 1) return;
+    final Offset across = axis == Axis.vertical
+        ? Offset(e.localDelta.dx, 0)
+        : Offset(0, e.localDelta.dy);
+    if (across == Offset.zero) return;
+    _anim.stop();
+    final Float64List m = _t.value.storage;
+    _t.value = _matrix(_scale, Offset(m[12], m[13]) + across);
+  }
+
   @override
   void dispose() {
     _t.dispose();
@@ -139,25 +167,36 @@ class ZoomViewState extends State<ZoomView>
     final Widget view = LayoutBuilder(
       builder: (BuildContext context, BoxConstraints c) {
         _size = c.biggest;
-        return RawGestureDetector(
-          // The whole view, margins too: a tap beside a narrow page still
-          // reaches whatever turns the page.
-          behavior: HitTestBehavior.opaque,
-          gestures: <Type, GestureRecognizerFactory>{
-            PinchFirst: GestureRecognizerFactoryWithHandlers<PinchFirst>(
-              () => PinchFirst(oneFinger: () => _zoomed),
-              (PinchFirst r) => r
-                ..onStart = _onStart
-                ..onUpdate = _onUpdate
-                ..onEnd = _onEnd,
-            ),
-          },
-          child: ClipRect(
-            child: ValueListenableBuilder<Matrix4>(
-              valueListenable: _t,
-              builder: (BuildContext context, Matrix4 m, Widget? child) =>
-                  Transform(transform: m, child: child),
-              child: widget.child,
+        // Raw pointer events, outside the gesture arena: the pan across a
+        // list runs alongside the list's own scroll instead of competing.
+        return Listener(
+          onPointerDown: (_) => _fingers++,
+          onPointerUp: (_) => _fingers--,
+          onPointerCancel: (_) => _fingers--,
+          onPointerMove: _onMove,
+          child: RawGestureDetector(
+            // The whole view, margins too: a tap beside a narrow page still
+            // reaches whatever turns the page.
+            behavior: HitTestBehavior.opaque,
+            gestures: <Type, GestureRecognizerFactory>{
+              PinchFirst: GestureRecognizerFactoryWithHandlers<PinchFirst>(
+                // Over a list, one finger is never taken whole (_onMove).
+                () => PinchFirst(
+                  oneFinger: () => _zoomed && widget.scrollAxis == null,
+                ),
+                (PinchFirst r) => r
+                  ..onStart = _onStart
+                  ..onUpdate = _onUpdate
+                  ..onEnd = _onEnd,
+              ),
+            },
+            child: ClipRect(
+              child: ValueListenableBuilder<Matrix4>(
+                valueListenable: _t,
+                builder: (BuildContext context, Matrix4 m, Widget? child) =>
+                    Transform(transform: m, child: child),
+                child: widget.child,
+              ),
             ),
           ),
         );

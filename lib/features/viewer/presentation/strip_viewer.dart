@@ -175,6 +175,7 @@ class _StripViewerState extends State<StripViewer> {
                 // Pinch or double-tap to zoom into a panel; one finger
                 // still scrolls the strip.
                 child: ZoomView(
+                  scrollAxis: Axis.vertical,
                   onZoomed: (bool z) => setState(() => _zoomed = z),
                   child: ListView.builder(
                     controller: _scroll,
