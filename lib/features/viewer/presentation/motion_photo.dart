@@ -27,15 +27,15 @@ final isMotionPhotoProvider = FutureProvider.family<bool, AssetEntity>((
 
 /// The id of the Motion Photo whose video is on screen now, for its badge
 /// to show.
-class MotionPlaying extends Notifier<String?> {
+class MotionPlayingNotifier extends Notifier<String?> {
   @override
   String? build() => null;
 
   void set(String? id) => state = id;
 }
 
-final motionPlayingProvider = NotifierProvider<MotionPlaying, String?>(
-  MotionPlaying.new,
+final motionPlayingProvider = NotifierProvider<MotionPlayingNotifier, String?>(
+  MotionPlayingNotifier.new,
 );
 
 /// A photo in the viewer that plays its motion while it is held, as iOS

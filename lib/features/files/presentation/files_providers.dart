@@ -282,8 +282,8 @@ final fileSortsProvider = AsyncNotifierProvider<FileSortsNotifier, FileSorts>(
 /// What is typed in a folder's search field, by folder path. Held here, not
 /// in the field's widget, because the bar above the list needs it too:
 /// Select all must select what the search is showing.
-class FolderQuery extends Notifier<String> {
-  FolderQuery(this.dir);
+class FolderQueryNotifier extends Notifier<String> {
+  FolderQueryNotifier(this.dir);
   final String dir;
 
   @override
@@ -293,7 +293,7 @@ class FolderQuery extends Notifier<String> {
 }
 
 final folderQueryProvider = NotifierProvider.autoDispose
-    .family<FolderQuery, String, String>(FolderQuery.new);
+    .family<FolderQueryNotifier, String, String>(FolderQueryNotifier.new);
 
 /// A picture or video file's thumbnail for its tile or row, keyed by path
 /// and size in pixels.
