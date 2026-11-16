@@ -60,6 +60,22 @@ class ViewerArgs {
   final String title;
 }
 
+/// Whether the viewer's page view may take a drag made with [fingers]
+/// fingers.
+///
+/// Two fingers are a pinch, never a page turn: left to itself the page view
+/// only stands aside when the fingers move apart on its axis, so a pinch
+/// with one finger held still turned the page.
+///
+/// Nor may it take a drag while a video is zoomed in, so that the finger
+/// pans the video. The page view asks extended_image's own zoom whether a
+/// drag is a page turn (gesture_page_view.dart, canHorizontalOrVerticalDrag),
+/// which a video zoomed by ZoomView never sets; canScrollPage only stops the
+/// page moving, so the page view still won every sideways drag and dropped
+/// it, and the video could not pan sideways or diagonally.
+bool pageMayTakeDrag(int fingers, {required bool videoZoomed}) =>
+    fingers == 1 && !videoZoomed;
+
 /// Full-screen photo and video viewer. Swipe sideways to page, down to close,
 /// up for details; pinch or double-tap to zoom; tap to show or hide controls.
 class ViewerScreen extends ConsumerStatefulWidget {
@@ -474,13 +490,11 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                   itemCount: _items.length,
                   // A pinched-in video pans instead of turning the page.
                   canScrollPage: (_) => !_videoZoomed,
-                  // Two fingers are a pinch, never a page turn. Left to
-                  // itself the page view only stands aside when the fingers
-                  // move apart on its axis, so a pinch with one finger
-                  // held still turned the page.
                   shouldAccpetHorizontalOrVerticalDrag:
-                      (Map<int, VelocityTracker> fingers) =>
-                          fingers.length == 1,
+                      (Map<int, VelocityTracker> fingers) => pageMayTakeDrag(
+                        fingers.length,
+                        videoZoomed: _videoZoomed,
+                      ),
                   onPageChanged: (int i) {
                     _videoZoomed = false;
                     if (_scrubbing) return;
