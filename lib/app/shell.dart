@@ -6,8 +6,10 @@ import '../core/haptics/app_haptics.dart';
 import '../core/selection/selection.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/bottom_bar_space.dart';
+import '../features/video_editor/presentation/save_job.dart';
 import 'edit_tabs_sheet.dart';
 import 'floating_nav.dart';
+import 'save_pill.dart';
 import 'tab_order.dart';
 import 'tab_root.dart';
 
@@ -42,6 +44,9 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final SelectionState sel = ref.watch(selectionProvider);
     final bool onTab = _tabs.contains(location);
+    final bool savingHidden = ref.watch(
+      saveJobProvider.select((SaveJob? j) => j?.hidden ?? false),
+    );
     final double bottom =
         MediaQuery.paddingOf(context).bottom + AppNavMetrics.bottomGap;
     return Scaffold(
@@ -57,52 +62,72 @@ class AppShell extends ConsumerWidget {
             left: 0,
             right: 0,
             bottom: bottom,
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: AppMotion.medium,
-                switchInCurve: AppMotion.decelerate,
-                switchOutCurve: AppMotion.accelerate,
-                transitionBuilder: (Widget child, Animation<double> a) =>
-                    FadeTransition(
-                      opacity: a,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 0.6),
-                          end: Offset.zero,
-                        ).animate(a),
-                        child: child,
-                      ),
-                    ),
-                child: sel.active
-                    ? SelectionBar(
-                        key: const ValueKey<String>('selection'),
-                        actions: <SelectionAction>[
-                          for (final SelectionAction a in sel.actions)
-                            if (a.isShownFor(sel.ids)) a,
-                        ],
-                        enabled: sel.ids.isNotEmpty,
-                        onAction: (SelectionAction a) =>
-                            a.run(context, sel.ids),
-                      )
-                    : onTab
-                    ? FloatingNav(
-                        key: const ValueKey<String>('nav'),
-                        index: shell.currentIndex,
-                        order: ref.watch(tabOrderProvider),
-                        onSelect: (int i) => _select(ref, i),
-                        onLongPress: () {
-                          AppHaptics.longPress();
-                          showEditTabs(context, ref);
-                        },
-                      )
-                    : const SizedBox.shrink(key: ValueKey<String>('none')),
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                // A save left to run in the background floats above the
+                // tabs; selecting takes the space for the selection bar.
+                AnimatedSwitcher(
+                  duration: AppMotion.medium,
+                  switchInCurve: AppMotion.decelerate,
+                  switchOutCurve: AppMotion.accelerate,
+                  transitionBuilder: _rise,
+                  child: onTab && !sel.active && savingHidden
+                      ? const Padding(
+                          key: ValueKey<String>('save'),
+                          padding: EdgeInsets.only(bottom: AppSpacing.md),
+                          child: SavePill(),
+                        )
+                      : const SizedBox.shrink(key: ValueKey<String>('none')),
+                ),
+                AnimatedSwitcher(
+                  duration: AppMotion.medium,
+                  switchInCurve: AppMotion.decelerate,
+                  switchOutCurve: AppMotion.accelerate,
+                  transitionBuilder: _rise,
+                  child: sel.active
+                      ? SelectionBar(
+                          key: const ValueKey<String>('selection'),
+                          actions: <SelectionAction>[
+                            for (final SelectionAction a in sel.actions)
+                              if (a.isShownFor(sel.ids)) a,
+                          ],
+                          enabled: sel.ids.isNotEmpty,
+                          onAction: (SelectionAction a) =>
+                              a.run(context, sel.ids),
+                        )
+                      : onTab
+                      ? FloatingNav(
+                          key: const ValueKey<String>('nav'),
+                          index: shell.currentIndex,
+                          order: ref.watch(tabOrderProvider),
+                          onSelect: (int i) => _select(ref, i),
+                          onLongPress: () {
+                            AppHaptics.longPress();
+                            showEditTabs(context, ref);
+                          },
+                        )
+                      : const SizedBox.shrink(key: ValueKey<String>('none')),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+
+  /// Bars come and go by fading as they rise from just below.
+  static Widget _rise(Widget child, Animation<double> a) => FadeTransition(
+    opacity: a,
+    child: SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(0, 0.6),
+        end: Offset.zero,
+      ).animate(a),
+      child: child,
+    ),
+  );
 }
 
 /// Switches tabs instantly, as iOS does: a tab change happens dozens of

@@ -11,6 +11,7 @@ import '../../../core/video/video_frames.dart';
 import '../../../core/video/video_session.dart';
 import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/dialogs.dart';
+import '../../../core/widgets/toast.dart';
 import '../../albums/presentation/albums_providers.dart'
     show nativeChannelProvider;
 import '../data/video_cutter.dart';
@@ -318,7 +319,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
       ],
     );
     if (replace == null || !mounted) return;
-    final SavedEdit? saved = await saveWithProgress(
+    final EditorSave outcome = await saveWithProgress(
       context,
       ref,
       id: widget.asset.id,
@@ -326,7 +327,16 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
       plan: plan,
       replace: replace,
     );
-    if (saved == null || !mounted) return;
+    if (!mounted) return;
+    if (outcome.hidden) {
+      // The edit is in Android's hands now; the pill and the notification
+      // follow it, and fotos says how it went.
+      showToast(context, 'Saving in the background');
+      Navigator.of(context).pop();
+      return;
+    }
+    final SavedEdit? saved = outcome.saved;
+    if (saved == null) return;
     Navigator.of(
       context,
     ).pop<EditOutcome>((saved: saved, askedToReplace: replace));

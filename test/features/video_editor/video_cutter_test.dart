@@ -114,13 +114,15 @@ void main() {
 
     tearDown(() => c.dispose());
 
+    Future<Future<SavedEdit?>> start({bool replace = true}) => c
+        .read(saveJobProvider.notifier)
+        .start('5', 'Trip.mp4', CutPlan.whole(60000), replace: replace);
+
     test('follows the progress and completes with the saved video', () async {
-      final Future<SavedEdit> saving = c
-          .read(saveJobProvider.notifier)
-          .save('5', 'Trip.mp4', CutPlan.whole(60000), replace: true);
-      await Future<void>.delayed(Duration.zero);
+      final Future<SavedEdit?> saving = await start();
       expect(c.read(saveJobProvider)?.name, 'Trip.mp4');
       expect(c.read(saveJobProvider)?.percent, 0);
+      expect(c.read(saveJobProvider)?.hidden, isFalse);
 
       await event('cutProgress', 42);
       expect(c.read(saveJobProvider)?.percent, 42);
@@ -130,16 +132,14 @@ void main() {
         'name': 'Trip.mp4',
         'replaced': true,
       });
-      final SavedEdit saved = await saving;
-      expect(saved.id, '9');
+      final SavedEdit? saved = await saving;
+      expect(saved!.id, '9');
       expect(saved.replaced, isTrue);
       expect(c.read(saveJobProvider), isNull);
     });
 
     test('a failure ends the job and is thrown', () async {
-      final Future<SavedEdit> saving = c
-          .read(saveJobProvider.notifier)
-          .save('5', 'Trip.mp4', CutPlan.whole(60000), replace: false);
+      final Future<SavedEdit?> saving = await start(replace: false);
       final Future<void> thrown = expectLater(
         saving,
         throwsA(
@@ -150,7 +150,6 @@ void main() {
           ),
         ),
       );
-      await Future<void>.delayed(Duration.zero);
       await event('cutDone', <String, Object>{
         'error': 'no_space',
         'message': 'full',
@@ -163,5 +162,45 @@ void main() {
       await c.read(saveJobProvider.notifier).cancel();
       expect(calls.last.method, 'cutCancel');
     });
+
+    test('Hide lets the editor go, asks to notify, and the end is told '
+        'by the app', () async {
+      final Future<SavedEdit?> saving = await start();
+      final List<HiddenEnd> told = <HiddenEnd>[];
+      c.read(saveJobProvider.notifier).hiddenEnds.listen(told.add);
+
+      c.read(saveJobProvider.notifier).hide();
+      expect(await saving, isNull);
+      expect(c.read(saveJobProvider)?.hidden, isTrue);
+      expect(calls.last.method, 'askNotifications');
+
+      await event('cutProgress', 70);
+      expect(c.read(saveJobProvider)?.percent, 70);
+      await event('cutDone', <String, Object>{
+        'id': '9',
+        'name': 'Trip (edited).mp4',
+        'replaced': false,
+      });
+      await Future<void>.delayed(Duration.zero);
+      expect(c.read(saveJobProvider), isNull);
+      expect(told.single.name, 'Trip.mp4');
+      expect(told.single.end.saved!.name, 'Trip (edited).mp4');
+    });
+  });
+
+  test('a fotos opened midway picks up the save, as a hidden one', () async {
+    answer(
+      (MethodCall call) => call.method == 'cutStatus'
+          ? <String, Object>{'running': true, 'percent': 35, 'name': 'Trip.mp4'}
+          : null,
+    );
+    final ProviderContainer c = ProviderContainer();
+    addTearDown(c.dispose);
+    c.listen(saveJobProvider, (_, _) {});
+    await Future<void>.delayed(Duration.zero);
+    final SaveJob? job = c.read(saveJobProvider);
+    expect(job?.name, 'Trip.mp4');
+    expect(job?.percent, 35);
+    expect(job?.hidden, isTrue);
   });
 }

@@ -42,6 +42,9 @@ class SaveEnd {
   final CutException? error;
 }
 
+/// A save under way, as Android reports it.
+typedef SaveStatus = ({String name, int percent});
+
 /// Saves a [CutPlan] through Android, where SaveService runs it
 /// (VideoCutter.kt) so it carries on with fotos in the background. One
 /// save runs at a time; its progress and end arrive as events.
@@ -85,6 +88,20 @@ class VideoCutter {
 
   /// Stops a save that is still encoding. Once saving has begun it finishes.
   Future<void> cancel() => _native.invoke<void>('cutCancel');
+
+  /// The save under way, or null when there is none: for a fotos opened
+  /// again while Android was still saving.
+  Future<SaveStatus?> status() async {
+    final Map<Object?, Object?>? m = await _native
+        .invoke<Map<Object?, Object?>>('cutStatus');
+    if (m == null || m['running'] != true) return null;
+    return (name: m['name']! as String, percent: m['percent']! as int);
+  }
+
+  /// Asks for leave to show notifications, so a save left to run in the
+  /// background can show its progress. Android stops asking after two
+  /// refusals; the save runs either way.
+  Future<void> askNotifications() => _native.invoke<void>('askNotifications');
 }
 
 /// The reason Android gave as [code].

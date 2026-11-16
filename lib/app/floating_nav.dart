@@ -131,7 +131,7 @@ class _FloatingNavState extends State<FloatingNav>
         animation: _dip,
         builder: (BuildContext context, Widget? pill) =>
             Transform.scale(scale: 1 - 0.04 * _dip.value, child: pill),
-        child: _Pill(
+        child: FrostedPill(
           child: SizedBox(
             width: _itemWidth * navDestinations.length,
             height: AppNavMetrics.height - 12,
@@ -327,7 +327,7 @@ class SelectionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    return _Pill(
+    return FrostedPill(
       // Grows and shrinks smoothly when an action comes or goes with what
       // is selected (Extract, for ZIPs only).
       child: AnimatedSize(
@@ -389,8 +389,8 @@ class SelectionBar extends StatelessWidget {
 
 /// Frosted glass: whatever scrolls behind shows through, blurred, as on
 /// iOS. A hairline edge keeps it distinct over photos of any colour.
-class _Pill extends StatelessWidget {
-  const _Pill({required this.child});
+class FrostedPill extends StatelessWidget {
+  const FrostedPill({super.key, required this.child});
   final Widget child;
 
   @override

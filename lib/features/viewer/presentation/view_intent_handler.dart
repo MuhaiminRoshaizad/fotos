@@ -70,35 +70,42 @@ class _ViewIntentHandlerState extends ConsumerState<ViewIntentHandler> {
       }
       return;
     }
-    if (await ref.read(mediaAccessProvider.future) == MediaAccess.denied) {
-      await ref.read(mediaAccessProvider.notifier).request();
-    }
-    final AssetEntity? asset = await AssetEntity.fromId(id);
-    if (asset == null) {
-      if (ctx != null && ctx.mounted) {
-        showToast(
-          ctx,
-          'That item isn\'t available. Allow photo access and try again.',
-        );
-      }
-      return;
-    }
-    // Open on this one at once; the library (about half a second for a
-    // thousand items) follows, so it can be paged through from there, as
-    // the camera's own gallery does.
-    ref
-        .read(routerProvider)
-        .push(
-          '/viewer',
-          extra: ViewerArgs(
-            items: <AssetEntity>[asset],
-            index: 0,
-            heroPrefix: 'intent',
-            library: ref.read(libraryProvider(MediaKind.all).future),
-          ),
-        );
+    await openInViewer(ref, id);
   }
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// Opens the photo or video with MediaStore id [id] in the viewer, over
+/// whatever is showing, or says why it can't.
+Future<void> openInViewer(WidgetRef ref, String id) async {
+  if (await ref.read(mediaAccessProvider.future) == MediaAccess.denied) {
+    await ref.read(mediaAccessProvider.notifier).request();
+  }
+  final AssetEntity? asset = await AssetEntity.fromId(id);
+  if (asset == null) {
+    final BuildContext? ctx = rootNavigatorKey.currentContext;
+    if (ctx != null && ctx.mounted) {
+      showToast(
+        ctx,
+        'That item isn\'t available. Allow photo access and try again.',
+      );
+    }
+    return;
+  }
+  // Open on this one at once; the library (about half a second for a
+  // thousand items) follows, so it can be paged through from there, as
+  // the camera's own gallery does.
+  ref
+      .read(routerProvider)
+      .push(
+        '/viewer',
+        extra: ViewerArgs(
+          items: <AssetEntity>[asset],
+          index: 0,
+          heroPrefix: 'intent',
+          library: ref.read(libraryProvider(MediaKind.all).future),
+        ),
+      );
 }
