@@ -12,6 +12,7 @@ import java.time.Instant
 
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
+    private var handler: NativeChannel? = null
 
     /** False while Android's launch screen is still up. */
     private var splashGone = true
@@ -73,8 +74,28 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NativeChannel.NAME)
-        channel.setMethodCallHandler(NativeChannel(this, channel))
+        val handler = NativeChannel(this, channel)
+        channel.setMethodCallHandler(handler)
         this.channel = channel
+        this.handler = handler
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        handler?.detach()
+        handler = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    // A video save tells its outcome on screen while fotos shows, and by
+    // notification otherwise (SaveService).
+    override fun onResume() {
+        super.onResume()
+        SaveJob.visible = true
+    }
+
+    override fun onPause() {
+        SaveJob.visible = false
+        super.onPause()
     }
 
     @Deprecated("FlutterActivity still routes plugin results through this callback.")

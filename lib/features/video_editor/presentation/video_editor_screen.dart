@@ -320,8 +320,9 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen> {
     if (replace == null || !mounted) return;
     final SavedEdit? saved = await saveWithProgress(
       context,
-      VideoCutter(native),
+      ref,
       id: widget.asset.id,
+      name: widget.asset.title ?? 'Video',
       plan: plan,
       replace: replace,
     );

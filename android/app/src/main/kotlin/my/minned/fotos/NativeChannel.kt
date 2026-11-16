@@ -32,8 +32,17 @@ class NativeChannel(
 
     @Volatile private var takeout: TakeoutImporter? = null
 
-    // The cut under way, if any; one at a time.
-    private var cutter: VideoCutter? = null
+    // Hears the video save, which outlives this screen, while it is open.
+    private val saveEvents: (String, Any?) -> Unit = { method, arg -> channel.invokeMethod(method, arg) }
+
+    init {
+        SaveJob.listener = saveEvents
+    }
+
+    /** Called as the screen goes: the save must not call into a Flutter that has gone. */
+    fun detach() {
+        if (SaveJob.listener === saveEvents) SaveJob.listener = null
+    }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -237,38 +246,38 @@ class NativeChannel(
                 TakeoutImporter.dropReview(activity, id)
                 null
             }
+            // Starts a save in SaveService; its progress and end come as
+            // cutProgress and cutDone events (SaveJob).
             "cutVideo" -> {
-                if (cutter != null) {
+                if (SaveJob.running) {
                     result.error("busy", "A video is already being saved", null)
                     return
                 }
                 val keep = call.argument<List<List<Number>>>("keep")!!.map { it[0].toLong() to it[1].toLong() }
-                val id = call.argument<String>("id")!!.toLong()
-                val replace = call.argument<Boolean>("replace")!!
-                val c = VideoCutter(activity, io) { percent ->
-                    channel.invokeMethod("cutProgress", percent)
-                }
-                // Only once the arguments are read: a bad call must not
-                // leave every later save refused as busy.
-                cutter = c
-                // An encode can take minutes; the phone mustn't sleep and
-                // pause it partway.
-                val awake = android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                activity.window.addFlags(awake)
-                c.start(id, keep, replace) { outcome ->
-                    cutter = null
-                    activity.window.clearFlags(awake)
-                    outcome.fold(
-                        { result.success(it) },
-                        { e ->
-                            val code = (e as? VideoCutter.CutException)?.code ?: "failed"
-                            result.error(code, e.message, null)
-                        },
-                    )
-                }
+                SaveService.start(
+                    activity,
+                    call.argument<String>("id")!!.toLong(),
+                    keep,
+                    call.argument<Boolean>("replace")!!,
+                    call.argument<String>("name")!!,
+                )
+                result.success(null)
             }
             "cutCancel" -> {
-                cutter?.cancel()
+                SaveJob.cancel()
+                result.success(null)
+            }
+            "cutStatus" -> result.success(SaveJob.status())
+            // Asked when a save is first left to run in the background, so
+            // its notification can show; Android itself stops asking after
+            // two refusals.
+            "askNotifications" -> {
+                val permission = android.Manifest.permission.POST_NOTIFICATIONS
+                if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                    activity.checkSelfPermission(permission) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    activity.requestPermissions(arrayOf(permission), 4108)
+                }
                 result.success(null)
             }
             "keepScreenOn" -> {

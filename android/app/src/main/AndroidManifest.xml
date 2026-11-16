@@ -10,6 +10,16 @@
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage"/>
+    <!-- Video saves run in SaveService, a foreground service, so they go on
+         when fotos is left: "mediaProcessing" from Android 15, "dataSync"
+         before. The notification shows its progress (asked for in context,
+         when a save is first hidden), and the wake lock keeps the phone
+         awake for it with the screen off. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <application
         android:label="fotos"
         android:name="${applicationName}"
@@ -81,6 +91,10 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/fotos_widget_info" />
         </receiver>
+        <service
+            android:name=".SaveService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|mediaProcessing" />
         <service
             android:name=".widget.FotosWidgetService"
             android:exported="false"

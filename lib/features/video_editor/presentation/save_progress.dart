@@ -1,51 +1,50 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart' show LinearProgressIndicator, Theme;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../data/video_cutter.dart';
 import '../domain/cut_plan.dart';
 import '../domain/save_estimate.dart';
+import 'save_job.dart';
 
-/// Saves [plan] behind a dialog that shows how far the encode has got and
-/// can be cancelled until saving begins. Returns the saved video, or null
-/// when cancelled or failed (after saying why). The original is untouched
-/// unless this returns an edit that replaced it.
+/// Saves [plan] of video [id] (file [name]) behind a dialog that shows how
+/// far the encode has got and can be cancelled until saving begins. Returns
+/// the saved video, or null when cancelled or failed (after saying why).
+/// The original is untouched unless this returns an edit that replaced it.
 Future<SavedEdit?> saveWithProgress(
   BuildContext context,
-  VideoCutter cutter, {
+  WidgetRef ref, {
   required String id,
+  required String name,
   required CutPlan plan,
   required bool replace,
 }) async {
-  final ValueNotifier<int> percent = ValueNotifier<int>(0);
-  final StreamSubscription<int> sub = cutter
-      .progressOf(plan)
-      .listen((int p) => percent.value = p);
+  final SaveJobNotifier job = ref.read(saveJobProvider.notifier);
   final NavigatorState navigator = Navigator.of(context, rootNavigator: true);
-  unawaited(
-    showCupertinoDialog<void>(
-      context: context,
-      useRootNavigator: true,
-      builder: (BuildContext ctx) => PopScope(
-        canPop: false,
-        child: _SavingDialog(percent: percent, onCancel: cutter.cancel),
-      ),
-    ),
-  );
   SavedEdit? saved;
   CutException? failure;
   try {
-    saved = await cutter.save(id, plan, replace: replace);
+    final Future<SavedEdit> saving = job.save(id, name, plan, replace: replace);
+    unawaited(
+      showCupertinoDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        builder: (BuildContext ctx) =>
+            const PopScope(canPop: false, child: SavingDialog()),
+      ),
+    );
+    try {
+      saved = await saving;
+    } finally {
+      navigator.pop();
+    }
   } on CutException catch (e) {
     failure = e;
   }
-  await sub.cancel();
-  navigator.pop();
-  percent.dispose();
   if (saved != null) {
     unawaited(AppHaptics.success());
     return saved;
@@ -65,9 +64,6 @@ Future<SavedEdit?> saveWithProgress(
           'fotos needs All files access to save beside the original. The '
               'original video is unchanged.',
         CutFailure.busy => 'Another video is still saving.',
-        CutFailure.afterTrash =>
-          'The original went to Recently deleted, but the edit couldn\'t '
-              'be finished. Restore the original from Recently deleted.',
         _ =>
           'Something went wrong while saving. The original video is '
               'unchanged.',
@@ -84,45 +80,35 @@ Future<SavedEdit?> saveWithProgress(
   return null;
 }
 
-class _SavingDialog extends StatefulWidget {
-  const _SavingDialog({required this.percent, required this.onCancel});
-
-  final ValueListenable<int> percent;
-  final VoidCallback onCancel;
+/// How far the save under way has got, with the time left, and Cancel.
+class SavingDialog extends ConsumerStatefulWidget {
+  const SavingDialog({super.key});
 
   @override
-  State<_SavingDialog> createState() => _SavingDialogState();
+  ConsumerState<SavingDialog> createState() => _SavingDialogState();
 }
 
-class _SavingDialogState extends State<_SavingDialog> {
-  final Stopwatch _clock = Stopwatch()..start();
-  late final SaveEstimate _estimate = SaveEstimate(() => _clock.elapsed);
-
+class _SavingDialogState extends ConsumerState<SavingDialog> {
   late final Timer _tick;
 
   @override
   void initState() {
     super.initState();
-    widget.percent.addListener(_report);
     // The time left counts down between progress reports.
     _tick = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
-  }
-
-  void _report() {
-    _estimate.report(widget.percent.value);
-    setState(() {});
   }
 
   @override
   void dispose() {
     _tick.cancel();
-    widget.percent.removeListener(_report);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final int p = widget.percent.value;
+    final SaveJobNotifier job = ref.read(saveJobProvider.notifier);
+    // Before Android has started the save there is no job yet.
+    final int p = ref.watch(saveJobProvider)?.percent ?? 0;
     // At 100 the encode is done and the file is being checked and named:
     // too late to stop safely.
     final bool finishing = p >= 100;
@@ -151,7 +137,7 @@ class _SavingDialogState extends State<_SavingDialog> {
             Text(finishing ? 'Checking the new video' : '$p%', style: figures),
             // Always one line here, so the dialog doesn't change size.
             Text(
-              finishing ? ' ' : timeLeft(_estimate.left),
+              finishing ? ' ' : timeLeft(job.left),
               style: figures.copyWith(
                 color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
@@ -162,7 +148,7 @@ class _SavingDialogState extends State<_SavingDialog> {
       actions: <Widget>[
         CupertinoDialogAction(
           isDestructiveAction: true,
-          onPressed: finishing ? null : widget.onCancel,
+          onPressed: finishing ? null : job.cancel,
           child: const Text('Cancel'),
         ),
       ],

@@ -1,6 +1,6 @@
 package my.minned.fotos
 
-import android.app.Activity
+import android.content.Context
 import android.content.ContentUris
 import android.content.ContentValues
 import android.media.MediaMetadataRetriever
@@ -39,17 +39,24 @@ import java.util.concurrent.TimeUnit
  *     folders or disks).
  *  2. The file is flushed to disk and checked: it must open, hold video
  *     (and audio if the original had it) and last as long as the parts kept.
- *  3. Only then is it given its name. To replace, the original goes to
- *     Android's trash first, with the system's own consent dialog, so it
- *     stays recoverable for 30 days; declined, the edit is kept as a copy.
+ *  3. Only then is it named, as a copy ("Trip (edited).mp4"). To replace,
+ *     the original then goes to Android's trash, recoverable for 30 days,
+ *     and the copy takes its name. Each step leaves both videos safe if
+ *     fotos is stopped right after it; if the trash refuses, the copy stays.
  *
  * Writing beside the original needs All files access: MediaStore only lets
  * an app create videos in DCIM, Movies and Pictures, and a video from
- * Download or a messaging app must not land anywhere else.
+ * Download or a messaging app must not land anywhere else. The same access
+ * lets fotos trash the original itself, with no screen to ask from, which
+ * a save running in the background needs (MediaProvider's update allows
+ * IS_TRASHED from an app that manages external storage, and renames the
+ * file and sets its 30 days just as the system's own trash request does).
+ *
+ * Runs on any Context, so [SaveService] can hold it with no screen open.
  */
 @OptIn(UnstableApi::class)
 class VideoCutter(
-    private val activity: Activity,
+    private val context: Context,
     private val io: ExecutorService,
     private val onProgress: (Int) -> Unit,
 ) {
@@ -70,14 +77,13 @@ class VideoCutter(
     private var temp: File? = null
     private var finished = false
 
-    // Set once the encode is checked and saving begins: from there a
-    // cancel could strand the original in the trash with no edit to show.
+    // Set once the encode is checked and saving begins: from there it runs
+    // to the end, so a cancel can't leave the trash and the files half done.
     private var committing = false
-
-    // Set once the original is in the trash: from then on the new file is
-    // the only copy outside the trash, and is never deleted, whatever fails.
-    private var trashed = false
     private var reply: ((Result<Map<String, Any?>>) -> Unit)? = null
+
+    // The kept parts' lengths, for progress by time (see [byLength]).
+    private var lengths: List<Long> = emptyList()
 
     /**
      * Starts the cut. [keep] lists the parts to keep, in order, as
@@ -91,6 +97,7 @@ class VideoCutter(
         done: (Result<Map<String, Any?>>) -> Unit,
     ) {
         reply = done
+        lengths = keep.map { it.second - it.first }
         io.execute {
             try {
                 if (!Environment.isExternalStorageManager()) {
@@ -133,7 +140,7 @@ class VideoCutter(
             MediaStore.MediaColumns.IS_FAVORITE,
             MediaStore.MediaColumns.DATE_ADDED,
         )
-        val (path, taken, favourite) = activity.contentResolver.query(uri, cols, null, null, null)?.use { c ->
+        val (path, taken, favourite) = context.contentResolver.query(uri, cols, null, null, null)?.use { c ->
             if (!c.moveToFirst()) null else Triple(
                 c.getString(0),
                 // The timeline places a video with no date taken by when it
@@ -188,7 +195,7 @@ class VideoCutter(
         } else {
             EditedMediaItemSequence.withVideoFrom(items)
         }
-        val encoders = DefaultEncoderFactory.Builder(activity)
+        val encoders = DefaultEncoderFactory.Builder(context)
             .apply {
                 // As sharp as the original: without this the encoder picks
                 // its own rate from the size, often lower.
@@ -212,7 +219,7 @@ class VideoCutter(
                 entries.add(Mp4TimestampData(t, t))
             }
         }
-        val t = Transformer.Builder(activity)
+        val t = Transformer.Builder(context)
             .setEncoderFactory(encoders)
             .setMuxerFactory(muxer)
             // fotos sends nothing anywhere, Android's media metrics included.
@@ -253,7 +260,7 @@ class VideoCutter(
     private fun poll() {
         val t = transformer ?: return
         val holder = ProgressHolder()
-        if (t.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) onProgress(holder.progress)
+        if (t.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) onProgress(byLength(holder.progress, lengths))
         main.postDelayed({ poll() }, 250)
     }
 
@@ -275,44 +282,45 @@ class VideoCutter(
         }
     }
 
-    /** On the main thread: trashes the original if replacing, then names the new file. */
+    /**
+     * From the main thread: names the new file as a copy, then, when
+     * replacing, trashes the original and gives the copy its name.
+     */
     private fun save(src: Source, out: File, replace: Boolean) {
         if (finished) return
         committing = true
-        if (!replace) {
-            io.execute { publish(src, out, copyName(src.file), replaced = false) }
-            return
-        }
-        try {
-            MediaRequests.trash(activity, listOf(src.id.toString()), listOf(true), true) { ok ->
-                trashed = ok
-                io.execute {
-                    // A declined trash keeps the original, and the edit
-                    // becomes a copy beside it.
-                    val name = if (ok) replaceName(src.file) else copyName(src.file)
-                    publish(src, out, name, replaced = ok)
-                }
-            }
-        } catch (e: Exception) {
-            io.execute { publish(src, out, copyName(src.file), replaced = false) }
-        }
-    }
-
-    private fun publish(src: Source, out: File, name: String, replaced: Boolean) {
-        try {
-            // The original's name can still be taken if Android has not
-            // moved it to the trash yet; a copy's name is better than
-            // failing with the original already gone.
-            val wanted = File(out.parentFile, name)
-            var target = if (wanted.exists()) File(out.parentFile, copyName(src.file)) else wanted
-            if (!out.renameTo(target)) {
-                // One more try under a copy's name before giving up.
-                target = File(out.parentFile, copyName(src.file))
+        io.execute {
+            try {
+                var target = File(out.parentFile, copyName(src.file))
                 if (!out.renameTo(target)) {
                     throw CutException("failed", "Could not name the new video ${target.name}")
                 }
+                // Named and visible: from here the edit is kept whatever happens.
+                temp = null
+                val replaced = replace && trash(src)
+                if (replaced) {
+                    // The trash renamed the original, which frees its name;
+                    // if the rename fails anyway, the copy's name stands.
+                    val wanted = File(out.parentFile, replaceName(src.file))
+                    if (!wanted.exists() && target.renameTo(wanted)) target = wanted
+                }
+                publish(src, target, replaced)
+            } catch (e: Exception) {
+                fail(e)
             }
-            temp = null
+        }
+    }
+
+    /** Moves the original to Android's trash; false, leaving it, if Android refuses. */
+    private fun trash(src: Source): Boolean = try {
+        val trashed = ContentValues().apply { put(MediaStore.MediaColumns.IS_TRASHED, 1) }
+        context.contentResolver.update(src.uri, trashed, null, null) == 1
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun publish(src: Source, target: File, replaced: Boolean) {
+        try {
             // The file is in place under its name, so the save stands even
             // if the media scan is slow to list it; the library catches up.
             val uri = scan(target)
@@ -324,7 +332,7 @@ class VideoCutter(
                 // A favourite stays one; best effort.
                 try {
                     val fav = ContentValues().apply { put(MediaStore.MediaColumns.IS_FAVORITE, 1) }
-                    activity.contentResolver.update(uri, fav, null, null)
+                    context.contentResolver.update(uri, fav, null, null)
                 } catch (_: Exception) {
                 }
             }
@@ -337,7 +345,7 @@ class VideoCutter(
     private fun scan(file: File): Uri? {
         val latch = CountDownLatch(1)
         var found: Uri? = null
-        MediaScannerConnection.scanFile(activity, arrayOf(file.path), null) { _, uri ->
+        MediaScannerConnection.scanFile(context, arrayOf(file.path), null) { _, uri ->
             found = uri
             latch.countDown()
         }
@@ -357,14 +365,9 @@ class VideoCutter(
             finished = true
             transformer?.cancel()
             transformer = null
+            // Only an unnamed encode is removed; once named, the edit stays.
             val t = temp
             temp = null
-            if (trashed) {
-                // The original is in the trash: keep the edit, hidden or
-                // not, and say so, rather than claim nothing changed.
-                reply?.invoke(Result.failure(CutException("after_trash", e.message ?: "Saving failed")))
-                return@post
-            }
             if (t != null) io.execute { t.delete() }
             reply?.invoke(Result.failure(e))
         }
@@ -406,5 +409,27 @@ class VideoCutter(
         /** The original's own name, as an MP4: the encode is always MP4. */
         fun replaceName(original: File): String =
             if (original.extension.equals("mp4", ignoreCase = true)) original.name else "${original.nameWithoutExtension}.mp4"
+
+        /**
+         * Media3's [progress] for a save of parts [lengths] long, as a share
+         * of the whole time to encode.
+         *
+         * Media3 gives every part an equal share of the progress however long
+         * it is (SequenceAssetLoader.getProgress in 1.9.2: the parts finished,
+         * times 100 over their count, plus the current part's percent over the
+         * count). A cut that left half a second before it made a save jump to
+         * 50% at once and then crawl through the remaining 54 minutes.
+         */
+        fun byLength(progress: Int, lengths: List<Long>): Int {
+            val n = lengths.size
+            if (n <= 1 || progress >= 100) return progress
+            val total = lengths.sum()
+            if (total <= 0) return progress
+            val index = minOf(n - 1, progress * n / 100)
+            val within = ((progress - index * 100 / n) * n).coerceIn(0, 100)
+            val done = lengths.take(index).sum()
+            val share = (done + lengths[index] * within / 100.0) / total
+            return kotlin.math.floor(share * 100).toInt().coerceIn(0, 99)
+        }
     }
 }

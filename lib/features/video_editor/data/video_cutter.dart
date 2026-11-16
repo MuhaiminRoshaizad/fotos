@@ -1,6 +1,3 @@
-import 'dart:math' as math;
-
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 
 import '../../../core/platform/native_channel.dart';
@@ -19,13 +16,12 @@ class SavedEdit {
 
   /// True when the original went to Recently deleted and this took its
   /// place; false when it was saved as a copy beside the original,
-  /// including when Android's prompt to replace was declined.
+  /// including when Android would not trash the original.
   final bool replaced;
 }
 
-/// Why a save did not finish. The original is untouched in every case but
-/// [afterTrash]: there it is in Recently deleted, and the edit is kept.
-enum CutFailure { noAccess, noSpace, cancelled, busy, failed, afterTrash }
+/// Why a save did not finish. The original is untouched in every case.
+enum CutFailure { noAccess, noSpace, cancelled, busy, failed }
 
 class CutException implements Exception {
   const CutException(this.reason, this.detail);
@@ -37,51 +33,53 @@ class CutException implements Exception {
   String toString() => 'CutException($reason, $detail)';
 }
 
-/// Saves a [CutPlan] through Android (VideoCutter.kt).
+/// How a save ended: [saved], or [error].
+class SaveEnd {
+  const SaveEnd.saved(SavedEdit this.saved) : error = null;
+  const SaveEnd.failed(CutException this.error) : saved = null;
+
+  final SavedEdit? saved;
+  final CutException? error;
+}
+
+/// Saves a [CutPlan] through Android, where SaveService runs it
+/// (VideoCutter.kt) so it carries on with fotos in the background. One
+/// save runs at a time; its progress and end arrive as events.
 class VideoCutter {
   const VideoCutter(this._native);
 
   final NativeChannel _native;
 
-  /// Percent done while [plan] saves, by time to encode.
-  Stream<int> progressOf(CutPlan plan) {
-    final List<int> lengths = <int>[for (final Span s in plan.kept) s.length];
-    return _native
-        .events('cutProgress')
-        .map((Object? p) => byLength(p! as int, lengths));
-  }
+  /// Percent done of the save under way, by time to encode.
+  Stream<int> get progress =>
+      _native.events('cutProgress').map((Object? p) => p! as int);
 
-  /// Encodes the parts of video [id] that [plan] keeps and saves them
+  /// The end of each save.
+  Stream<SaveEnd> get ends => _native
+      .events('cutDone')
+      .map((Object? m) => endOf(m! as Map<Object?, Object?>));
+
+  /// Starts encoding the parts of video [id] that [plan] keeps, to be saved
   /// beside the original, as a copy or, with [replace], in its place.
-  /// Throws [CutException].
-  Future<SavedEdit> save(
+  /// [name] is the original's file name, for the notification. Throws
+  /// [CutException] (busy) when a save is already running.
+  Future<void> start(
     String id,
     CutPlan plan, {
     required bool replace,
+    required String name,
   }) async {
     try {
-      final Map<Object?, Object?> m = (await _native
-          .invoke<Map<Object?, Object?>>('cutVideo', <String, Object?>{
-            'id': id,
-            'keep': <List<int>>[
-              for (final Span s in plan.kept) <int>[s.start, s.end],
-            ],
-            'replace': replace,
-          }))!;
-      return SavedEdit(
-        id: m['id']! as String,
-        name: m['name']! as String,
-        replaced: m['replaced']! as bool,
-      );
+      await _native.invoke<void>('cutVideo', <String, Object?>{
+        'id': id,
+        'keep': <List<int>>[
+          for (final Span s in plan.kept) <int>[s.start, s.end],
+        ],
+        'replace': replace,
+        'name': name,
+      });
     } on PlatformException catch (e) {
-      throw CutException(switch (e.code) {
-        'no_access' => CutFailure.noAccess,
-        'no_space' => CutFailure.noSpace,
-        'cancelled' => CutFailure.cancelled,
-        'busy' => CutFailure.busy,
-        'after_trash' => CutFailure.afterTrash,
-        _ => CutFailure.failed,
-      }, e.message);
+      throw CutException(reasonOf(e.code), e.message);
     }
   }
 
@@ -89,26 +87,29 @@ class VideoCutter {
   Future<void> cancel() => _native.invoke<void>('cutCancel');
 }
 
-/// Media3's [progress] for a save of parts [lengths] long, as a share of
-/// the whole time to encode.
-///
-/// Media3 gives every part an equal share of the progress however long it
-/// is (SequenceAssetLoader.getProgress in 1.9.2: the parts finished, times
-/// 100 over their count, plus the current part's percent over the count).
-/// A cut that leaves half a second before it made a save jump to 50% at
-/// once and then crawl through the remaining 54 minutes.
-@visibleForTesting
-int byLength(int progress, List<int> lengths) {
-  final int n = lengths.length;
-  if (n <= 1 || progress >= 100) return progress;
-  final int total = lengths.fold(0, (int sum, int l) => sum + l);
-  if (total <= 0) return progress;
-  final int index = math.min(n - 1, progress * n ~/ 100);
-  final int within = ((progress - index * 100 ~/ n) * n).clamp(0, 100);
-  int done = 0;
-  for (int i = 0; i < index; i++) {
-    done += lengths[i];
+/// The reason Android gave as [code].
+CutFailure reasonOf(String code) => switch (code) {
+  'no_access' => CutFailure.noAccess,
+  'no_space' => CutFailure.noSpace,
+  'cancelled' => CutFailure.cancelled,
+  'busy' => CutFailure.busy,
+  _ => CutFailure.failed,
+};
+
+/// A cutDone event: the new video's id, name and whether it replaced the
+/// original, or an error code and message.
+SaveEnd endOf(Map<Object?, Object?> m) {
+  final Object? error = m['error'];
+  if (error is String) {
+    return SaveEnd.failed(
+      CutException(reasonOf(error), m['message'] as String?),
+    );
   }
-  final double share = (done + lengths[index] * within / 100) / total;
-  return (share * 100).floor().clamp(0, 99);
+  return SaveEnd.saved(
+    SavedEdit(
+      id: m['id']! as String,
+      name: m['name']! as String,
+      replaced: m['replaced']! as bool,
+    ),
+  );
 }
