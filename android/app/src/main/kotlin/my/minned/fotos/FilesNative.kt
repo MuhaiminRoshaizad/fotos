@@ -154,25 +154,32 @@ object FilesNative {
 
     /**
      * Extracts [zipPath] into [targetDir], reporting progress after each file.
-     * Entries that would land outside the target (a "zip slip") are skipped.
-     * Returns the paths written.
+     * [strip] comes off the front of each entry name (a folder the whole
+     * archive sits in). macOS resource forks are left out, as everywhere
+     * else, and entries that would land outside the target (a "zip slip")
+     * are skipped. Returns the paths written.
      */
     fun extract(
         zipPath: String,
         targetDir: String,
+        strip: String,
         progress: (done: Int, total: Int) -> Unit,
     ): List<String> {
         val target = File(targetDir).canonicalFile
         val written = mutableListOf<String>()
         ZipFile(zipPath).use { zip ->
-            val entries = zip.entries().toList().filter { !it.isDirectory }
+            val entries = zip.entries().toList().filter {
+                !it.isDirectory && !it.name.startsWith("__MACOSX/")
+            }
             val needed = entries.sumOf { maxOf(it.size, 0L) }
             if (needed > StatFs(target.parentFile?.path ?: targetDir).availableBytes) {
                 throw IllegalStateException("not_enough_space:$needed")
             }
             target.mkdirs()
             entries.forEachIndexed { i, e ->
-                val out = File(target, e.name).canonicalFile
+                val name = e.name.removePrefix(strip)
+                if (name.isEmpty()) return@forEachIndexed
+                val out = File(target, name).canonicalFile
                 if (!out.path.startsWith(target.path + File.separator)) return@forEachIndexed
                 out.parentFile?.mkdirs()
                 zip.getInputStream(e).use { input ->

@@ -114,6 +114,7 @@ class NativeChannel(
                 val written = FilesNative.extract(
                     call.argument<String>("zip")!!,
                     call.argument<String>("target")!!,
+                    call.argument<String>("strip") ?: "",
                 ) { done, total ->
                     activity.runOnUiThread {
                         channel.invokeMethod(

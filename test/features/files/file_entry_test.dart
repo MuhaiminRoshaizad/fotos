@@ -77,6 +77,21 @@ void main() {
     expect(firstImagePath(<String>['/c/a.txt', '/c/notes.pdf']), isNull);
   });
 
+  test('sharedTopFolder finds the one folder a comic was zipped as', () {
+    // Extracting into "Comic A" must not give Comic A/Comic A/001.jpg.
+    expect(
+      sharedTopFolder(<String>['Comic A/001.jpg', 'Comic A/sub/002.jpg']),
+      'Comic A/',
+    );
+  });
+
+  test('sharedTopFolder is null for loose or mixed files', () {
+    expect(sharedTopFolder(<String>['001.jpg', '002.jpg']), isNull);
+    expect(sharedTopFolder(<String>['Comic A/001.jpg', 'cover.jpg']), isNull);
+    expect(sharedTopFolder(<String>['A/001.jpg', 'B/001.jpg']), isNull);
+    expect(sharedTopFolder(<String>[]), isNull);
+  });
+
   test('uniqueName numbers clashes and keeps the extension', () {
     expect(uniqueName('holiday', <String>{}), 'holiday');
     expect(uniqueName('holiday', <String>{'Holiday'}), 'holiday (2)');

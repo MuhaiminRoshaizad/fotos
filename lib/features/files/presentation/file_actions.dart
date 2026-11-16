@@ -576,7 +576,10 @@ Future<void> _extract(
     progress: native.extractProgress,
     each: (FileEntry z) async {
       try {
-        written = await native.extract(z.path, target);
+        final String? top = sharedTopFolder(<String>[
+          for (final ZipEntry e in await native.zipEntries(z.path)) e.name,
+        ]);
+        written = await native.extract(z.path, target, strip: top ?? '');
       } on Exception catch (e) {
         error = e;
         rethrow;

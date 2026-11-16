@@ -147,6 +147,23 @@ String uniqueName(String wanted, Set<String> taken) {
   }
 }
 
+/// The folder every one of [names] (a ZIP's file entries) sits inside, with
+/// its trailing slash, e.g. "Comic A/"; null when the files are loose or
+/// spread over several folders. Extracting strips it, because the ZIP already
+/// gets a folder of its own name and a comic zipped as its folder would
+/// otherwise land as Comic A/Comic A/.
+String? sharedTopFolder(Iterable<String> names) {
+  String? top;
+  for (final String name in names) {
+    final int slash = name.indexOf('/');
+    if (slash <= 0) return null;
+    final String folder = name.substring(0, slash + 1);
+    if (top != null && folder != top) return null;
+    top = folder;
+  }
+  return top;
+}
+
 /// The image among [paths] that stands for a comic — its first page, by
 /// natural name order, the same page a ZIP shows as its cover. Null when none
 /// of [paths] is an image. Whole paths are compared, so pages nested in a

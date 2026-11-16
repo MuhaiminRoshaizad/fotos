@@ -250,13 +250,15 @@ class NativeChannel {
       });
 
   /// Extracts [zip] into [target] and returns how many files were written.
-  /// Throws [NotEnoughSpaceException] before writing anything when the phone
-  /// lacks room.
-  Future<int> extract(String zip, String target) async {
+  /// [strip] is taken off the front of every entry name, to drop a folder
+  /// the whole archive sits in. Throws [NotEnoughSpaceException] before
+  /// writing anything when the phone lacks room.
+  Future<int> extract(String zip, String target, {String strip = ''}) async {
     try {
       return (await _channel.invokeMethod<int>('extract', <String, Object>{
         'zip': zip,
         'target': target,
+        'strip': strip,
       }))!;
     } on PlatformException catch (e) {
       final String msg = e.message ?? '';
