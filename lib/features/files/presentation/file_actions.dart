@@ -26,6 +26,7 @@ import '../../albums/data/album_prefs.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../../albums/presentation/follow_albums.dart';
 import '../domain/file_entry.dart';
+import '../data/files_repository.dart';
 import 'files_providers.dart';
 import 'folder_picker.dart';
 
@@ -560,11 +561,8 @@ Future<void> _extract(
   String parent,
 ) async {
   final repo = ref.read(filesRepositoryProvider);
-  final String stem = p.basenameWithoutExtension(zip.name);
-  final String folder = uniqueName(stem, await repo.namesIn(parent));
-  final String target = p.join(parent, folder);
-  if (!context.mounted) return;
   final NativeChannel native = ref.read(nativeChannelProvider);
+  String target = p.join(parent, p.basenameWithoutExtension(zip.name));
   int written = 0;
   Exception? error;
   await runBatch<FileEntry>(
@@ -576,10 +574,7 @@ Future<void> _extract(
     progress: native.extractProgress,
     each: (FileEntry z) async {
       try {
-        final String? top = sharedTopFolder(<String>[
-          for (final ZipEntry e in await native.zipEntries(z.path)) e.name,
-        ]);
-        written = await native.extract(z.path, target, strip: top ?? '');
+        (target, written) = await _extractInto(native, repo, z, parent);
       } on Exception catch (e) {
         error = e;
         rethrow;
@@ -587,7 +582,8 @@ Future<void> _extract(
     },
   );
   final String message = switch (error) {
-    null => 'Extracted ${Fmt.count(written, 'file')} into $folder',
+    null =>
+      'Extracted ${Fmt.count(written, 'file')} into ${p.basename(target)}',
     NotEnoughSpaceException(:final int needed) =>
       'Not enough space. Extracting needs ${Fmt.size(needed)} free.',
     _ => 'Couldn\'t extract ${zip.name}. It may be damaged.',
@@ -612,6 +608,123 @@ Future<void> _extract(
   // Best-effort, after the toast so feedback is immediate: point the new
   // album's cover at the comic's first page.
   if (written > 0) await _coverExtractedComic(ref, target);
+}
+
+/// Extracts [zip] into a new folder inside [parent], named after the ZIP
+/// (numbered if taken), and returns that folder and how many files went
+/// in. A ZIP that holds one folder around everything, as a comic zipped as
+/// its folder does, has that folder dropped rather than nested.
+Future<(String, int)> _extractInto(
+  NativeChannel native,
+  FilesRepository repo,
+  FileEntry zip,
+  String parent,
+) async {
+  final String folder = uniqueName(
+    p.basenameWithoutExtension(zip.name),
+    await repo.namesIn(parent),
+  );
+  final String target = p.join(parent, folder);
+  final String? top = sharedTopFolder(<String>[
+    for (final ZipEntry e in await native.zipEntries(zip.path)) e.name,
+  ]);
+  return (target, await native.extract(zip.path, target, strip: top ?? ''));
+}
+
+/// Extracts every ZIP in [zips], each into its own folder named after it,
+/// either beside the ZIPs or in a folder the user picks, behind one dialog
+/// counting the ZIPs. Returns whether it ran (false when dismissed).
+Future<bool> extractEntries(
+  BuildContext context,
+  WidgetRef ref,
+  List<FileEntry> zips,
+) async {
+  if (zips.isEmpty) return false;
+  final String from = p.dirname(zips.first.path);
+  final String? choice = await showActionSheet<String>(
+    context,
+    title: zips.length == 1
+        ? 'Extract ${zips.single.name}'
+        : 'Extract ${Fmt.count(zips.length, 'ZIP')}',
+    message: 'Each ZIP goes into a folder of its own name.',
+    choices: const <SheetChoice<String>>[
+      SheetChoice<String>('here', 'Extract here'),
+      SheetChoice<String>('to', 'Extract to…'),
+    ],
+  );
+  if (choice == null || !context.mounted) return false;
+  String dir = from;
+  if (choice == 'to') {
+    final String root = await ref.read(storageRootProvider.future);
+    if (!context.mounted) return false;
+    final String? picked = await pickFolder(
+      context,
+      ref,
+      start: from,
+      root: root,
+      action: 'Extract here',
+    );
+    if (picked == null || !context.mounted) return false;
+    dir = picked;
+  }
+  final String what = zips.length == 1
+      ? zips.single.name
+      : Fmt.count(zips.length, 'ZIP');
+  final repo = ref.read(filesRepositoryProvider);
+  final NativeChannel native = ref.read(nativeChannelProvider);
+  final List<String> made = <String>[];
+  bool noSpace = false;
+  final int failed = await runBatch<FileEntry>(
+    context,
+    verb: 'Extracting',
+    doneVerb: 'Extracted',
+    what: what,
+    items: zips,
+    nameOf: (FileEntry z) => z.name,
+    each: (FileEntry z) async {
+      try {
+        final (String target, int written) = await _extractInto(
+          native,
+          repo,
+          z,
+          dir,
+        );
+        if (written > 0) made.add(target);
+      } on NotEnoughSpaceException {
+        noSpace = true;
+        rethrow;
+      }
+    },
+  );
+  _refresh(ref);
+  if (context.mounted) {
+    final String why = noSpace
+        ? 'There isn\'t enough free space.'
+        : '${failed == 1 ? 'It' : 'They'} may be damaged.';
+    showToast(
+      context,
+      failed == 0
+          ? 'Extracted $what into ${p.basename(dir)}'
+          : failed == zips.length
+          ? 'Couldn\'t extract $what. $why'
+          : 'Couldn\'t extract $failed of $what. $why',
+      failed: failed > 0,
+      actionLabel: made.isEmpty || dir == from ? null : 'Open',
+      onAction: made.isEmpty || dir == from
+          ? null
+          : () => context.push(
+              Uri(
+                path: '/files/folder',
+                queryParameters: <String, String>{'path': dir},
+              ).toString(),
+            ),
+    );
+  }
+  // Best-effort, after the toast: each comic's album opens on its first page.
+  for (final String target in made) {
+    await _coverExtractedComic(ref, target);
+  }
+  return true;
 }
 
 /// Sets the cover of the album Android forms from a freshly extracted comic to

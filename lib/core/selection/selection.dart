@@ -8,12 +8,20 @@ class SelectionAction {
     required this.label,
     required this.run,
     this.destructive = false,
+    this.shownFor,
   });
 
   final IconData icon;
   final String label;
   final Future<void> Function(BuildContext context, Set<String> ids) run;
   final bool destructive;
+
+  /// Whether the bar offers this for the items selected; always when null.
+  /// For an action that only makes sense for some items, such as Extract
+  /// for ZIPs.
+  final bool Function(Set<String> ids)? shownFor;
+
+  bool isShownFor(Set<String> ids) => shownFor?.call(ids) ?? true;
 }
 
 /// Which screen is selecting, what is selected, and what the bar offers.

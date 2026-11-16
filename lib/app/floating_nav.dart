@@ -328,53 +328,59 @@ class SelectionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
     return _Pill(
-      child: SizedBox(
-        height: AppNavMetrics.height - 12,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            for (final SelectionAction a in actions)
-              Semantics(
-                button: true,
-                enabled: enabled,
-                label: a.label,
-                excludeSemantics: true,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: enabled ? () => onAction(a) : null,
-                  child: SizedBox(
-                    width: _itemWidth + 4,
-                    child: Opacity(
-                      opacity: enabled ? 1 : 0.4,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Icon(
-                            a.icon,
-                            size: AppIconSize.standard,
-                            color: a.destructive ? cs.error : cs.onSurface,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            a.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textScaler: MediaQuery.textScalerOf(
-                              context,
-                            ).clamp(maxScaleFactor: 1.3),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+      // Grows and shrinks smoothly when an action comes or goes with what
+      // is selected (Extract, for ZIPs only).
+      child: AnimatedSize(
+        duration: AppMotion.medium,
+        curve: AppMotion.emphasized,
+        child: SizedBox(
+          height: AppNavMetrics.height - 12,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              for (final SelectionAction a in actions)
+                Semantics(
+                  button: true,
+                  enabled: enabled,
+                  label: a.label,
+                  excludeSemantics: true,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: enabled ? () => onAction(a) : null,
+                    child: SizedBox(
+                      width: _itemWidth + 4,
+                      child: Opacity(
+                        opacity: enabled ? 1 : 0.4,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Icon(
+                              a.icon,
+                              size: AppIconSize.standard,
                               color: a.destructive ? cs.error : cs.onSurface,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              a.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textScaler: MediaQuery.textScalerOf(
+                                context,
+                              ).clamp(maxScaleFactor: 1.3),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: a.destructive ? cs.error : cs.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -11,8 +11,8 @@ import 'files_providers.dart';
 /// The selection owner for the folder at [dir]. Selected ids are paths.
 String filesSelectionOwner(String dir) => 'files:$dir';
 
-/// The selection bar for a folder: Move, Copy, Share and Delete, each run
-/// once for everything selected.
+/// The selection bar for a folder: Move, Copy, Share, Extract (ZIPs only)
+/// and Delete, each run once for everything selected.
 List<SelectionAction> filesSelectionActions(WidgetRef ref, String dir) {
   List<FileEntry> picked(Set<String> paths) => <FileEntry>[
     for (final FileEntry e
@@ -41,6 +41,18 @@ List<SelectionAction> filesSelectionActions(WidgetRef ref, String dir) {
       label: 'Share',
       run: (BuildContext context, Set<String> ids) async =>
           done(await shareEntries(context, picked(ids))),
+    ),
+    SelectionAction(
+      icon: CupertinoIcons.archivebox,
+      label: 'Extract',
+      // Offered only while every item selected is a ZIP.
+      shownFor: (Set<String> ids) {
+        final List<FileEntry> entries = picked(ids);
+        return entries.isNotEmpty &&
+            entries.every((FileEntry e) => e.kind == FileKind.zip);
+      },
+      run: (BuildContext context, Set<String> ids) async =>
+          done(await extractEntries(context, ref, picked(ids))),
     ),
     SelectionAction(
       icon: CupertinoIcons.trash,

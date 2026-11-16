@@ -76,7 +76,10 @@ class AppShell extends ConsumerWidget {
                 child: sel.active
                     ? SelectionBar(
                         key: const ValueKey<String>('selection'),
-                        actions: sel.actions,
+                        actions: <SelectionAction>[
+                          for (final SelectionAction a in sel.actions)
+                            if (a.isShownFor(sel.ids)) a,
+                        ],
                         enabled: sel.ids.isNotEmpty,
                         onAction: (SelectionAction a) =>
                             a.run(context, sel.ids),
