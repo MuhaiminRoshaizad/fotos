@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,11 @@ import 'package:fotos/core/widgets/large_title_scaffold.dart';
 import 'package:fotos/features/files/presentation/pdf_screen.dart';
 import 'package:fotos/features/files/presentation/text_screen.dart';
 
+// A 1x1 PNG, standing in for a rendered page.
+final Uint8List _png = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+);
+
 void main() {
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -16,8 +22,8 @@ void main() {
           const MethodChannel('my.minned.fotos/native'),
           (MethodCall call) async => switch (call.method) {
             'pdfPageCount' => 2,
-            // No picture: the page keeps its place and says so.
-            _ => throw PlatformException(code: 'none'),
+            'pdfPage' => _png,
+            _ => null,
           },
         );
   });
@@ -90,5 +96,26 @@ void main() {
     await tester.drag(find.byType(Scrollable).last, const Offset(0, -200));
     await tester.pumpAndSettle();
     expect(find.text('first line\nsecond'), findsOneWidget);
+  });
+
+  testWidgets('a tapped PDF page opens full screen and closes with the '
+      'glass button', (WidgetTester tester) async {
+    await open(tester, const PdfScreen(path: '/root/Download/Report.pdf'));
+    // Pages decode on real time, outside the test's fake clock.
+    for (int i = 0; i < 50; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+      if (tester.getSize(find.byType(Image).first).height > 0) break;
+    }
+    await tester.tap(find.byType(Image).first);
+    await tester.pumpAndSettle();
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    expect(find.byType(IconButton), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('Close'));
+    await tester.pumpAndSettle();
+    expect(find.byType(InteractiveViewer), findsNothing);
   });
 }

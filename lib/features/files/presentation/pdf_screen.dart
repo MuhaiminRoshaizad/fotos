@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart'
+    show CupertinoButton, CupertinoIcons, CupertinoPageRoute;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -10,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
+import '../../../core/widgets/viewer_glass.dart';
 import '../../albums/presentation/albums_providers.dart';
 import '../../../core/widgets/bottom_bar_space.dart';
 
@@ -190,29 +192,10 @@ class _Page extends ConsumerWidget {
           ),
           data: (Uint8List bytes) => GestureDetector(
             // Tap a page to read it zoomed; pinch and pan there.
-            onTap: () => showDialog<void>(
-              context: context,
-              useRootNavigator: true,
-              builder: (BuildContext ctx) => Dialog.fullscreen(
-                backgroundColor: Colors.black,
-                child: Stack(
-                  children: <Widget>[
-                    InteractiveViewer(
-                      maxScale: 6,
-                      child: Center(
-                        child: Image.memory(bytes, gaplessPlayback: true),
-                      ),
-                    ),
-                    SafeArea(
-                      child: IconButton(
-                        tooltip: 'Close',
-                        color: Colors.white,
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        icon: const Icon(CupertinoIcons.xmark),
-                      ),
-                    ),
-                  ],
-                ),
+            onTap: () => Navigator.of(context, rootNavigator: true).push(
+              CupertinoPageRoute<void>(
+                fullscreenDialog: true,
+                builder: (_) => _PageZoom(bytes: bytes),
               ),
             ),
             child: Image.memory(
@@ -223,6 +206,46 @@ class _Page extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// One page full screen on black, to pinch and pan, closed with the same
+/// glass button as the viewer.
+class _PageZoom extends StatelessWidget {
+  const _PageZoom({required this.bytes});
+  final Uint8List bytes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: <Widget>[
+          InteractiveViewer(
+            maxScale: 6,
+            child: Center(child: Image.memory(bytes, gaplessPlayback: true)),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              child: ViewerGlass(
+                shape: const CircleBorder(),
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(44, 44),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Icon(
+                    CupertinoIcons.xmark,
+                    color: Colors.white,
+                    semanticLabel: 'Close',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
