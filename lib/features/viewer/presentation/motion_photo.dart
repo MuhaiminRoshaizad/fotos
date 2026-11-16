@@ -9,7 +9,7 @@ import 'package:video_player/video_player.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../albums/presentation/albums_providers.dart';
-import 'viewer_glass.dart';
+import '../../../core/widgets/viewer_glass.dart';
 
 /// Whether the photo with this id is a Motion Photo: a still with a short
 /// video inside the same file. Checked once per photo, by reading the

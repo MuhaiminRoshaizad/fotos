@@ -17,7 +17,7 @@ import '../data/viewer_settings.dart';
 import '../../../core/video/strip_tiles.dart';
 import '../../../core/video/video_frames.dart';
 import '../../../core/video/video_session.dart';
-import 'viewer_glass.dart';
+import '../../../core/widgets/viewer_glass.dart';
 import 'viewer_metrics.dart';
 
 /// One video in the viewer.

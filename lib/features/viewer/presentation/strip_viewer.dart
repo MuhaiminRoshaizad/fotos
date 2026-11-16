@@ -12,7 +12,8 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/scroll_handle.dart';
 import '../../../core/widgets/zoom_view.dart';
-import 'viewer_glass.dart';
+import '../../../core/widgets/viewer_glass.dart';
+import '../../../core/widgets/viewer_top_bar.dart';
 
 /// One page of a strip: its shape, and its picture decoded [width] pixels
 /// across.
@@ -212,116 +213,20 @@ class _StripViewerState extends State<StripViewer> {
                   ),
                 ),
               ),
-              _StripBar(
+              ViewerTopBar(
                 visible: _chrome,
                 title: widget.title,
-                page: '${_page + 1} of ${widget.pages.length}',
+                subtitle: '${_page + 1} of ${widget.pages.length}',
                 onClose: () => Navigator.of(context).pop(),
-                onReadMode: widget.onReadMode == null
+                trailing: widget.onReadMode == null
                     ? null
-                    : () => widget.onReadMode!(_page),
+                    : ReadModeButton(
+                        onPressed: () => widget.onReadMode!(_page),
+                      ),
               ),
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _StripBar extends StatelessWidget {
-  const _StripBar({
-    required this.visible,
-    required this.title,
-    required this.page,
-    required this.onClose,
-    required this.onReadMode,
-  });
-
-  final bool visible;
-  final String title;
-  final String page;
-  final VoidCallback onClose;
-  final VoidCallback? onReadMode;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: IgnorePointer(
-        ignoring: !visible,
-        child: AnimatedOpacity(
-          opacity: visible ? 1 : 0,
-          duration: AppMotion.short,
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: <Color>[Color(0x8C000000), Color(0x00000000)],
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xs,
-                  AppSpacing.xs,
-                  AppSpacing.lg,
-                  AppSpacing.xl,
-                ),
-                child: SizedBox(
-                  height: 48,
-                  child: NavigationToolbar(
-                    leading: ViewerGlass(
-                      shape: const CircleBorder(),
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(44, 44),
-                        onPressed: onClose,
-                        child: const Icon(
-                          CupertinoIcons.chevron_back,
-                          color: Colors.white,
-                          semanticLabel: 'Close',
-                        ),
-                      ),
-                    ),
-                    trailing: onReadMode == null
-                        ? null
-                        : ReadModeButton(onPressed: onReadMode!),
-                    middle: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          page,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                            fontFeatures: <FontFeature>[
-                              FontFeature.tabularFigures(),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'package:flutter/cupertino.dart'
-    show CupertinoButton, CupertinoIcons, CupertinoPageRoute;
+import 'package:flutter/cupertino.dart' show CupertinoIcons, CupertinoPageRoute;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart' show VelocityTracker;
@@ -26,7 +25,8 @@ import 'details_sheet.dart';
 import 'video_page.dart';
 import 'motion_photo.dart';
 import 'strip_viewer.dart';
-import 'viewer_glass.dart';
+import '../../../core/widgets/viewer_glass.dart';
+import '../../../core/widgets/viewer_top_bar.dart';
 import 'viewer_metrics.dart';
 
 /// What the viewer opens with: the list it pages through, where to start,
@@ -517,15 +517,15 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                 ),
               ),
             ),
-            _TopBar(
+            ViewerTopBar(
               visible: _chrome,
-              date: e.createDateTime,
+              title: Fmt.date(e.createDateTime),
+              subtitle: Fmt.time(e.createDateTime),
               onClose: () => Navigator.of(context).pop(),
               // Pages and Strip are ways to read pictures, not videos.
-              onReadMode:
-                  widget.args.folder == null || e.type == AssetType.video
+              trailing: widget.args.folder == null || e.type == AssetType.video
                   ? null
-                  : _chooseReadMode,
+                  : ReadModeButton(onPressed: _chooseReadMode),
             ),
             Positioned(
               left: AppSpacing.lg,
@@ -650,101 +650,6 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.visible,
-    required this.date,
-    required this.onClose,
-    required this.onReadMode,
-  });
-
-  final bool visible;
-  final DateTime date;
-  final VoidCallback onClose;
-
-  /// Switches between Photos, Pages and Strip; no button when null.
-  final VoidCallback? onReadMode;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: IgnorePointer(
-        ignoring: !visible,
-        child: AnimatedOpacity(
-          opacity: visible ? 1 : 0,
-          duration: AppMotion.short,
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: <Color>[Color(0x8C000000), Color(0x00000000)],
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xs,
-                  AppSpacing.xs,
-                  AppSpacing.lg,
-                  AppSpacing.xl,
-                ),
-                // NavigationToolbar fills whatever height it is given, so the
-                // bar needs its own or it covers the whole photo.
-                child: SizedBox(
-                  height: 48,
-                  child: NavigationToolbar(
-                    leading: ViewerGlass(
-                      shape: const CircleBorder(),
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(44, 44),
-                        onPressed: onClose,
-                        child: const Icon(
-                          CupertinoIcons.chevron_back,
-                          color: Colors.white,
-                          semanticLabel: 'Close',
-                        ),
-                      ),
-                    ),
-                    trailing: onReadMode == null
-                        ? null
-                        : ReadModeButton(onPressed: onReadMode!),
-                    middle: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          Fmt.date(date),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          Fmt.time(date),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
