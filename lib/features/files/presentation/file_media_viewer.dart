@@ -13,6 +13,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../viewer/presentation/strip_viewer.dart';
 import '../domain/file_entry.dart';
 import 'files_providers.dart';
+import '../../../core/widgets/viewer_top_bar.dart';
 import '../../../core/widgets/zoom_view.dart';
 
 /// Photos and videos opened from the Files tab, paged through in folder
@@ -146,70 +147,58 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
     final FileEntry e = widget.items[_index];
     return Scaffold(
       backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true,
-      appBar: !_chrome
-          ? null
-          : AppBar(
-              backgroundColor: Colors.black54,
-              foregroundColor: Colors.white,
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  Text(
-                    '${Fmt.size(e.size)} · ${Fmt.date(e.modified)}',
-                    style: const TextStyle(fontSize: 13, color: Colors.white70),
-                  ),
-                ],
-              ),
-              actions: <Widget>[
-                // Pages and Strip are ways to read pictures, not videos.
-                if (folder != null && e.kind == FileKind.image)
-                  IconButton(
-                    tooltip: 'Read as',
-                    icon: const Icon(CupertinoIcons.book),
-                    onPressed: () => _chooseReadMode(folder),
-                  ),
-              ],
-            ),
-      body: PageView.builder(
-        key: ValueKey<int>(_generation),
-        controller: _pages,
-        // Zoomed in, a finger pans the picture instead of turning the page.
-        physics: _zoomed ? const NeverScrollableScrollPhysics() : null,
-        itemCount: widget.items.length,
-        onPageChanged: (int i) => setState(() {
-          _index = i;
-          _zoomed = false;
-        }),
-        itemBuilder: (BuildContext context, int i) {
-          final FileEntry item = widget.items[i];
-          if (item.kind == FileKind.video) {
-            return _FileVideo(
-              key: ValueKey<String>(item.path),
-              file: File(item.path),
-              active: i == _index,
-              onZoomed: _setZoomed,
-            );
-          }
-          return GestureDetector(
-            onTapUp: (TapUpDetails d) => _tapAt(d.globalPosition.dx, mode),
-            child: ZoomView(
-              onZoomed: _setZoomed,
-              child: Center(
-                child: Image.file(
-                  File(item.path),
-                  fit: BoxFit.contain,
-                  cacheWidth: 2560,
-                  errorBuilder: (_, _, _) => const Text(
-                    'This photo can\'t be shown.',
-                    style: TextStyle(color: Colors.white70),
+      body: Stack(
+        children: <Widget>[
+          PageView.builder(
+            key: ValueKey<int>(_generation),
+            controller: _pages,
+            // Zoomed in, a finger pans the picture instead of turning the page.
+            physics: _zoomed ? const NeverScrollableScrollPhysics() : null,
+            itemCount: widget.items.length,
+            onPageChanged: (int i) => setState(() {
+              _index = i;
+              _zoomed = false;
+            }),
+            itemBuilder: (BuildContext context, int i) {
+              final FileEntry item = widget.items[i];
+              if (item.kind == FileKind.video) {
+                return _FileVideo(
+                  key: ValueKey<String>(item.path),
+                  file: File(item.path),
+                  active: i == _index,
+                  onZoomed: _setZoomed,
+                );
+              }
+              return GestureDetector(
+                onTapUp: (TapUpDetails d) => _tapAt(d.globalPosition.dx, mode),
+                child: ZoomView(
+                  onZoomed: _setZoomed,
+                  child: Center(
+                    child: Image.file(
+                      File(item.path),
+                      fit: BoxFit.contain,
+                      cacheWidth: 2560,
+                      errorBuilder: (_, _, _) => const Text(
+                        'This photo can\'t be shown.',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
+              );
+            },
+          ),
+          ViewerTopBar(
+            visible: _chrome,
+            title: e.name,
+            subtitle: '${Fmt.size(e.size)} · ${Fmt.date(e.modified)}',
+            onClose: () => Navigator.of(context).pop(),
+            // Pages and Strip are ways to read pictures, not videos.
+            trailing: folder != null && e.kind == FileKind.image
+                ? ReadModeButton(onPressed: () => _chooseReadMode(folder))
+                : null,
+          ),
+        ],
       ),
     );
   }
