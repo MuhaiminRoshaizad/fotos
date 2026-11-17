@@ -25,6 +25,7 @@ class LargeTitleScaffold extends StatefulWidget {
     this.leading,
     this.trailing = const <Widget>[],
     this.barTitle,
+    this.barSubtitle,
     this.grouped = false,
   });
 
@@ -36,6 +37,11 @@ class LargeTitleScaffold extends StatefulWidget {
   /// Shown in the bar at all times, with the bar solid, when set (for
   /// example "3 selected" while selecting).
   final String? barTitle;
+
+  /// A small line under the bar's title while the bar shows it (for
+  /// example "Videos only" while a list shows one kind). Not shown with
+  /// [barTitle].
+  final String? barSubtitle;
 
   /// A page of inset groups: grey behind the rows in light mode.
   final bool grouped;
@@ -89,6 +95,7 @@ class _LargeTitleScaffoldState extends State<LargeTitleScaffold> {
                 solid: solid,
                 background: background,
                 title: widget.barTitle ?? widget.title,
+                subtitle: widget.barTitle == null ? widget.barSubtitle : null,
                 leading: widget.leading,
                 trailing: widget.trailing,
               ),
@@ -172,12 +179,16 @@ class FrostedBar extends StatelessWidget {
     super.key,
     required this.solid,
     required this.title,
+    this.subtitle,
     this.background,
     this.leading,
     this.trailing = const <Widget>[],
   });
 
   final bool solid;
+
+  /// A small line under [title].
+  final String? subtitle;
 
   /// The page colour the bar frosts over; the surface when null.
   final Color? background;
@@ -241,22 +252,42 @@ class FrostedBar extends StatelessWidget {
             child: _swap(
               context,
               Alignment.center,
-              Text(
-                title,
-                key: ValueKey<String>(title),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textScaler: MediaQuery.textScalerOf(
-                  context,
-                ).clamp(maxScaleFactor: 1.3),
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurface,
-                  fontFeatures: const <FontFeature>[
-                    FontFeature.tabularFigures(),
-                  ],
-                ),
+              Column(
+                key: ValueKey<String>('$title\n${subtitle ?? ''}'),
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textScaler: MediaQuery.textScalerOf(
+                      context,
+                    ).clamp(maxScaleFactor: 1.3),
+                    style: TextStyle(
+                      fontSize: subtitle == null ? 17 : 15,
+                      fontWeight: FontWeight.w600,
+                      height: subtitle == null ? null : 1.2,
+                      color: cs.onSurface,
+                      fontFeatures: const <FontFeature>[
+                        FontFeature.tabularFigures(),
+                      ],
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textScaler: MediaQuery.textScalerOf(
+                        context,
+                      ).clamp(maxScaleFactor: 1.2),
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.2,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),

@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoSlidingSegmentedControl;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +13,7 @@ import '../../../core/media/media_providers.dart';
 import '../../../core/media/media_repository.dart';
 import '../../../core/media/selection_actions.dart';
 import '../../../core/selection/selection.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
@@ -89,8 +91,9 @@ class FavouritesScreen extends ConsumerWidget {
 
 /// A pushed screen holding one media grid: the iOS back button, a large
 /// title with the count, Select and optional bar buttons, the grid with
-/// selection, and its empty, error and loading states.
-class MediaListScreen extends ConsumerWidget {
+/// selection, and its empty, error and loading states. A list holding both
+/// photos and videos gets a switch under its title to show only one kind.
+class MediaListScreen extends ConsumerStatefulWidget {
   const MediaListScreen({
     super.key,
     required this.owner,
@@ -126,11 +129,102 @@ class MediaListScreen extends ConsumerWidget {
   final String? readingFolder;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MediaListScreen> createState() => _MediaListScreenState();
+}
+
+/// Which kind of item a mixed list shows.
+enum MediaShown {
+  all('All', 'item', null),
+  photos('Photos', 'photo', AssetType.image),
+  videos('Videos', 'video', AssetType.video);
+
+  const MediaShown(this.label, this.noun, this.type);
+
+  final String label;
+
+  /// What the count under the title counts.
+  final String noun;
+
+  /// Null shows every item.
+  final AssetType? type;
+
+  List<AssetEntity> apply(List<AssetEntity> items) => type == null
+      ? items
+      : items.where((AssetEntity e) => e.type == type).toList();
+}
+
+class _MediaListScreenState extends ConsumerState<MediaListScreen>
+    with SingleTickerProviderStateMixin {
+  /// What the switch shows, at once, so its thumb slides on the tap.
+  MediaShown _picked = MediaShown.all;
+
+  /// What the grid shows: [_picked] once the old tiles have faded out.
+  /// Not saved; the list opens on All every time, so a kind left hidden
+  /// can't seem to go missing later.
+  MediaShown _shown = MediaShown.all;
+
+  /// The page colour drawn over the tiles (not the title or the switch)
+  /// while they change: the old ones fade out, then the new ones in.
+  late final AnimationController _curtain;
+  double _curtainTop = 0;
+  final GlobalKey _switch = GlobalKey();
+  final GlobalKey _body = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _curtain = AnimationController(vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _curtain.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pick(MediaShown next) async {
+    if (next == _picked) return;
+    setState(() => _picked = next);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      setState(() => _shown = next);
+      return;
+    }
+    final RenderBox? sw =
+        _switch.currentContext?.findRenderObject() as RenderBox?;
+    final RenderBox? body =
+        _body.currentContext?.findRenderObject() as RenderBox?;
+    if (sw != null && body != null) {
+      _curtainTop = sw
+          .localToGlobal(Offset(0, sw.size.height), ancestor: body)
+          .dy;
+    }
+    await _curtain.animateTo(
+      1,
+      duration: AppMotion.short,
+      curve: Curves.easeIn,
+    );
+    if (!mounted) return;
+    // After a second tap meanwhile, show where the switch ended up.
+    setState(() => _shown = _picked);
+    await _curtain.animateTo(
+      0,
+      duration: AppMotion.medium,
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final SelectionState sel = ref.watch(selectionProvider);
-    final bool selecting = sel.isActiveFor(owner);
+    final bool selecting = sel.isActiveFor(widget.owner);
     final SelectionNotifier selection = ref.read(selectionProvider.notifier);
-    final List<AssetEntity> list = items.value ?? const <AssetEntity>[];
+    final List<AssetEntity> all = widget.items.value ?? const <AssetEntity>[];
+    // Only a list holding both kinds can be narrowed to one.
+    final bool mixed =
+        all.any((AssetEntity e) => e.type == AssetType.image) &&
+        all.any((AssetEntity e) => e.type == AssetType.video);
+    final MediaShown shown = mixed ? _shown : MediaShown.all;
+    final List<AssetEntity> list = shown.apply(all);
     final int n = sel.ids.length;
     return PopScope(
       canPop: !selecting,
@@ -138,9 +232,14 @@ class MediaListScreen extends ConsumerWidget {
         if (!didPop) selection.clear();
       },
       child: LargeTitleScaffold(
-        title: title,
-        subtitle: items.hasValue ? Fmt.count(list.length, 'item') : '',
+        title: widget.title,
+        subtitle: widget.items.hasValue
+            ? Fmt.count(list.length, shown.noun)
+            : '',
         barTitle: selecting ? (n == 0 ? 'Select items' : '$n selected') : null,
+        // Collapsed, the bar says the list is narrowed, so it is never
+        // mistaken for a short one.
+        barSubtitle: shown.type == null ? null : '${shown.label} only',
         leading: selecting
             ? BarButton.text(
                 label: 'Select all',
@@ -162,11 +261,11 @@ class MediaListScreen extends ConsumerWidget {
                   onPressed: list.isEmpty
                       ? null
                       : () => selection.start(
-                          owner,
+                          widget.owner,
                           mediaSelectionActions(ref, () => list),
                         ),
                 ),
-                ...actions,
+                ...widget.actions,
               ],
         body: (BuildContext context, Widget header) {
           Widget headed(Widget state) => Column(
@@ -176,7 +275,7 @@ class MediaListScreen extends ConsumerWidget {
               Expanded(child: state),
             ],
           );
-          return items.when(
+          return widget.items.when(
             // A delete or move reads the library again, and the album with it;
             // the skeleton would replace the grid and lose the scroll position.
             skipLoadingOnRefresh: true,
@@ -185,52 +284,131 @@ class MediaListScreen extends ConsumerWidget {
             error: (_, _) => headed(
               EmptyState(
                 icon: CupertinoIcons.exclamationmark_circle,
-                title: 'Couldn\'t load $title',
+                title: 'Couldn\'t load ${widget.title}',
                 message: 'Something went wrong reading the photo library.',
                 actionLabel: 'Try again',
-                onAction: onRetry,
+                onAction: widget.onRetry,
               ),
             ),
             data: (List<AssetEntity> data) => data.isEmpty
                 ? headed(
                     EmptyState(
                       icon: CupertinoIcons.rectangle_stack,
-                      title: emptyTitle,
-                      message: emptyMessage,
+                      title: widget.emptyTitle,
+                      message: widget.emptyMessage,
                     ),
                   )
-                : EntranceScope(
-                    child: MediaGrid(
-                      animateIn: true,
-                      items: data,
-                      level: GridLevel.all,
-                      grouped: grouped,
-                      orderLabel: orderLabel,
-                      header: header,
-                      overlayTop:
-                          MediaQuery.paddingOf(context).top + kBarHeight,
-                      heroPrefix: owner,
-                      selectionOwner: owner,
-                      selectionActions: () =>
-                          mediaSelectionActions(ref, () => data),
-                      onOpen: (int index, RevealItem reveal) => context.push(
-                        '/viewer',
-                        extra: ViewerArgs(
-                          items: data,
-                          index: index,
-                          heroPrefix: owner,
-                          folder: readingFolder,
-                          title: title,
-                          onShow: reveal,
+                : Stack(
+                    key: _body,
+                    fit: StackFit.expand,
+                    children: <Widget>[
+                      EntranceScope(
+                        child: MediaGrid(
+                          animateIn: true,
+                          items: list,
+                          level: GridLevel.all,
+                          grouped: widget.grouped,
+                          orderLabel: widget.orderLabel,
+                          header: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              header,
+                              if (mixed)
+                                _ShownSwitch(
+                                  key: _switch,
+                                  value: _picked,
+                                  enabled: !selecting,
+                                  onChanged: _pick,
+                                ),
+                            ],
+                          ),
+                          overlayTop:
+                              MediaQuery.paddingOf(context).top + kBarHeight,
+                          heroPrefix: widget.owner,
+                          selectionOwner: widget.owner,
+                          selectionActions: () =>
+                              mediaSelectionActions(ref, () => list),
+                          onOpen: (int index, RevealItem reveal) =>
+                              context.push(
+                                '/viewer',
+                                extra: ViewerArgs(
+                                  items: list,
+                                  index: index,
+                                  heroPrefix: widget.owner,
+                                  folder: widget.readingFolder,
+                                  title: widget.title,
+                                  onShow: reveal,
+                                ),
+                              ),
                         ),
                       ),
-                    ),
+                      Positioned(
+                        top: _curtainTop,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: IgnorePointer(
+                          child: FadeTransition(
+                            opacity: _curtain,
+                            child: ColoredBox(
+                              color: Theme.of(context).colorScheme.surface,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
           );
         },
       ),
     );
   }
+}
+
+/// All, Photos or Videos, under a mixed list's title. Dimmed and still
+/// while selecting, so a selection never holds items it no longer shows.
+class _ShownSwitch extends StatelessWidget {
+  const _ShownSwitch({
+    super.key,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final MediaShown value;
+  final bool enabled;
+  final ValueChanged<MediaShown> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.lg,
+      AppSpacing.xs,
+      AppSpacing.lg,
+      AppSpacing.md,
+    ),
+    child: IgnorePointer(
+      ignoring: !enabled,
+      child: AnimatedOpacity(
+        opacity: enabled ? 1 : 0.4,
+        duration: AppMotion.short,
+        child: CupertinoSlidingSegmentedControl<MediaShown>(
+          groupValue: value,
+          children: <MediaShown, Widget>{
+            for (final MediaShown s in MediaShown.values)
+              s: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(s.label),
+              ),
+          },
+          onValueChanged: (MediaShown? v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ),
+    ),
+  );
 }
 
 /// What an album's scroll handle says when it is sorted by name (how far
