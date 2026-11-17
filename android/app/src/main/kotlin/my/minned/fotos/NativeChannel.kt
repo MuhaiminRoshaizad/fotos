@@ -93,9 +93,12 @@ class NativeChannel(
                 result.success(asks)
             }
             "launchUri" -> {
-                // Handed out once, so a later resume doesn't reopen it.
+                // Handed out once, so a later resume doesn't reopen it. Only
+                // a View request is cleared: clearing any other wiped the save
+                // notification's Stop... before launchAsksStop could read it
+                // (found on the phone, 17/11/2026).
                 val uri = MainActivity.viewUri(activity.intent)
-                activity.intent = android.content.Intent(activity.intent).setAction(null)
+                if (uri != null) activity.intent = android.content.Intent(activity.intent).setAction(null)
                 result.success(uri)
             }
             "root" -> result.success(FilesNative.root())
