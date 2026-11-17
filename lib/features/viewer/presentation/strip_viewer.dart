@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
+import '../../video_editor/presentation/save_ring.dart';
 import '../../../core/media/animated.dart';
 import '../../../core/media/read_mode.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -226,6 +227,7 @@ class _StripViewerState extends State<StripViewer> {
               ),
               ViewerTopBar(
                 visible: _chrome,
+                status: SaveRing(flies: _chrome),
                 title: widget.title,
                 subtitle: '${_page + 1} of ${widget.pages.length}',
                 onClose: () => Navigator.of(context).pop(),

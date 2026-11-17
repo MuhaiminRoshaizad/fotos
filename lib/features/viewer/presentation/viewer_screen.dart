@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
+import '../../video_editor/presentation/save_ring.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/haptics/app_haptics.dart';
 import '../../../core/media/add_to_album.dart';
@@ -553,6 +554,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             ),
             ViewerTopBar(
               visible: _chrome,
+              status: SaveRing(flies: _chrome),
               title: Fmt.date(e.createDateTime),
               subtitle: Fmt.time(e.createDateTime),
               onClose: () => Navigator.of(context).pop(),

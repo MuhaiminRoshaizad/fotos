@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/core/widgets/zoom_view.dart';
 import 'package:fotos/features/viewer/presentation/strip_viewer.dart';
@@ -19,14 +20,16 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
-      MaterialApp(
-        home: StripViewer(
-          title: 'Iron Orchard',
-          pages: <StripPage>[
-            for (int i = 0; i < 20; i++)
-              StripPage(aspect: 1000 / 1400, image: (_) => _pixel),
-          ],
-          index: 0,
+      ProviderScope(
+        child: MaterialApp(
+          home: StripViewer(
+            title: 'Iron Orchard',
+            pages: <StripPage>[
+              for (int i = 0; i < 20; i++)
+                StripPage(aspect: 1000 / 1400, image: (_) => _pixel),
+            ],
+            index: 0,
+          ),
         ),
       ),
     );

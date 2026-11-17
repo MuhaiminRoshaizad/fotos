@@ -392,42 +392,56 @@ class FrostedPill extends StatelessWidget {
   const FrostedPill({super.key, required this.child});
   final Widget child;
 
+  /// The blur behind the glass.
+  static const double sigma = 24;
+
+  /// Room around [child] inside the glass.
+  static const EdgeInsets padding = EdgeInsets.symmetric(
+    horizontal: 8,
+    vertical: 6,
+  );
+
+  /// The glass's tint, its hairline edge and its shadow, shared with
+  /// anything drawn to look like it (the save pill's flight).
+  static Color fill(BuildContext context) {
+    final bool dark = Theme.of(context).brightness == Brightness.dark;
+    return Theme.of(
+      context,
+    ).colorScheme.surfaceContainerLow.withValues(alpha: dark ? 0.68 : 0.74);
+  }
+
+  static BorderSide edge(BuildContext context) => BorderSide(
+    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+    width: 0.5,
+  );
+
+  static BoxShadow shadow(BuildContext context) {
+    final bool dark = Theme.of(context).brightness == Brightness.dark;
+    return BoxShadow(
+      color: Colors.black.withValues(alpha: dark ? 0.35 : 0.12),
+      blurRadius: 24,
+      offset: const Offset(0, 8),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    final bool dark = Theme.of(context).brightness == Brightness.dark;
     const ShapeBorder shape = StadiumBorder();
     return DecoratedBox(
       decoration: ShapeDecoration(
         shape: shape,
-        shadows: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: dark ? 0.35 : 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        shadows: <BoxShadow>[shadow(context)],
       ),
       child: ClipPath(
         clipper: const ShapeBorderClipper(shape: shape),
         child: Frost(
-          sigma: 24,
+          sigma: sigma,
           child: DecoratedBox(
             decoration: ShapeDecoration(
-              color: cs.surfaceContainerLow.withValues(
-                alpha: dark ? 0.68 : 0.74,
-              ),
-              shape: StadiumBorder(
-                side: BorderSide(
-                  color: cs.onSurface.withValues(alpha: 0.08),
-                  width: 0.5,
-                ),
-              ),
+              color: fill(context),
+              shape: StadiumBorder(side: edge(context)),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: child,
-            ),
+            child: Padding(padding: padding, child: child),
           ),
         ),
       ),

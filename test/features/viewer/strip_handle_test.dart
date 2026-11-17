@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotos/features/viewer/presentation/strip_viewer.dart';
 
@@ -19,15 +20,17 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
-      MaterialApp(
-        home: StripViewer(
-          title: 'Iron Orchard',
-          // 40 pages, each 400 x 560 on this screen.
-          pages: <StripPage>[
-            for (int i = 0; i < 40; i++)
-              StripPage(aspect: 1000 / 1400, image: (_) => _pixel),
-          ],
-          index: 0,
+      ProviderScope(
+        child: MaterialApp(
+          home: StripViewer(
+            title: 'Iron Orchard',
+            // 40 pages, each 400 x 560 on this screen.
+            pages: <StripPage>[
+              for (int i = 0; i < 40; i++)
+                StripPage(aspect: 1000 / 1400, image: (_) => _pixel),
+            ],
+            index: 0,
+          ),
         ),
       ),
     );
@@ -64,16 +67,18 @@ void main() {
     addTearDown(tester.view.reset);
     final List<int> told = <int>[];
     await tester.pumpWidget(
-      MaterialApp(
-        home: StripViewer(
-          title: 'Iron Orchard',
-          // 40 pages, each 400 x 560 on this screen.
-          pages: <StripPage>[
-            for (int i = 0; i < 40; i++)
-              StripPage(aspect: 1000 / 1400, image: (_) => _pixel),
-          ],
-          index: 0,
-          onPage: told.add,
+      ProviderScope(
+        child: MaterialApp(
+          home: StripViewer(
+            title: 'Iron Orchard',
+            // 40 pages, each 400 x 560 on this screen.
+            pages: <StripPage>[
+              for (int i = 0; i < 40; i++)
+                StripPage(aspect: 1000 / 1400, image: (_) => _pixel),
+            ],
+            index: 0,
+            onPage: told.add,
+          ),
         ),
       ),
     );
@@ -100,14 +105,16 @@ void main() {
       for (int i = 0; i < 60; i++) i % 7 == 0 || i % 11 == 0 ? 2000 : 200,
     ];
     await tester.pumpWidget(
-      MaterialApp(
-        home: StripViewer(
-          title: 'Iron Orchard',
-          pages: <StripPage>[
-            for (final double h in heights)
-              StripPage(aspect: 400 / h, image: (_) => _pixel),
-          ],
-          index: 0,
+      ProviderScope(
+        child: MaterialApp(
+          home: StripViewer(
+            title: 'Iron Orchard',
+            pages: <StripPage>[
+              for (final double h in heights)
+                StripPage(aspect: 400 / h, image: (_) => _pixel),
+            ],
+            index: 0,
+          ),
         ),
       ),
     );

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 import 'package:video_player/video_player.dart';
 
+import '../../video_editor/presentation/save_ring.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/media/read_mode.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -230,6 +231,7 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
           ),
           ViewerTopBar(
             visible: _chrome,
+            status: SaveRing(flies: _chrome),
             title: e.name,
             subtitle: '${Fmt.size(e.size)} · ${Fmt.date(e.modified)}',
             onClose: () => Navigator.of(context).pop(),

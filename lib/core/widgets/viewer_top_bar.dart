@@ -17,6 +17,7 @@ class ViewerTopBar extends StatelessWidget {
     required this.subtitle,
     required this.onClose,
     this.trailing,
+    this.status,
   });
 
   final bool visible;
@@ -24,6 +25,10 @@ class ViewerTopBar extends StatelessWidget {
   final String subtitle;
   final VoidCallback onClose;
   final Widget? trailing;
+
+  /// Something running in the background (a video save), at the far right
+  /// beyond [trailing]. It sizes itself, down to nothing when idle.
+  final Widget? status;
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +76,12 @@ class ViewerTopBar extends StatelessWidget {
                         ),
                       ),
                     ),
-                    trailing: trailing,
+                    trailing: status == null
+                        ? trailing
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[?trailing, status!],
+                          ),
                     middle: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
