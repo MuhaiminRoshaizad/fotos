@@ -5,6 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../core/widgets/stable_insets.dart';
 import '../core/widgets/tap_outside_closes_keyboard.dart';
 import '../features/video_editor/presentation/save_end_listener.dart';
+import '../features/video_editor/presentation/save_stop_listener.dart';
 import '../features/viewer/presentation/view_intent_handler.dart';
 import 'handle_every_back.dart';
 import 'router.dart';
@@ -28,8 +29,10 @@ class FotosApp extends ConsumerWidget {
           child: SplashPluck(
             child: ViewIntentHandler(
               child: SaveEndListener(
-                child: TapOutsideClosesKeyboard(
-                  child: child ?? const SizedBox.shrink(),
+                child: SaveStopListener(
+                  child: TapOutsideClosesKeyboard(
+                    child: child ?? const SizedBox.shrink(),
+                  ),
                 ),
               ),
             ),

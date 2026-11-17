@@ -57,12 +57,34 @@ Future<EditorSave> saveWithProgress(
 /// Shows how the save under way is going, over everything: from the editor,
 /// and again from the progress pill. It closes itself when the save ends or
 /// is hidden.
-Future<void> showSaveDialog(BuildContext context) => showCupertinoDialog<void>(
+Future<void> showSaveDialog(BuildContext context) =>
+    Navigator.of(context, rootNavigator: true).push(saveDialogRoute(context));
+
+/// The saving dialog as a route on [navigator]'s side, opened already
+/// asking whether to stop when [ask].
+CupertinoDialogRoute<void> saveDialogRoute(
+  BuildContext context, {
+  bool ask = false,
+}) => CupertinoDialogRoute<void>(
   context: context,
-  useRootNavigator: true,
   builder: (BuildContext ctx) =>
-      const PopScope(canPop: false, child: SavingDialog()),
+      PopScope(canPop: false, child: SavingDialog(ask: ask)),
 );
+
+/// Requests from outside the dialog (the notification's Stop...) for it to
+/// ask whether to stop. Each request is a new number, so asking twice asks
+/// twice.
+final saveStopAskProvider = NotifierProvider<SaveStopAskNotifier, int>(
+  SaveStopAskNotifier.new,
+);
+
+class SaveStopAskNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  /// Asks the open saving dialog whether to stop.
+  void ask() => state++;
+}
 
 Future<void> _sayWhy(BuildContext context, CutException failure) async {
   unawaited(AppHaptics.error());
@@ -97,7 +119,15 @@ Future<void> _sayWhy(BuildContext context, CutException failure) async {
 /// Cancel asks first, in the same dialog: stopping loses the encode so far,
 /// and for a hidden save the cuts too, since the editor has closed.
 class SavingDialog extends ConsumerStatefulWidget {
-  const SavingDialog({super.key});
+  const SavingDialog({super.key, this.ask = false});
+
+  /// Opens on the question, as the notification's Stop... asks.
+  final bool ask;
+
+  /// How many are open: one at most, but a request to ask must know
+  /// whether to turn an open one or open a new one.
+  static int _open = 0;
+  static bool get isOpen => _open > 0;
 
   @override
   ConsumerState<SavingDialog> createState() => _SavingDialogState();
@@ -107,26 +137,35 @@ class _SavingDialogState extends ConsumerState<SavingDialog> {
   late final Timer _tick;
   bool _closed = false;
 
-  /// Cancel was tapped: the dialog is asking whether to stop.
-  bool _asking = false;
+  /// Cancel was tapped (or Stop... in the notification): the dialog is
+  /// asking whether to stop.
+  late bool _asking = widget.ask;
 
   @override
   void initState() {
     super.initState();
+    SavingDialog._open++;
     // The time left counts down between progress reports.
     _tick = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
   }
 
   @override
   void dispose() {
+    SavingDialog._open--;
     _tick.cancel();
     super.dispose();
   }
 
+  /// Closes this dialog, and only this one: a pop would take whatever
+  /// lies on top of it instead.
   void _close() {
     if (_closed || !mounted) return;
     _closed = true;
-    Navigator.of(context).pop();
+    final ModalRoute<Object?>? route = ModalRoute.of(context);
+    if (route == null) return;
+    route.isCurrent
+        ? Navigator.of(context).pop()
+        : Navigator.of(context).removeRoute(route);
   }
 
   @override
@@ -135,6 +174,9 @@ class _SavingDialogState extends ConsumerState<SavingDialog> {
     final SaveJob? now = ref.watch(saveJobProvider);
     ref.listen<SaveJob?>(saveJobProvider, (SaveJob? _, SaveJob? next) {
       if (next == null) _close();
+    });
+    ref.listen<int>(saveStopAskProvider, (int? _, int _) {
+      if (!_asking) setState(() => _asking = true);
     });
     // Ended before this first showed: nothing left to show.
     if (now == null) {

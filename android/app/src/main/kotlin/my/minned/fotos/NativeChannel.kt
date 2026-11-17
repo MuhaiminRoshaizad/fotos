@@ -85,6 +85,13 @@ class NativeChannel(
                 // opened to show one photo.
                 if (main == null) result.success(false) else main.whenSplashGone { result.success(main.openedToView) }
             }
+            "launchAsksStop" -> {
+                // Handed out once, as launchUri is, so a later resume doesn't
+                // ask again.
+                val asks = MainActivity.asksToStopSave(activity.intent)
+                if (asks) activity.intent = android.content.Intent(activity.intent).setAction(null)
+                result.success(asks)
+            }
             "launchUri" -> {
                 // Handed out once, so a later resume doesn't reopen it.
                 val uri = MainActivity.viewUri(activity.intent)

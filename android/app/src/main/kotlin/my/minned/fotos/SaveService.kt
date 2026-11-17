@@ -31,7 +31,13 @@ class SaveService : Service() {
         private const val CHANNEL = "saving"
         private const val ONGOING = 41
         private const val OUTCOME = 42
-        private const val ACTION_CANCEL = "my.minned.fotos.CANCEL_SAVE"
+
+        /**
+         * Opens fotos to ask whether to stop the save. Stopping from the
+         * notification at once lost a hidden save's cuts with no question,
+         * where everything else that destroys work asks first.
+         */
+        const val ACTION_ASK_STOP = "my.minned.fotos.ASK_STOP_SAVE"
 
         /**
          * Starts saving video [id], keeping the parts [keep] ([start, end] in
@@ -60,10 +66,6 @@ class SaveService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_CANCEL) {
-            cutter?.cancel()
-            return START_NOT_STICKY
-        }
         // One save at a time; fotos refuses a second before it gets here.
         if (intent == null || cutter != null) return START_NOT_STICKY
         name = intent.getStringExtra("name") ?: ""
@@ -147,12 +149,14 @@ class SaveService : Service() {
                     addAction(
                         Notification.Action.Builder(
                             null,
-                            "Cancel",
-                            PendingIntent.getService(
+                            "Stop\u2026",
+                            PendingIntent.getActivity(
                                 this@SaveService,
-                                0,
-                                Intent(this@SaveService, SaveService::class.java).setAction(ACTION_CANCEL),
-                                PendingIntent.FLAG_IMMUTABLE,
+                                2,
+                                Intent(ACTION_ASK_STOP)
+                                    .setClass(this@SaveService, MainActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                             ),
                         ).build(),
                     )

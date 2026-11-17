@@ -107,14 +107,21 @@ class MainActivity : FlutterActivity() {
         super.onActivityResult(requestCode, resultCode, data)
     }
 
-    /** A View or camera Review request while fotos is already running. */
+    /**
+     * A View or camera Review request, or the save notification's Stop...,
+     * while fotos is already running.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         viewUri(intent)?.let { channel?.invokeMethod("openUri", it) }
+        if (asksToStopSave(intent)) channel?.invokeMethod("askStopSave", null)
     }
 
     companion object {
+        /** Whether [intent] came from the save notification's Stop.... */
+        fun asksToStopSave(intent: Intent?): Boolean = intent?.action == SaveService.ACTION_ASK_STOP
+
         fun viewUri(intent: Intent?): String? {
             if (intent == null) return null
             val viewing = intent.action == Intent.ACTION_VIEW ||

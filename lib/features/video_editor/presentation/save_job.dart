@@ -42,6 +42,7 @@ class SaveJobNotifier extends Notifier<SaveJob?> {
   final Stopwatch _clock = Stopwatch();
   SaveEstimate? _estimate;
   Completer<SavedEdit?>? _waiting;
+  final Completer<void> _ready = Completer<void>();
   final StreamController<HiddenEnd> _hiddenEnds =
       StreamController<HiddenEnd>.broadcast();
 
@@ -57,6 +58,11 @@ class SaveJobNotifier extends Notifier<SaveJob?> {
     unawaited(_pickUp());
     return null;
   }
+
+  /// Completes once fotos knows whether Android was already saving when it
+  /// started (a save picked up, or none), so a request about the save made
+  /// as fotos opens is not answered too early.
+  Future<void> get ready => _ready.future;
 
   /// The ends of saves that were hidden, for the app to tell.
   Stream<HiddenEnd> get hiddenEnds => _hiddenEnds.stream;
@@ -110,6 +116,7 @@ class SaveJobNotifier extends Notifier<SaveJob?> {
     } on MissingPluginException {
       // Widget tests run without the Android side.
     }
+    if (!_ready.isCompleted) _ready.complete();
   }
 
   void _begin(String name, int percent, {required bool hidden}) {
