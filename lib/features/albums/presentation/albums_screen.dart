@@ -23,7 +23,6 @@ import '../../../core/widgets/search_field.dart';
 import '../data/album_prefs.dart';
 import '../data/galleries.dart';
 import 'album_selection.dart';
-import 'album_sheets.dart';
 import 'album_tiles.dart';
 import 'albums_providers.dart';
 import 'gallery_sheets.dart';
@@ -67,14 +66,9 @@ class AlbumsScreen extends ConsumerWidget {
                 onPressed: any ? () => startAlbumSelection(ref) : null,
               ),
               BarButton.icon(
-                icon: CupertinoIcons.arrow_up_arrow_down,
-                tooltip: 'Sort albums',
-                onPressed: () => showAlbumsOrderSheet(context, ref),
-              ),
-              BarButton.icon(
-                icon: CupertinoIcons.plus,
-                tooltip: 'New album or gallery',
-                onPressed: () => showNewMenu(context, ref),
+                icon: CupertinoIcons.ellipsis,
+                tooltip: 'More',
+                onPressed: () => showAlbumsMenu(context, ref),
               ),
             ],
       body: (BuildContext context, Widget header) => MediaAccessGate(

@@ -54,8 +54,8 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Albums').last);
     await tester.pumpAndSettle();
 
-    // ＋ offers a new album or a new gallery.
-    await tester.tap(find.byTooltip('New album or gallery'));
+    // More offers a new album or a new gallery.
+    await tester.tap(find.byTooltip('More'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('New album'));
     await tester.pumpAndSettle();
@@ -71,5 +71,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Holiday 2026'), findsOneWidget);
     expect(find.text('Empty'), findsOneWidget);
+  });
+
+  testWidgets('the Albums bar is Select and More, and More holds New and '
+      'Sort', (WidgetTester tester) async {
+    // A phone, so the sort sheet has a phone's height to open into.
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [
+          mediaRepositoryProvider.overrideWithValue(FakeMediaRepository()),
+          emptyAlbumsProvider.overrideWith(_MemoryEmptyAlbums.new),
+          albumPrefsProvider.overrideWith(_NoPrefs.new),
+        ],
+        child: const FotosApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Albums').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Select'), findsOneWidget);
+    expect(find.byTooltip('Sort albums'), findsNothing);
+    expect(find.byTooltip('New album or gallery'), findsNothing);
+
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    expect(find.text('New album'), findsOneWidget);
+    expect(find.text('New gallery'), findsOneWidget);
+    await tester.tap(find.text('Sort albums…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sort albums'), findsOneWidget);
+    expect(find.text('Most recent photo'), findsOneWidget);
   });
 }

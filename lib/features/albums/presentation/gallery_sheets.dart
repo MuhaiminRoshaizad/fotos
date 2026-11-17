@@ -41,20 +41,27 @@ enum GalleryOption {
       this == GalleryOption.pin && pinned ? CupertinoIcons.pin_slash : icon;
 }
 
-/// The ＋ on the Albums tab: a new album, or a new gallery to hold albums.
-Future<void> showNewMenu(BuildContext context, WidgetRef ref) async {
+/// The Albums tab's More menu: a new album, a new gallery to hold albums,
+/// or the order of the albums. These were two buttons of their own, which
+/// with Select crowded one side of the bar while the other stayed empty;
+/// the album page and Files folders already pair Select with More.
+Future<void> showAlbumsMenu(BuildContext context, WidgetRef ref) async {
   final String? choice = await showActionSheet<String>(
     context,
     choices: const <SheetChoice<String>>[
       SheetChoice<String>('album', 'New album'),
       SheetChoice<String>('gallery', 'New gallery'),
+      SheetChoice<String>('sort', 'Sort albums…'),
     ],
   );
   if (choice == null || !context.mounted) return;
-  if (choice == 'album') {
-    await createAlbum(context, ref);
-  } else {
-    await createGallery(context, ref);
+  switch (choice) {
+    case 'album':
+      await createAlbum(context, ref);
+    case 'gallery':
+      await createGallery(context, ref);
+    default:
+      await showAlbumsOrderSheet(context, ref);
   }
 }
 
