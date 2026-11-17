@@ -39,7 +39,7 @@ class WidgetSetupActivity : FlutterActivity() {
                         result.error("bad_args", "Expected the widget's settings", null)
                     } else {
                         WidgetConfig.save(this, widgetId, WidgetConfig.fromMap(args))
-                        FotosWidgetProvider.update(this, widgetId)
+                        FotosWidgetProvider.refresh(this, intArrayOf(widgetId))
                         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
                         result.success(null)
                         finish()

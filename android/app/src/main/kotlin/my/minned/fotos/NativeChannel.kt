@@ -1,13 +1,13 @@
 package my.minned.fotos
 
 import android.app.Activity
-import android.appwidget.AppWidgetManager
 import android.graphics.Rect
 import android.media.ExifInterface
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import my.minned.fotos.widget.FotosWidgetProvider
 import my.minned.fotos.widget.WidgetConfig
 
 /** Android work Flutter has no API for. Slow calls run off the main thread. */
@@ -96,9 +96,8 @@ class NativeChannel(
                 val changed = WidgetConfig.rekeyAlbum(
                     activity, call.argument<String>("from")!!, call.argument<String>("to")!!,
                 )
-                val manager = AppWidgetManager.getInstance(activity)
                 // The widget reads its pictures again with the new id.
-                for (id in changed) manager.notifyAppWidgetViewDataChanged(id, R.id.flipper)
+                FotosWidgetProvider.refresh(activity, changed.toIntArray())
                 result.success(changed.size)
             }
             "hasAllFilesAccess" -> result.success(FilesNative.hasAllFilesAccess())

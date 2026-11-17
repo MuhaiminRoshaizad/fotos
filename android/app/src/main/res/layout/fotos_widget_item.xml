@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One picture in the photo widget, drawn at the widget's size by
-     FotosWidgetService, with its caption and badge. -->
+     WidgetPictures, with its caption and badge. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/item"
     android:layout_width="match_parent"
