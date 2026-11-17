@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 import 'package:video_player/video_player.dart';
 
@@ -16,15 +17,40 @@ import 'files_providers.dart';
 import '../../../core/widgets/viewer_top_bar.dart';
 import '../../../core/widgets/zoom_view.dart';
 
+/// What the `/files/media` route is given: the items, the one to open at,
+/// and who to tell as the viewer moves through them.
+typedef FileMediaArgs = (List<FileEntry>, int, ValueChanged<FileEntry>?);
+
+/// Opens [items] in the Files viewer at [index]. The only way in, so the
+/// route's arguments keep one shape.
+void openFileMedia(
+  BuildContext context,
+  List<FileEntry> items,
+  int index, {
+  ValueChanged<FileEntry>? onShow,
+}) {
+  final FileMediaArgs args = (items, index, onShow);
+  context.push('/files/media', extra: args);
+}
+
 /// Photos and videos opened from the Files tab, paged through in folder
 /// order. Pinch to zoom photos; tap a video to play or pause it. Read as in
 /// the bar switches the folder between Photos, Pages (a tap on either edge
 /// turns the page) and Strip, the same choice the folder has as an album.
 class FileMediaViewer extends ConsumerStatefulWidget {
-  const FileMediaViewer({super.key, required this.items, required this.index});
+  const FileMediaViewer({
+    super.key,
+    required this.items,
+    required this.index,
+    this.onShow,
+  });
 
   final List<FileEntry> items;
   final int index;
+
+  /// Told each item the viewer comes to, so the folder it was opened from
+  /// can keep that item in view and closing lands on it.
+  final ValueChanged<FileEntry>? onShow;
 
   @override
   ConsumerState<FileMediaViewer> createState() => _FileMediaViewerState();
@@ -44,6 +70,17 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
 
   /// Bumped when the pages are rebuilt at a new place.
   int _generation = 0;
+
+  String? _shown;
+
+  /// Tells [FileMediaViewer.onShow] once about each item come to, after the
+  /// frame, so the folder scrolls in its own layout.
+  void _show(FileEntry e) {
+    final ValueChanged<FileEntry>? onShow = widget.onShow;
+    if (onShow == null || e.path == _shown) return;
+    _shown = e.path;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onShow(e));
+  }
 
   List<FileEntry> get _pictures => <FileEntry>[
     for (final FileEntry e in widget.items)
@@ -123,6 +160,7 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
       if (aspects == null) {
         return const Scaffold(backgroundColor: Colors.black);
       }
+      _show(at < 0 ? widget.items[_index] : pictures[at]);
       return StripViewer(
         title: p.basename(p.dirname(widget.items.first.path)),
         index: at < 0 ? 0 : at,
@@ -137,6 +175,7 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
               ),
             ),
         ],
+        onPage: (int page) => _show(pictures[page]),
         onReadMode: (int page) {
           // Back in Photos or Pages, carry on from the page on screen.
           _showAt(widget.items.indexOf(pictures[page]));
@@ -145,6 +184,7 @@ class _FileMediaViewerState extends ConsumerState<FileMediaViewer> {
       );
     }
     final FileEntry e = widget.items[_index];
+    _show(e);
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(

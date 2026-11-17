@@ -45,7 +45,7 @@ void main() {
               items: pages,
               level: GridLevel.all,
               heroPrefix: 'album',
-              onOpen: (_) {},
+              onOpen: (_, _) {},
               grouped: false,
               orderLabel: orderLabel,
             ),

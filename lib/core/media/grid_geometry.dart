@@ -72,14 +72,27 @@ class GridGeometry {
     return math.min(i, _starts[g] + _sizes[g] - 1);
   }
 
-  /// The scroll offset that puts [item]'s row at the top, its group's heading
-  /// included when the item is in the first row.
-  double offsetOf(int item) {
+  /// Where [item]'s tile starts, below its group's heading.
+  double tileTop(int item) {
     if (itemCount == 0) return 0;
+    final int g = _groupOf(item);
+    final int row = (item - _starts[g]) ~/ columns;
+    return _tops[g] + headerExtent + row * (tile + spacing);
+  }
+
+  int _groupOf(int item) {
     int g = groupCount - 1;
     while (g > 0 && _starts[g] > item) {
       g--;
     }
+    return g;
+  }
+
+  /// The scroll offset that puts [item]'s row at the top, its group's heading
+  /// included when the item is in the first row.
+  double offsetOf(int item) {
+    if (itemCount == 0) return 0;
+    final int g = _groupOf(item);
     final int row = (item - _starts[g]) ~/ columns;
     if (row == 0) return _tops[g];
     return _tops[g] + headerExtent + row * (tile + spacing);

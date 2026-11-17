@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -19,6 +18,7 @@ import '../../../core/widgets/entrance.dart';
 import '../../../core/widgets/large_title_scaffold.dart';
 import '../../../core/widgets/toast.dart';
 import '../../files/domain/file_entry.dart';
+import '../../files/presentation/file_media_viewer.dart';
 import '../data/takeout_repository.dart';
 import '../domain/takeout_models.dart';
 
@@ -380,21 +380,15 @@ class _StagedVideoState extends ConsumerState<_StagedVideo> {
 
   void _play() {
     final ReviewItem item = widget.item;
-    context.push(
-      '/files/media',
-      extra: (
-        <FileEntry>[
-          FileEntry(
-            path: item.path,
-            name: item.name,
-            kind: FileKind.video,
-            size: item.size,
-            modified: item.taken ?? DateTime.now(),
-          ),
-        ],
-        0,
+    openFileMedia(context, <FileEntry>[
+      FileEntry(
+        path: item.path,
+        name: item.name,
+        kind: FileKind.video,
+        size: item.size,
+        modified: item.taken ?? DateTime.now(),
       ),
-    );
+    ], 0);
   }
 
   @override

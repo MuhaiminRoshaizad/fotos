@@ -213,7 +213,7 @@ class MediaListScreen extends ConsumerWidget {
                       selectionOwner: owner,
                       selectionActions: () =>
                           mediaSelectionActions(ref, () => data),
-                      onOpen: (int index) => context.push(
+                      onOpen: (int index, RevealItem reveal) => context.push(
                         '/viewer',
                         extra: ViewerArgs(
                           items: data,
@@ -221,6 +221,7 @@ class MediaListScreen extends ConsumerWidget {
                           heroPrefix: owner,
                           folder: readingFolder,
                           title: title,
+                          onShow: reveal,
                         ),
                       ),
                     ),

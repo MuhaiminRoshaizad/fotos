@@ -68,9 +68,12 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: '/files/media',
         parentNavigatorKey: rootNavigatorKey,
         builder: (_, GoRouterState state) {
-          final (List<FileEntry> items, int index) =
-              state.extra! as (List<FileEntry>, int);
-          return FileMediaViewer(items: items, index: index);
+          final (
+            List<FileEntry> items,
+            int index,
+            ValueChanged<FileEntry>? onShow,
+          ) = state.extra! as FileMediaArgs;
+          return FileMediaViewer(items: items, index: index, onShow: onShow);
         },
       ),
       StatefulShellRoute(

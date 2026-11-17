@@ -39,6 +39,7 @@ class ViewerArgs {
     this.library,
     this.folder,
     this.title = '',
+    this.onShow,
   });
 
   final List<AssetEntity> items;
@@ -58,6 +59,10 @@ class ViewerArgs {
 
   /// The album's name, shown by the strip.
   final String title;
+
+  /// Told each item the viewer comes to, so the grid it was opened from can
+  /// keep that item's tile in view and the viewer closes back into it.
+  final ValueChanged<AssetEntity>? onShow;
 }
 
 /// Whether the viewer's page view may take a drag made with [fingers]
@@ -111,6 +116,18 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
   AssetEntity get _current => _items[_index];
   String _hero(AssetEntity e) => '${widget.args.heroPrefix}-${e.id}';
+
+  String? _shown;
+
+  /// Tells [ViewerArgs.onShow] once about each item come to, however it
+  /// was reached (a swipe, the filmstrip, a delete, the strip). After the
+  /// frame: the grid scrolls in its own layout, not in the middle of ours.
+  void _show(AssetEntity e) {
+    final ValueChanged<AssetEntity>? onShow = widget.args.onShow;
+    if (onShow == null || e.id == _shown) return;
+    _shown = e.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onShow(e));
+  }
 
   @override
   void initState() {
@@ -430,12 +447,14 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           if (e.type != AssetType.video) e,
       ];
       final int at = pictures.indexOf(_current);
+      _show(at < 0 ? _current : pictures[at]);
       return StripViewer(
         title: widget.args.title,
         pages: <StripPage>[
           for (final AssetEntity e in pictures) StripPage.asset(e),
         ],
         index: at < 0 ? 0 : at,
+        onPage: (int page) => _show(pictures[page]),
         onReadMode: (int page) {
           // Back in Photos or Pages, carry on from the page on screen.
           _showAt(_items.indexOf(pictures[page]));
@@ -444,6 +463,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       );
     }
     final AssetEntity e = _current;
+    _show(e);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: ExtendedImageSlidePage(

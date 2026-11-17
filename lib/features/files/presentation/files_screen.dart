@@ -454,13 +454,14 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
     return HandleLabel(l.primary, secondary: l.secondary, mark: l.mark);
   }
 
-  /// Where each step (letter, year, size band) starts. Rows and grid lines
-  /// all have one height, so a row's place follows from the laid-out ones.
-  List<HandleMark> _handleMarks() {
+  /// The scroll offset that puts each row (or grid line) at the top, and
+  /// its height. Rows and grid lines all have one height, so any row's place
+  /// follows from the laid-out ones; null before the rows are laid out.
+  ({double Function(int index) topOf, double height})? _lines() {
     final RenderObject? r = _rowsKey.currentContext?.findRenderObject();
-    if (r is! RenderSliverMultiBoxAdaptor) return const <HandleMark>[];
+    if (r is! RenderSliverMultiBoxAdaptor) return null;
     final RenderBox? first = r.firstChild;
-    if (first == null) return const <HandleMark>[];
+    if (first == null) return null;
     final RenderAbstractViewport viewport = RenderAbstractViewport.of(r);
     double revealOf(RenderBox c) => viewport.getOffsetToReveal(c, 0).offset;
     final double firstTop = revealOf(first);
@@ -477,16 +478,48 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
         break;
       }
     }
+    return (
+      topOf: (int i) =>
+          firstTop + (i ~/ perLine - firstIndex ~/ perLine) * stride,
+      height: first.size.height,
+    );
+  }
+
+  /// Where each step (letter, year, size band) starts.
+  List<HandleMark> _handleMarks() {
+    final double Function(int)? topOf = _lines()?.topOf;
+    if (topOf == null) return const <HandleMark>[];
     final List<HandleMark> marks = <HandleMark>[];
     final Set<String> seen = <String>{};
     for (int i = 0; i < _handleLabels.length; i++) {
       final String? mark = _handleLabels[i].mark;
       if (mark == null || !seen.add(mark)) continue;
-      final double top =
-          firstTop + (i ~/ perLine - firstIndex ~/ perLine) * stride;
-      marks.add(HandleMark(top - _underBar, mark));
+      marks.add(HandleMark(topOf(i) - _underBar, mark));
     }
     return marks;
+  }
+
+  /// Scrolls, out of sight behind the viewer, so [entry]'s row or tile is
+  /// fully on screen, centred if it had to move: closing the viewer then
+  /// lands on the last photo seen, not the one it was opened on.
+  void _reveal(FileEntry entry) {
+    final int i = _shown.indexOf(entry.path);
+    final ({double Function(int index) topOf, double height})? lines = _lines();
+    if (!mounted || i < 0 || lines == null || !_scroll.hasClients) return;
+    final ScrollPosition p = _scroll.position;
+    final double top = lines.topOf(i);
+    final double above = _underBar;
+    final double shown = p.viewportDimension - above - bottomClearance(context);
+    if (top >= p.pixels + above &&
+        top + lines.height <= p.pixels + above + shown) {
+      return;
+    }
+    _scroll.jumpTo(
+      (top - above - (shown - lines.height) / 2).clamp(
+        p.minScrollExtent,
+        p.maxScrollExtent,
+      ),
+    );
   }
 
   @override
@@ -630,7 +663,13 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                               ? () => ref
                                     .read(selectionProvider.notifier)
                                     .toggle(e.path)
-                              : () => openEntry(context, ref, e, shown),
+                              : () => openEntry(
+                                  context,
+                                  ref,
+                                  e,
+                                  shown,
+                                  onShow: _reveal,
+                                ),
                           onLongPress: () => _startSelecting(e.path),
                           onMore: () => showEntryActions(context, ref, e),
                         );
@@ -662,7 +701,13 @@ class _FolderBodyState extends ConsumerState<FolderBody> {
                             ? () => ref
                                   .read(selectionProvider.notifier)
                                   .toggle(e.path)
-                            : () => openEntry(context, ref, e, shown),
+                            : () => openEntry(
+                                context,
+                                ref,
+                                e,
+                                shown,
+                                onShow: _reveal,
+                              ),
                         onLongPress: () => _startSelecting(e.path),
                         onSweepStart: (_) => _sweepStart(e.path),
                         onSweepUpdate: _sweepUpdate,

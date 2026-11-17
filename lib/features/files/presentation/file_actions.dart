@@ -27,17 +27,20 @@ import '../../albums/presentation/albums_providers.dart';
 import '../../albums/presentation/follow_albums.dart';
 import '../domain/file_entry.dart';
 import '../data/files_repository.dart';
+import 'file_media_viewer.dart';
 import 'files_providers.dart';
 import 'folder_picker.dart';
 
 /// Opens [entry] the way its type calls for. [siblings] are the folder's
-/// entries, so photos and videos can be paged through.
+/// entries, so photos and videos can be paged through; [onShow] is told
+/// each one the viewer comes to.
 Future<void> openEntry(
   BuildContext context,
   WidgetRef ref,
   FileEntry entry,
-  List<FileEntry> siblings,
-) async {
+  List<FileEntry> siblings, {
+  ValueChanged<FileEntry>? onShow,
+}) async {
   switch (entry.kind) {
     case FileKind.folder:
       context.push(
@@ -51,7 +54,7 @@ Future<void> openEntry(
       final List<FileEntry> media = siblings
           .where((FileEntry e) => e.isMedia)
           .toList();
-      context.push('/files/media', extra: (media, media.indexOf(entry)));
+      openFileMedia(context, media, media.indexOf(entry), onShow: onShow);
     case FileKind.pdf:
       context.push(
         Uri(

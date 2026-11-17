@@ -155,12 +155,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           selectionOwner: _owner,
           selectionActions: _actions,
           onLevelChanged: (GridLevel l) => setState(() => _level = l),
-          onOpen: (int index) => context.push(
+          onOpen: (int index, RevealItem reveal) => context.push(
             '/viewer',
             extra: ViewerArgs(
               items: list,
               index: index,
               heroPrefix: widget.kind.name,
+              onShow: reveal,
             ),
           ),
         );

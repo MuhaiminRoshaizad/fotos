@@ -33,6 +33,10 @@ class _TileTag {
 /// selects the whole range passed over. Two
 /// fingers pinching step between [GridLevel]s; the item at the top stays in
 /// place across the change.
+/// Keeps a grid on [item]: scrolls so its tile is in full view, if it is
+/// not already. Given to whatever the grid opens.
+typedef RevealItem = void Function(AssetEntity item);
+
 class MediaGrid extends ConsumerStatefulWidget {
   const MediaGrid({
     super.key,
@@ -53,7 +57,10 @@ class MediaGrid extends ConsumerStatefulWidget {
   final List<AssetEntity> items;
   final GridLevel level;
   final String heroPrefix;
-  final void Function(int index) onOpen;
+
+  /// Opens the item at [index]. [reveal] keeps the grid on whichever item
+  /// the viewer moves to, so closing it lands on that item's tile.
+  final void Function(int index, RevealItem reveal) onOpen;
   final ValueChanged<GridLevel>? onLevelChanged;
   final String? selectionOwner;
   final List<SelectionAction> Function()? selectionActions;
@@ -330,7 +337,33 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
       sel.toggle(widget.items[index].id);
       return;
     }
-    widget.onOpen(index);
+    widget.onOpen(index, _reveal);
+  }
+
+  /// Scrolls, out of sight behind the viewer, so [item]'s tile is fully on
+  /// screen between the bar at the top and the one at the bottom, centred
+  /// if it had to move. Swiping through a viewer used to leave the grid
+  /// where it was opened, so the photo closed into nothing and the grid
+  /// showed the first photo's place, not the last.
+  void _reveal(AssetEntity item) {
+    final GridGeometry? geo = _geometry;
+    if (!mounted || geo == null || !_scroll.hasClients) return;
+    final int i = widget.items.indexWhere((AssetEntity e) => e.id == item.id);
+    if (i < 0) return;
+    final ScrollPosition p = _scroll.position;
+    final double top = _headerExtent + geo.tileTop(i);
+    final double above = widget.overlayTop;
+    final double below = bottomClearance(context);
+    final double shown = p.viewportDimension - above - below;
+    if (top >= p.pixels + above && top + geo.tile <= p.pixels + above + shown) {
+      return;
+    }
+    _scroll.jumpTo(
+      (top - above - (shown - geo.tile) / 2).clamp(
+        p.minScrollExtent,
+        p.maxScrollExtent,
+      ),
+    );
   }
 
   // ---- pinch ---------------------------------------------------------------

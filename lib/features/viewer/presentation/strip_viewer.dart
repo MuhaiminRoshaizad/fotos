@@ -74,6 +74,7 @@ class StripViewer extends StatefulWidget {
     required this.pages,
     required this.index,
     this.onReadMode,
+    this.onPage,
   });
 
   final String title;
@@ -85,6 +86,9 @@ class StripViewer extends StatefulWidget {
   /// The bar's reading-mode button, given the page on screen; none when
   /// null.
   final ValueChanged<int>? onReadMode;
+
+  /// Told the page under the middle of the screen each time it changes.
+  final ValueChanged<int>? onPage;
 
   @override
   State<StripViewer> createState() => _StripViewerState();
@@ -148,7 +152,10 @@ class _StripViewerState extends State<StripViewer> {
     final ScrollController? s = _scroll;
     if (s == null || !s.hasClients) return;
     final int page = _pageAt(s.offset);
-    if (page != _page) setState(() => _page = page);
+    if (page != _page) {
+      setState(() => _page = page);
+      widget.onPage?.call(page);
+    }
   }
 
   @override

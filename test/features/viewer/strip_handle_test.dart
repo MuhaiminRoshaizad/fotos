@@ -56,6 +56,38 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
+  testWidgets('the strip says which page it has scrolled to', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final List<int> told = <int>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StripViewer(
+          title: 'Iron Orchard',
+          // 40 pages, each 400 x 560 on this screen.
+          pages: <StripPage>[
+            for (int i = 0; i < 40; i++)
+              StripPage(aspect: 1000 / 1400, image: (_) => _pixel),
+          ],
+          index: 0,
+          onPage: told.add,
+        ),
+      ),
+    );
+    tester
+        .state<ScrollableState>(find.byType(Scrollable))
+        .position
+        .jumpTo(560 * 20);
+    await tester.pump();
+    // Page 21 starts at the top; the middle of the screen is still on it.
+    expect(told.last, 20);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
+  });
+
   testWidgets('the handle moves steadily down a strip of uneven pages', (
     WidgetTester tester,
   ) async {
