@@ -94,6 +94,8 @@ Future<void> _sayWhy(BuildContext context, CutException failure) async {
 }
 
 /// How far the save under way has got, with the time left, Cancel and Hide.
+/// Cancel asks first, in the same dialog: stopping loses the encode so far,
+/// and for a hidden save the cuts too, since the editor has closed.
 class SavingDialog extends ConsumerStatefulWidget {
   const SavingDialog({super.key});
 
@@ -104,6 +106,9 @@ class SavingDialog extends ConsumerStatefulWidget {
 class _SavingDialogState extends ConsumerState<SavingDialog> {
   late final Timer _tick;
   bool _closed = false;
+
+  /// Cancel was tapped: the dialog is asking whether to stop.
+  bool _asking = false;
 
   @override
   void initState() {
@@ -143,54 +148,104 @@ class _SavingDialogState extends ConsumerState<SavingDialog> {
       fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
     );
     final Color secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    return CupertinoAlertDialog(
-      title: Text(finishing ? 'Finishing' : 'Saving video'),
-      content: Padding(
-        padding: const EdgeInsets.only(top: AppSpacing.md),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadii.pill),
-              child: LinearProgressIndicator(
-                value: finishing ? null : p / 100,
-                minHeight: 6,
-                color: Theme.of(context).colorScheme.primary,
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(finishing ? 'Checking the new video' : '$p%', style: figures),
-            // Always one line here, so the dialog doesn't change size.
-            Text(
-              finishing ? ' ' : timeLeft(job.left),
-              style: figures.copyWith(color: secondary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Hide this to keep using your phone. The save carries on.',
-              style: TextStyle(color: secondary),
-            ),
-          ],
-        ),
+    // Too late to stop once finishing: back to the progress, which then
+    // offers no Cancel.
+    final bool asking = _asking && !finishing && now != null;
+    // The question fades in over the progress and back, in place.
+    return AnimatedSwitcher(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : AppMotion.short,
+      child: KeyedSubtree(
+        key: ValueKey<bool>(asking),
+        child: asking
+            ? _confirm(job, now)
+            : _progress(job, p, finishing, figures, secondary),
       ),
-      actions: <Widget>[
-        CupertinoDialogAction(
-          isDestructiveAction: true,
-          onPressed: finishing ? null : job.cancel,
-          child: const Text('Cancel'),
-        ),
-        CupertinoDialogAction(
-          isDefaultAction: true,
-          onPressed: () {
-            job.hide();
-            _close();
-          },
-          child: const Text('Hide'),
-        ),
-      ],
     );
   }
+
+  /// Whether to stop, and what stopping loses.
+  Widget _confirm(SaveJobNotifier job, SaveJob now) => CupertinoAlertDialog(
+    title: const Text('Stop saving?'),
+    content: Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Text(
+        now.hidden
+            ? 'The edit will be lost. ${now.name} stays as it is.'
+            : 'Your cuts stay in the editor, so you can save again. '
+                  '${now.name} stays as it is.',
+      ),
+    ),
+    actions: <Widget>[
+      // iOS bolds the safe choice when the other destroys.
+      CupertinoDialogAction(
+        isDefaultAction: true,
+        onPressed: () => setState(() => _asking = false),
+        child: const Text('Keep Saving'),
+      ),
+      CupertinoDialogAction(
+        isDestructiveAction: true,
+        onPressed: job.cancel,
+        child: const Text('Stop Saving'),
+      ),
+    ],
+  );
+
+  /// How far the save has got, with Cancel and Hide.
+  Widget _progress(
+    SaveJobNotifier job,
+    int p,
+    bool finishing,
+    TextStyle figures,
+    Color secondary,
+  ) => CupertinoAlertDialog(
+    title: Text(finishing ? 'Finishing' : 'Saving video'),
+    content: Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+            child: LinearProgressIndicator(
+              value: finishing ? null : p / 100,
+              minHeight: 6,
+              color: Theme.of(context).colorScheme.primary,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(finishing ? 'Checking the new video' : '$p%', style: figures),
+          // Always one line here, so the dialog doesn't change size.
+          Text(
+            finishing ? ' ' : timeLeft(job.left),
+            style: figures.copyWith(color: secondary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Hide this to keep using your phone. The save carries on.',
+            style: TextStyle(color: secondary),
+          ),
+        ],
+      ),
+    ),
+    actions: <Widget>[
+      CupertinoDialogAction(
+        isDestructiveAction: true,
+        onPressed: finishing ? null : () => setState(() => _asking = true),
+        child: const Text('Cancel'),
+      ),
+      CupertinoDialogAction(
+        isDefaultAction: true,
+        onPressed: () {
+          job.hide();
+          _close();
+        },
+        child: const Text('Hide'),
+      ),
+    ],
+  );
 }

@@ -132,6 +132,22 @@ void main() {
     await tester.tap(find.byType(SavePill));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    // Nothing stops until it is confirmed.
+    expect(calls, isNot(contains('cutCancel')));
+    expect(find.text('Stop saving?'), findsOneWidget);
+    expect(
+      find.text('The edit will be lost. Trip.mp4 stays as it is.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Keep Saving'));
+    await tester.pumpAndSettle();
+    expect(calls, isNot(contains('cutCancel')));
+    expect(find.text('Saving video'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Stop Saving'));
     await tester.pump();
     expect(calls, contains('cutCancel'));
     await event('cutDone', <String, Object>{
@@ -141,6 +157,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(SavingDialog), findsNothing);
     expect(find.text('Save cancelled. Trip.mp4 is unchanged.'), findsOneWidget);
+    await tester.pumpAndSettle(const Duration(seconds: 6));
+  });
+
+  testWidgets('a save that ends while Stop saving? is asked closes it, with '
+      'nothing left asking', (WidgetTester tester) async {
+    final ProviderContainer c = await open(tester);
+    await saveHidden(tester, c);
+    await tester.tap(find.byType(SavePill));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Stop saving?'), findsOneWidget);
+
+    await event('cutDone', <String, Object>{
+      'id': '',
+      'name': 'Trip (edited).mp4',
+      'replaced': false,
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Stop saving?'), findsNothing);
+    expect(find.byType(SavingDialog), findsNothing);
+    expect(calls, isNot(contains('cutCancel')));
     await tester.pumpAndSettle(const Duration(seconds: 6));
   });
 
