@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/widgets/frost.dart';
 import '../features/albums/presentation/album_screen.dart';
 import '../features/albums/presentation/albums_screen.dart';
 import '../features/albums/presentation/empty_album_screen.dart';
@@ -30,6 +31,7 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   final GoRouter router = GoRouter(
     navigatorKey: rootNavigatorKey,
+    observers: <NavigatorObserver>[popupWatch],
     initialLocation: tabPaths[ref.read(initialTabOrderProvider).first],
     routes: <RouteBase>[
       GoRoute(

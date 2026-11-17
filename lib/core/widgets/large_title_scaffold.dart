@@ -1,9 +1,8 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_tokens.dart';
+import 'frost.dart';
 import 'inset_group.dart';
 import 'motion.dart';
 
@@ -287,8 +286,8 @@ class FrostedBar extends StatelessWidget {
         if (solid)
           Positioned.fill(
             child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Frost(
+                sigma: 20,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: (background ?? cs.surface).withValues(alpha: 0.78),

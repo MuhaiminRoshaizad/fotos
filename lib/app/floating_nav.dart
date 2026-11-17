@@ -1,11 +1,10 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
 import '../core/selection/selection.dart';
 import '../core/theme/app_tokens.dart';
+import '../core/widgets/frost.dart';
 
 class NavDestination {
   const NavDestination(this.icon, this.selectedIcon, this.label);
@@ -411,8 +410,8 @@ class FrostedPill extends StatelessWidget {
       ),
       child: ClipPath(
         clipper: const ShapeBorderClipper(shape: shape),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Frost(
+          sigma: 24,
           child: DecoratedBox(
             decoration: ShapeDecoration(
               color: cs.surfaceContainerLow.withValues(
