@@ -177,24 +177,27 @@ class _StripViewerState extends State<StripViewer> {
                 child: ZoomView(
                   scrollAxis: Axis.vertical,
                   onZoomed: (bool z) => setState(() => _zoomed = z),
-                  child: ListView.builder(
+                  child: ListView.custom(
                     controller: _scroll,
                     padding: EdgeInsets.only(
                       bottom: MediaQuery.paddingOf(context).bottom,
                     ),
-                    itemCount: widget.pages.length,
                     itemExtentBuilder: (int i, _) => _tops[i + 1] - _tops[i],
-                    itemBuilder: (BuildContext context, int i) => Semantics(
-                      image: true,
-                      label: 'Page ${i + 1} of ${widget.pages.length}',
-                      child: ColoredBox(
-                        color: const Color(0xFF151517),
-                        child: Image(
-                          image: widget.pages[i].image(px),
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
+                    childrenDelegate: _StripPages(
+                      (BuildContext context, int i) => Semantics(
+                        image: true,
+                        label: 'Page ${i + 1} of ${widget.pages.length}',
+                        child: ColoredBox(
+                          color: const Color(0xFF151517),
+                          child: Image(
+                            image: widget.pages[i].image(px),
+                            fit: BoxFit.cover,
+                            gaplessPlayback: true,
+                          ),
                         ),
                       ),
+                      childCount: widget.pages.length,
+                      length: _tops.last,
                     ),
                   ),
                 ),
@@ -231,6 +234,27 @@ class _StripViewerState extends State<StripViewer> {
       ),
     );
   }
+}
+
+/// The strip's pages, with the strip's true length.
+///
+/// Without it the list guesses its length from the pages on screen (their
+/// average height times the page count) and guesses again on every scroll.
+/// Strip pages differ in height, so the guess kept changing, and the
+/// scroll handle, placed by offset over that length, jumped up and down
+/// the edge as the strip scrolled (found on the phone, 17/11/2026).
+class _StripPages extends SliverChildBuilderDelegate {
+  _StripPages(super.builder, {required super.childCount, required this.length});
+
+  final double length;
+
+  @override
+  double? estimateMaxScrollOffset(
+    int firstIndex,
+    int lastIndex,
+    double leadingScrollOffset,
+    double trailingScrollOffset,
+  ) => length;
 }
 
 /// The viewer bar's button for switching between Photos, Pages and Strip.

@@ -55,4 +55,46 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 2));
   });
+
+  testWidgets('the handle moves steadily down a strip of uneven pages', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    // Short and very tall pages mixed, as strip chapters are: 200 px and
+    // 2000 px high at this width, in an uneven pattern.
+    final List<double> heights = <double>[
+      for (int i = 0; i < 60; i++) i % 7 == 0 || i % 11 == 0 ? 2000 : 200,
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StripViewer(
+          title: 'Iron Orchard',
+          pages: <StripPage>[
+            for (final double h in heights)
+              StripPage(aspect: 400 / h, image: (_) => _pixel),
+          ],
+          index: 0,
+        ),
+      ),
+    );
+    final ScrollPosition pos = tester
+        .state<ScrollableState>(find.byType(Scrollable))
+        .position;
+    final double length = heights.reduce((double a, double b) => a + b);
+    final Finder handle = find.byIcon(CupertinoIcons.chevron_up_chevron_down);
+    double last = -1;
+    for (double y = 0; y < length - 800; y += 450) {
+      pos.jumpTo(y);
+      await tester.pump();
+      // The strip's true length, whichever pages are on screen.
+      expect(pos.maxScrollExtent, length - 800, reason: 'at $y');
+      final double top = tester.getTopLeft(handle).dy;
+      expect(top, greaterThanOrEqualTo(last), reason: 'at $y');
+      last = top;
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
+  });
 }
