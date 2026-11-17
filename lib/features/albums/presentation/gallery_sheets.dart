@@ -305,10 +305,9 @@ class _AlbumPickerState extends State<_AlbumPicker> {
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
     final bool can = widget.allowNone || _picked.isNotEmpty;
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.7,
-      maxChildSize: 0.92,
+    return DraggableSheet(
+      initialSize: 0.7,
+      maxSize: 0.92,
       builder: (BuildContext context, ScrollController scroll) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[

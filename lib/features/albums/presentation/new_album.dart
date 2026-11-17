@@ -91,10 +91,9 @@ class _PickerState extends State<_Picker> {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.85,
-      maxChildSize: 0.95,
+    return DraggableSheet(
+      initialSize: 0.85,
+      maxSize: 0.95,
       builder: (BuildContext context, ScrollController scroll) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[

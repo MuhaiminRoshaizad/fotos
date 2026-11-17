@@ -347,10 +347,9 @@ class _AddToAlbumSheetState extends ConsumerState<_AddToAlbumSheet> {
         ],
       ),
     ];
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.6,
-      maxChildSize: 0.9,
+    return DraggableSheet(
+      initialSize: 0.6,
+      maxSize: 0.9,
       // Only the rows on screen are built, thumbnails included: a phone
       // with a hundred albums opens the sheet as fast as one with three.
       builder: (BuildContext context, ScrollController scroll) =>

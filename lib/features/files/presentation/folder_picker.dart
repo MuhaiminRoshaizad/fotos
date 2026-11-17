@@ -99,10 +99,9 @@ class _FolderPickerState extends ConsumerState<_FolderPicker> {
           path,
     ];
     final int lead = pins.isEmpty ? 0 : 1;
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.75,
-      maxChildSize: 0.95,
+    return DraggableSheet(
+      initialSize: 0.75,
+      maxSize: 0.95,
       builder: (BuildContext context, ScrollController scroll) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[

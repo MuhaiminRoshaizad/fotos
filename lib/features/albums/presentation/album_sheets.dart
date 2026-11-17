@@ -309,10 +309,9 @@ Future<void> pickAlbumCover(
   final String? id = await showAppSheet<String>(
     context,
     scrollControlled: true,
-    builder: (BuildContext ctx) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.7,
-      maxChildSize: 0.95,
+    builder: (BuildContext ctx) => DraggableSheet(
+      initialSize: 0.7,
+      maxSize: 0.95,
       builder: (BuildContext ctx, ScrollController scroll) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[

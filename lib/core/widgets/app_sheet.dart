@@ -27,6 +27,45 @@ Future<T?> showAppSheet<T>(
   );
 }
 
+/// A tall [showAppSheet] page with a long list: it opens at [initialSize]
+/// of the screen, drags up to [maxSize], and on release settles at one of
+/// those two or closes, never somewhere between.
+///
+/// Inside it the list stops at its ends instead of bouncing. With the app's
+/// rubber-band scrolling, a quick flick down ran the list past its top
+/// while the sheet shrank under it; the two pulled against each other and
+/// the sheet came to rest at a random height (found on the phone,
+/// 17/11/2026). Flutter's own DraggableScrollableSheet notes that the iOS
+/// bounce "just isn't right here".
+class DraggableSheet extends StatelessWidget {
+  const DraggableSheet({
+    super.key,
+    required this.initialSize,
+    required this.maxSize,
+    required this.builder,
+  });
+
+  final double initialSize;
+  final double maxSize;
+  final ScrollableWidgetBuilder builder;
+
+  @override
+  Widget build(BuildContext context) => DraggableScrollableSheet(
+    expand: false,
+    initialChildSize: initialSize,
+    maxChildSize: maxSize,
+    snap: true,
+    snapSizes: <double>[initialSize],
+    builder: (BuildContext context, ScrollController scroll) =>
+        ScrollConfiguration(
+          behavior: ScrollConfiguration.of(
+            context,
+          ).copyWith(physics: const ClampingScrollPhysics()),
+          child: builder(context, scroll),
+        ),
+  );
+}
+
 /// The heading of a task sheet: a small centred title, as on iOS, with an
 /// optional line under it.
 class SheetTitle extends StatelessWidget {
