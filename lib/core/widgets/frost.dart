@@ -6,29 +6,62 @@ import 'package:flutter/widgets.dart';
 /// frosted bars beneath them can stop blurring ([Frost]). Registered on the
 /// root navigator, where every one of them opens.
 class PopupWatch extends NavigatorObserver with ChangeNotifier {
-  final Set<Route<dynamic>> _open = <Route<dynamic>>{};
+  /// Each one tracked, with the listener on its animation.
+  final Map<ModalRoute<dynamic>, VoidCallback> _open =
+      <ModalRoute<dynamic>, VoidCallback>{};
 
-  /// Whether one is open now. A route whose navigator has gone counts as
-  /// closed.
-  bool get open => _open.any((Route<dynamic> r) => r.isActive);
+  /// How much of the blur shows: 1 with nothing open, 0 once one is fully
+  /// up, and in between while one opens, closes or is dragged, in step with
+  /// the scrim it fades under (the route's own barrier curve). A route that
+  /// has been disposed, as when its navigator has gone, counts as closed.
+  double get clear {
+    double cover = 0;
+    for (final ModalRoute<dynamic> r in _open.keys) {
+      if (r.navigator == null) continue;
+      final Animation<double>? a = r.animation;
+      final double v = a == null ? 1 : r.barrierCurve.transform(a.value);
+      if (v > cover) cover = v;
+    }
+    return 1 - cover;
+  }
 
   void _add(Route<dynamic>? r) {
-    if (r is PopupRoute && _open.add(r)) notifyListeners();
+    if (r is! PopupRoute || _open.containsKey(r)) return;
+    for (final ModalRoute<dynamic> gone
+        in _open.keys
+            .where((ModalRoute<dynamic> o) => o.navigator == null)
+            .toList()) {
+      final VoidCallback changed = _open.remove(gone)!;
+      gone.animation?.removeListener(changed);
+    }
+    final Animation<double>? a = r.animation;
+    void changed() {
+      // Closed and finished closing: nothing of it is left on screen.
+      if (a!.isDismissed && !r.isActive) {
+        _remove(r);
+      } else {
+        notifyListeners();
+      }
+    }
+
+    _open[r] = changed;
+    a?.addListener(changed);
+    notifyListeners();
   }
 
   void _remove(Route<dynamic>? r) {
-    if (_open.remove(r)) notifyListeners();
+    final VoidCallback? changed = _open.remove(r);
+    if (changed == null) return;
+    (r! as ModalRoute<dynamic>).animation?.removeListener(changed);
+    notifyListeners();
   }
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
       _add(route);
 
-  // At the start of the closing animation, so the blur is back before the
-  // sheet has moved off it.
-  @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
-      _remove(route);
+  // A popped route stays tracked while it animates away, so the blur comes
+  // back as its scrim fades; it goes once the animation has finished.
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
@@ -51,8 +84,12 @@ final PopupWatch popupWatch = PopupWatch();
 /// one still cost a full-screen pass every frame. With the selection bar
 /// under it, scrolling the Move to picker missed the 120 Hz budget (8.3 ms)
 /// on 1.6% of frames, and 0.2% without the blurs (measured on the phone,
-/// 17/11/2026). `enabled` keeps the tree as it is, so nothing inside is
-/// rebuilt.
+/// 17/11/2026).
+///
+/// It fades out as the sheet comes up and back in as it goes, rather than
+/// switching in one frame: switched, the bars went sharp while the scrim
+/// over them had barely begun, which showed as a flicker. `enabled` keeps
+/// the tree as it is, so nothing inside is rebuilt.
 class Frost extends StatelessWidget {
   const Frost({super.key, required this.sigma, required this.child});
 
@@ -62,11 +99,15 @@ class Frost extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: popupWatch,
-    builder: (BuildContext context, Widget? child) => BackdropFilter(
-      enabled: !popupWatch.open,
-      filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-      child: child,
-    ),
+    builder: (BuildContext context, Widget? child) {
+      final double s = sigma * popupWatch.clear;
+      return BackdropFilter(
+        // Below half a pixel the blur can't be seen, but still costs.
+        enabled: s >= 0.5,
+        filter: ImageFilter.blur(sigmaX: s, sigmaY: s),
+        child: child,
+      );
+    },
     child: child,
   );
 }
