@@ -100,10 +100,17 @@ class Frost extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: popupWatch,
     builder: (BuildContext context, Widget? child) {
-      final double s = sigma * popupWatch.clear;
+      // Squared: a light blur already looks most of the way blurred, so in
+      // proportion the blur came back over the first few frames of a
+      // closing sheet while its scrim took 250 ms to lift (recorded on the
+      // phone, 17/11/2026). Squared, it looks to change with the scrim.
+      final double c = popupWatch.clear;
+      final double s = sigma * c * c;
       return BackdropFilter(
-        // Below half a pixel the blur can't be seen, but still costs.
-        enabled: s >= 0.5,
+        // Off only once it can't be seen, though it still costs: at half a
+        // logical pixel (over a pixel on the phone's screen) it switched on
+        // as a visible step on the phone.
+        enabled: s >= 0.1,
         filter: ImageFilter.blur(sigmaX: s, sigmaY: s),
         child: child,
       );
