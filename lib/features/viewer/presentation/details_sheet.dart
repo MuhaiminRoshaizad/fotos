@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../../../core/format/formatters.dart';
+import '../../../core/media/video_length.dart';
 import '../../../core/platform/native_channel.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_sheet.dart';
@@ -32,7 +33,10 @@ class _DetailsSheetState extends State<DetailsSheet> {
       final File? f = await a.originFile;
       if (f != null) camera = await const NativeChannel().exif(f.path);
     }
-    return _Extra(size: size, where: where, camera: camera);
+    final Duration? length = a.type == AssetType.video && a.duration == 0
+        ? await readVideoLength(a)
+        : null;
+    return _Extra(size: size, where: where, camera: camera, length: length);
   }
 
   @override
@@ -48,9 +52,12 @@ class _DetailsSheetState extends State<DetailsSheet> {
         final bool hasPlace =
             where != null && (where.latitude != 0 || where.longitude != 0);
         final String? camera = x?.camera?.camera;
+        // Android lists a fragmented MP4 as 0:00; its length comes with
+        // the rest, read from the file.
+        final Duration? length = a.duration > 0 ? a.videoDuration : x?.length;
         final String dims =
             '${a.orientatedWidth} × ${a.orientatedHeight}'
-            '${video ? ' · ${Fmt.duration(a.videoDuration)}' : ''}';
+            '${video && length != null ? ' · ${Fmt.duration(length)}' : ''}';
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,10 +108,13 @@ class _DetailsSheetState extends State<DetailsSheet> {
 }
 
 class _Extra {
-  const _Extra({required this.size, this.where, this.camera});
+  const _Extra({required this.size, this.where, this.camera, this.length});
   final int size;
   final LatLng? where;
   final CameraInfo? camera;
+
+  /// A video's length when Android lists it as 0:00.
+  final Duration? length;
 }
 
 class _Row extends StatelessWidget {

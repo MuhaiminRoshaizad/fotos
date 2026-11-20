@@ -9,6 +9,7 @@ import '../widgets/corner_badge.dart';
 import '../widgets/select_check.dart';
 import 'media_flight.dart';
 import 'motion_name.dart';
+import 'video_length.dart';
 
 /// Thumbnail sizes are bucketed so the same decode serves every grid level.
 int thumbnailPixels(double logicalWidth, double devicePixelRatio) {
@@ -101,9 +102,12 @@ class MediaTile extends StatelessWidget {
                   Positioned(
                     right: 4,
                     bottom: 4,
-                    child: CornerBadge(
-                      icon: CupertinoIcons.play_fill,
-                      text: Fmt.duration(asset.videoDuration),
+                    child: VideoLengthText(
+                      asset,
+                      builder: (_, String length) => CornerBadge(
+                        icon: CupertinoIcons.play_fill,
+                        text: length,
+                      ),
                     ),
                   ),
                 if (!video && !selecting && looksLikeMotionPhoto(asset.title))
