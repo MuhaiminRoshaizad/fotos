@@ -49,6 +49,10 @@ Future<SortPick?> pickSort(
   SortOption? option,
 }) => showAppSheet<SortPick>(
   context,
+  // Sized to its rows, not Flutter's default cap of 9/16 of the screen:
+  // with Favourites first added the cap cut Apply off under the navigation
+  // bar on a Pixel 9 Pro (21/11/2026). Past the screen, it scrolls.
+  scrollControlled: true,
   builder: (BuildContext ctx) => _SortSheet(
     title: title,
     labels: labels,
@@ -94,117 +98,119 @@ class _SortSheetState extends State<_SortSheet> {
     final (String first, String second) = widget.directions[_by];
     final String? forAll = widget.forAllLabel;
     final SortOption? option = widget.option;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        SheetTitle(widget.title),
-        // iOS marks the choice with a checkmark, not a radio button.
-        InsetGroup(
-          children: <Widget>[
-            for (final (int i, String label) in widget.labels.indexed)
-              Semantics(
-                selected: i == _by,
-                inMutuallyExclusiveGroup: true,
-                child: GroupRow(
-                  title: label,
-                  chevron: false,
-                  trailing: i == _by
-                      ? Icon(
-                          CupertinoIcons.checkmark,
-                          size: 20,
-                          color: cs.primary,
-                        )
-                      : null,
-                  onTap: () => setState(() {
-                    _by = i;
-                    _reversed = false;
-                  }),
-                ),
-              ),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.sm,
-          ),
-          child: CupertinoSlidingSegmentedControl<bool>(
-            groupValue: _reversed,
-            children: <bool, Widget>{
-              false: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(first),
-              ),
-              true: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(second),
-              ),
-            },
-            onValueChanged: (bool? v) {
-              if (v != null) setState(() => _reversed = v);
-            },
-          ),
-        ),
-        if (option != null)
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          SheetTitle(widget.title),
+          // iOS marks the choice with a checkmark, not a radio button.
           InsetGroup(
-            footer: option.footer,
             children: <Widget>[
-              MergeSemantics(
-                child: GroupRow(
-                  title: option.label,
-                  chevron: false,
-                  trailing: CupertinoSwitch(
-                    value: _option,
-                    onChanged: (bool v) => setState(() => _option = v),
+              for (final (int i, String label) in widget.labels.indexed)
+                Semantics(
+                  selected: i == _by,
+                  inMutuallyExclusiveGroup: true,
+                  child: GroupRow(
+                    title: label,
+                    chevron: false,
+                    trailing: i == _by
+                        ? Icon(
+                            CupertinoIcons.checkmark,
+                            size: 20,
+                            color: cs.primary,
+                          )
+                        : null,
+                    onTap: () => setState(() {
+                      _by = i;
+                      _reversed = false;
+                    }),
                   ),
-                  onTap: () => setState(() => _option = !_option),
                 ),
-              ),
             ],
           ),
-        if (forAll != null)
-          InsetGroup(
-            footer: _forAll
-                ? 'New ones, and any you have not sorted yourself, use this '
-                      'order.'
-                : 'Only this one changes.',
-            children: <Widget>[
-              MergeSemantics(
-                child: GroupRow(
-                  title: forAll,
-                  chevron: false,
-                  trailing: CupertinoSwitch(
-                    value: _forAll,
-                    onChanged: (bool v) => setState(() => _forAll = v),
-                  ),
-                  onTap: () => setState(() => _forAll = !_forAll),
-                ),
-              ),
-            ],
-          ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.sm,
-            AppSpacing.lg,
-            AppSpacing.lg,
-          ),
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(
-              SortPick(
-                _by,
-                reversed: _reversed,
-                forAll: _forAll,
-                option: _option,
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.sm,
             ),
-            child: const Text('Apply'),
+            child: CupertinoSlidingSegmentedControl<bool>(
+              groupValue: _reversed,
+              children: <bool, Widget>{
+                false: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(first),
+                ),
+                true: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(second),
+                ),
+              },
+              onValueChanged: (bool? v) {
+                if (v != null) setState(() => _reversed = v);
+              },
+            ),
           ),
-        ),
-      ],
+          if (option != null)
+            InsetGroup(
+              footer: option.footer,
+              children: <Widget>[
+                MergeSemantics(
+                  child: GroupRow(
+                    title: option.label,
+                    chevron: false,
+                    trailing: CupertinoSwitch(
+                      value: _option,
+                      onChanged: (bool v) => setState(() => _option = v),
+                    ),
+                    onTap: () => setState(() => _option = !_option),
+                  ),
+                ),
+              ],
+            ),
+          if (forAll != null)
+            InsetGroup(
+              footer: _forAll
+                  ? 'New ones, and any you have not sorted yourself, use this '
+                        'order.'
+                  : 'Only this one changes.',
+              children: <Widget>[
+                MergeSemantics(
+                  child: GroupRow(
+                    title: forAll,
+                    chevron: false,
+                    trailing: CupertinoSwitch(
+                      value: _forAll,
+                      onChanged: (bool v) => setState(() => _forAll = v),
+                    ),
+                    onTap: () => setState(() => _forAll = !_forAll),
+                  ),
+                ),
+              ],
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            child: FilledButton(
+              onPressed: () => Navigator.of(context).pop(
+                SortPick(
+                  _by,
+                  reversed: _reversed,
+                  forAll: _forAll,
+                  option: _option,
+                ),
+              ),
+              child: const Text('Apply'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
