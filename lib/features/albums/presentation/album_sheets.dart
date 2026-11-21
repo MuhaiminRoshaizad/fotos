@@ -369,12 +369,18 @@ Future<void> showSortSheet(
     ],
     by: current.by.index,
     reversed: current.reversed,
+    option: SortOption(
+      'Favourites first',
+      footer: 'Favourites sit at the top, like a pinned album.',
+      value: current.favouritesFirst,
+    ),
     forAllLabel: 'Use for all albums',
   );
   if (next == null) return;
   final AlbumSort sort = AlbumSort(
     AlbumSortBy.values[next.by],
     reversed: next.reversed,
+    favouritesFirst: next.option,
   );
   final AlbumPrefsNotifier prefs = ref.read(albumPrefsProvider.notifier);
   await (next.forAll

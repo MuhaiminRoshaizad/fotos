@@ -44,6 +44,7 @@ class AlbumScreen extends ConsumerWidget {
       readingFolder: ref.watch(albumFolderProvider(albumId)).value,
       items: items,
       grouped: sort.groupsByDate,
+      favouritesFirst: sort.favouritesFirst,
       orderLabel: _orderLabel(sort.by),
       onRetry: () => ref.invalidate(albumItemsProvider(albumId)),
       emptyTitle: 'This album is empty',
@@ -106,6 +107,7 @@ class MediaListScreen extends ConsumerStatefulWidget {
     required this.emptyMessage,
     this.actions = const <Widget>[],
     this.readingFolder,
+    this.favouritesFirst = false,
   });
 
   final String owner;
@@ -127,6 +129,10 @@ class MediaListScreen extends ConsumerStatefulWidget {
   /// The folder these come from, as a reading key, so the viewer can
   /// read them as pages or a strip; null for a mixed list.
   final String? readingFolder;
+
+  /// [items] open with their favourites, which a list grouped by date
+  /// shows under their own heading.
+  final bool favouritesFirst;
 
   @override
   ConsumerState<MediaListScreen> createState() => _MediaListScreenState();
@@ -308,6 +314,16 @@ class _MediaListScreenState extends ConsumerState<MediaListScreen>
                           items: list,
                           level: GridLevel.all,
                           grouped: widget.grouped,
+                          lead: widget.favouritesFirst
+                              ? (
+                                  count: list
+                                      .takeWhile(
+                                        (AssetEntity e) => e.isFavorite,
+                                      )
+                                      .length,
+                                  label: 'Favourites',
+                                )
+                              : null,
                           orderLabel: widget.orderLabel,
                           header: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,

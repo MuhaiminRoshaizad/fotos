@@ -10,10 +10,29 @@ import 'inset_group.dart';
 /// direction was picked, and whether it should become the default for
 /// everything of its kind.
 class SortPick {
-  const SortPick(this.by, {required this.reversed, this.forAll = false});
+  const SortPick(
+    this.by, {
+    required this.reversed,
+    this.forAll = false,
+    this.option = false,
+  });
   final int by;
   final bool reversed;
   final bool forAll;
+
+  /// The sheet's extra switch, when it has one (see [SortOption]).
+  final bool option;
+}
+
+/// A switch the sort sheet offers beside the order, such as an album's
+/// Favourites first.
+class SortOption {
+  const SortOption(this.label, {required this.footer, required this.value});
+  final String label;
+
+  /// Said under the switch, so its effect is plain before it is tried.
+  final String footer;
+  final bool value;
 }
 
 /// The sort sheet: a key to sort by and one of its two directions. With
@@ -27,6 +46,7 @@ Future<SortPick?> pickSort(
   required int by,
   required bool reversed,
   String? forAllLabel,
+  SortOption? option,
 }) => showAppSheet<SortPick>(
   context,
   builder: (BuildContext ctx) => _SortSheet(
@@ -36,6 +56,7 @@ Future<SortPick?> pickSort(
     by: by,
     reversed: reversed,
     forAllLabel: forAllLabel,
+    option: option,
   ),
 );
 
@@ -47,6 +68,7 @@ class _SortSheet extends StatefulWidget {
     required this.by,
     required this.reversed,
     required this.forAllLabel,
+    required this.option,
   });
   final String title;
   final List<String> labels;
@@ -54,6 +76,7 @@ class _SortSheet extends StatefulWidget {
   final int by;
   final bool reversed;
   final String? forAllLabel;
+  final SortOption? option;
 
   @override
   State<_SortSheet> createState() => _SortSheetState();
@@ -62,6 +85,7 @@ class _SortSheet extends StatefulWidget {
 class _SortSheetState extends State<_SortSheet> {
   late int _by = widget.by;
   late bool _reversed = widget.reversed;
+  late bool _option = widget.option?.value ?? false;
   bool _forAll = false;
 
   @override
@@ -69,6 +93,7 @@ class _SortSheetState extends State<_SortSheet> {
     final ColorScheme cs = Theme.of(context).colorScheme;
     final (String first, String second) = widget.directions[_by];
     final String? forAll = widget.forAllLabel;
+    final SortOption? option = widget.option;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -123,6 +148,23 @@ class _SortSheetState extends State<_SortSheet> {
             },
           ),
         ),
+        if (option != null)
+          InsetGroup(
+            footer: option.footer,
+            children: <Widget>[
+              MergeSemantics(
+                child: GroupRow(
+                  title: option.label,
+                  chevron: false,
+                  trailing: CupertinoSwitch(
+                    value: _option,
+                    onChanged: (bool v) => setState(() => _option = v),
+                  ),
+                  onTap: () => setState(() => _option = !_option),
+                ),
+              ),
+            ],
+          ),
         if (forAll != null)
           InsetGroup(
             footer: _forAll
@@ -151,9 +193,14 @@ class _SortSheetState extends State<_SortSheet> {
             AppSpacing.lg,
           ),
           child: FilledButton(
-            onPressed: () => Navigator.of(
-              context,
-            ).pop(SortPick(_by, reversed: _reversed, forAll: _forAll)),
+            onPressed: () => Navigator.of(context).pop(
+              SortPick(
+                _by,
+                reversed: _reversed,
+                forAll: _forAll,
+                option: _option,
+              ),
+            ),
             child: const Text('Apply'),
           ),
         ),

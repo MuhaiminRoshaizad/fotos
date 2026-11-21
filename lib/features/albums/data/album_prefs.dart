@@ -24,18 +24,27 @@ enum AlbumSortBy {
 }
 
 class AlbumSort {
-  const AlbumSort(this.by, {this.reversed = false});
+  const AlbumSort(
+    this.by, {
+    this.reversed = false,
+    this.favouritesFirst = false,
+  });
 
   final AlbumSortBy by;
 
   /// False means the first of [AlbumSortBy.directions].
   final bool reversed;
 
+  /// Favourites come before everything else, each part in this order, the
+  /// way a pinned album sits at the top of the Albums tab.
+  final bool favouritesFirst;
+
   static const AlbumSort standard = AlbumSort(AlbumSortBy.taken);
 
   bool get groupsByDate => by == AlbumSortBy.taken;
 
-  String encode() => '${by.name}:${reversed ? 1 : 0}';
+  String encode() =>
+      '${by.name}:${reversed ? 1 : 0}${favouritesFirst ? ':f' : ''}';
 
   static AlbumSort decode(String s) {
     final List<String> p = s.split(':');
@@ -43,11 +52,24 @@ class AlbumSort {
       (AlbumSortBy b) => b.name == p.first,
       orElse: () => AlbumSortBy.taken,
     );
-    return AlbumSort(by, reversed: p.length > 1 && p[1] == '1');
+    return AlbumSort(
+      by,
+      reversed: p.length > 1 && p[1] == '1',
+      favouritesFirst: p.length > 2 && p[2] == 'f',
+    );
   }
 
   /// [items] arrive newest first by date taken.
   List<AssetEntity> apply(List<AssetEntity> items) {
+    final List<AssetEntity> sorted = _order(items);
+    if (!favouritesFirst) return sorted;
+    return <AssetEntity>[
+      ...sorted.where((AssetEntity e) => e.isFavorite),
+      ...sorted.where((AssetEntity e) => !e.isFavorite),
+    ];
+  }
+
+  List<AssetEntity> _order(List<AssetEntity> items) {
     final List<AssetEntity> out = List<AssetEntity>.of(items);
     switch (by) {
       case AlbumSortBy.taken:

@@ -62,4 +62,69 @@ void main() {
     expect(AlbumSort.standard.groupsByDate, isTrue);
     expect(const AlbumSort(AlbumSortBy.name).groupsByDate, isFalse);
   });
+
+  group('favourites first', () {
+    AssetEntity f(String id, String title, int seconds, {bool fav = false}) =>
+        AssetEntity(
+          id: id,
+          typeInt: 2,
+          width: 1,
+          height: 1,
+          duration: seconds,
+          title: title,
+          isFavorite: fav,
+        );
+    final List<AssetEntity> mixed = <AssetEntity>[
+      f('1', 'beach.mp4', 30),
+      f('2', 'Alley.mp4', 90, fav: true),
+      f('3', 'cake.mp4', 5),
+      f('4', 'dog.mp4', 60, fav: true),
+    ];
+    List<String> order(AlbumSort s) =>
+        s.apply(mixed).map((AssetEntity e) => e.id).toList();
+
+    test('puts favourites at the top, each part in the album order', () {
+      const AlbumSort byDate = AlbumSort(
+        AlbumSortBy.taken,
+        favouritesFirst: true,
+      );
+      expect(order(byDate), <String>['2', '4', '1', '3']);
+      expect(
+        order(
+          const AlbumSort(
+            AlbumSortBy.taken,
+            reversed: true,
+            favouritesFirst: true,
+          ),
+        ),
+        <String>['4', '2', '3', '1'],
+      );
+      expect(
+        order(const AlbumSort(AlbumSortBy.name, favouritesFirst: true)),
+        <String>['2', '4', '1', '3'],
+      );
+      expect(
+        order(const AlbumSort(AlbumSortBy.length, favouritesFirst: true)),
+        <String>['2', '4', '1', '3'],
+      );
+    });
+
+    test('off, favourites stay where the order puts them', () {
+      expect(order(AlbumSort.standard), <String>['1', '2', '3', '4']);
+    });
+
+    test('is saved, and a sort saved before it existed reads as off', () {
+      const AlbumSort s = AlbumSort(
+        AlbumSortBy.length,
+        reversed: true,
+        favouritesFirst: true,
+      );
+      final AlbumSort back = AlbumSort.decode(s.encode());
+      expect(back.by, AlbumSortBy.length);
+      expect(back.reversed, isTrue);
+      expect(back.favouritesFirst, isTrue);
+      expect(AlbumSort.decode('name:1').favouritesFirst, isFalse);
+      expect(const AlbumSort(AlbumSortBy.name).encode(), 'name:0');
+    });
+  });
 }

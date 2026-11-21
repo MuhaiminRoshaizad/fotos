@@ -52,6 +52,7 @@ class MediaGrid extends ConsumerStatefulWidget {
     this.header,
     this.overlayTop = 0,
     this.animateIn = false,
+    this.lead,
   });
 
   final List<AssetEntity> items;
@@ -85,6 +86,10 @@ class MediaGrid extends ConsumerStatefulWidget {
   /// Height of a bar floating over the grid's top edge; the scrubber and
   /// drag-select auto-scroll stay below it.
   final double overlayTop;
+
+  /// In a grid grouped by date, the first [count] items gathered under
+  /// their own heading before the dates (an album's favourites).
+  final ({int count, String label})? lead;
 
   @override
   ConsumerState<MediaGrid> createState() => _MediaGridState();
@@ -127,13 +132,39 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
   double _gridOffset(double offset) =>
       (offset - _headerExtent).clamp(0, double.infinity).toDouble();
 
-  List<MediaGroup<AssetEntity>> get _groups => widget.grouped
-      ? groupByDate(
-          widget.items,
-          (AssetEntity e) => e.createDateTime,
-          widget.level,
-        )
-      : <MediaGroup<AssetEntity>>[MediaGroup<AssetEntity>('', widget.items)];
+  /// How many items open the grid under [MediaGrid.lead]'s heading.
+  int get _leadCount => widget.grouped
+      ? (widget.lead?.count ?? 0).clamp(0, widget.items.length)
+      : 0;
+
+  List<MediaGroup<AssetEntity>> get _groups {
+    if (!widget.grouped) {
+      return <MediaGroup<AssetEntity>>[
+        MediaGroup<AssetEntity>('', widget.items),
+      ];
+    }
+    final int n = _leadCount;
+    return <MediaGroup<AssetEntity>>[
+      if (n > 0)
+        MediaGroup<AssetEntity>(widget.lead!.label, widget.items.sublist(0, n)),
+      ...groupByDate(
+        widget.items.sublist(n),
+        (AssetEntity e) => e.createDateTime,
+        widget.level,
+      ),
+    ];
+  }
+
+  /// The handle's label over group [g]: the lead group's heading, or the
+  /// date of a date group.
+  HandleLabel _groupLabel(List<MediaGroup<AssetEntity>> groups, int g) {
+    final bool lead = _leadCount > 0;
+    if (lead && g == 0) return HandleLabel(groups.first.label);
+    return _dateLabel(
+      groups[g],
+      oneYear: _oneYear(lead ? groups.sublist(1) : groups),
+    );
+  }
 
   // ---- scroll handle -------------------------------------------------------
 
@@ -169,11 +200,10 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
     List<MediaGroup<AssetEntity>> groups,
     GridGeometry geo,
   ) {
-    final bool oneYear = _oneYear(groups);
     final List<HandleMark> marks = <HandleMark>[];
     String? last;
     for (int g = 0; g < groups.length; g++) {
-      final String? mark = _dateLabel(groups[g], oneYear: oneYear).mark;
+      final String? mark = _groupLabel(groups, g).mark;
       if (mark == null || mark == last) continue;
       last = mark;
       marks.add(HandleMark(_headerExtent + geo.groupTop(g), mark));
@@ -572,9 +602,9 @@ class _MediaGridState extends ConsumerState<MediaGrid> {
                           semanticLabel: 'Scroll by date',
                           labelAt: (double offset) => groups.isEmpty
                               ? HandleLabel.none
-                              : _dateLabel(
-                                  groups[geo.groupAt(_gridOffset(offset))],
-                                  oneYear: _oneYear(groups),
+                              : _groupLabel(
+                                  groups,
+                                  geo.groupAt(_gridOffset(offset)),
                                 ),
                           marks: () => _dateMarks(groups, geo),
                         )
