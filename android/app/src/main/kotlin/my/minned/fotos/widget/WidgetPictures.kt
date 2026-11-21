@@ -69,6 +69,10 @@ class WidgetPictures(private val context: Context, private val id: Int, private 
         views.setTextViewText(R.id.caption, text)
         views.setViewVisibility(R.id.caption, if (text.isEmpty()) View.GONE else View.VISIBLE)
         val badge = when {
+            // Android lists a fragmented MP4 (from screen and game
+            // recorders) as 0 long. The app reads the real length from the
+            // file; here the play mark shows alone rather than a wrong 0:00.
+            item.video && item.durationMs <= 0 -> "▶"
             item.video -> "▶ " + duration(item.durationMs)
             item.motion -> "◎ MOTION"
             else -> ""
